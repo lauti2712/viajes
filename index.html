@@ -136,6 +136,8 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 .stay{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--sea);border-radius:12px;padding:13px 15px;margin-bottom:14px;cursor:pointer}
 .stay:hover{border-color:var(--muted);border-left-color:var(--sea)}
 .stay .nm{font-family:var(--display);font-weight:700;font-size:19px}
+.stay .abnb{display:inline-flex;align-items:center;font-family:var(--body);font-size:13px;font-weight:700;color:#FF385C;text-decoration:none;border:1px solid #FF385C;border-radius:999px;padding:2px 10px;vertical-align:middle;margin-left:6px}
+.stay .abnb:hover{background:#FF385C;color:#fff}
 .stay .dates{display:flex;flex-wrap:wrap;gap:2px 16px;margin-top:6px;font-size:14px}
 .stay .dates b{font-variant-numeric:tabular-nums}
 
@@ -194,6 +196,17 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 .msg{font-weight:600;min-height:1.4em;margin:6px 0 0}
 .msg.err{color:var(--rose)}
 .panel hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+.sideSec{margin:2px 0 4px}
+.sideSec h3{margin-bottom:8px}
+.attlist,.lnklist{display:grid;gap:6px;margin-bottom:10px}
+.attitem,.lnkitem{display:flex;align-items:center;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:7px 9px}
+.attitem a,.lnkitem a{display:flex;align-items:center;gap:7px;flex:1;min-width:0;color:var(--ink);text-decoration:none;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.attitem .anm{overflow:hidden;text-overflow:ellipsis}
+.attitem .asz{font-size:12px;color:var(--muted);font-weight:500;flex:none}
+.attitem .x,.lnkitem .x{flex:none;border:0;background:transparent;color:var(--muted);font-size:15px;padding:4px 6px;border-radius:6px}
+.attitem .x:hover,.lnkitem .x:hover{color:var(--rose)}
+.filebtn{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.chipsm{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--muted);margin-left:8px}
 @media (prefers-reduced-motion:reduce){#sheet .panel{animation:none}}
 </style>
 </head>
@@ -267,7 +280,7 @@ try{
   }
 }catch(e){}
 var live=function(k){return S[k].filter(function(x){return !x.del})};
-function upsert(k,id,data){var now=Date.now(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:now});}else{it=Object.assign({id:uid(),u:now},data);S[k].push(it);}save();pushItem(k,it);}
+function upsert(k,id,data){var now=Date.now(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:now});}else{it=Object.assign({id:uid(),u:now},data);S[k].push(it);}save();pushItem(k,it);return it.id;}
 function remove(k,id){var x=S[k].find(function(y){return y.id===id});if(x){x.del=true;x.u=Date.now();save();pushItem(k,x);}}
 
 /* ---------- Fechas y plata ---------- */
@@ -349,13 +362,21 @@ function vResumen(){
   return h;
 }
 
+function attLinkChips(item){
+  var n=(item&&item.attachments)?item.attachments.length:0,m=(item&&item.links)?item.links.length:0,out=[];
+  if(n)out.push('<span class="chipsm">📎 '+n+'</span>');
+  if(m)out.push('<span class="chipsm">🔗 '+m+'</span>');
+  return out.join('');
+}
+function fileIcon(type){return type&&type.indexOf('pdf')>=0?'📄':(type&&type.indexOf('image')>=0?'🖼️':'📎')}
+function humanSize(n){n=n||0;if(n<1024)return n+' B';if(n<1048576)return Math.round(n/1024)+' KB';return (n/1048576).toFixed(1)+' MB';}
 function ticket(t){
   var ty=TYPES[t.type]||TYPES.otro,dd=(t.dep||'').slice(0,10),ad=(t.arr||'').slice(0,10);
   return '<div class="ticket" role="button" tabindex="0" data-act="edit" data-k="transports" data-id="'+t.id+'">'
    +'<div class="stub"><span class="ic" aria-hidden="true">'+ty[0]+'</span>'+(dd?'<b>'+pd(dd).getDate()+'</b><small>'+esc(mon(dd))+'</small>':'<small>Sin fecha</small>')+'</div>'
    +'<div class="tb"><div class="route">'+esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?')+'</div>'
    +((t.dep||t.arr)?'<div class="times"><div><span>Sale</span><b>'+(t.dep?esc(fShort(dd))+' '+tm(t.dep):'—')+'</b></div><div><span>Llega</span><b>'+(t.arr?esc(fShort(ad))+' '+tm(t.arr):'—')+'</b></div></div>':'')
-   +((t.company||t.ref||ty)?'<div class="meta"><span>'+esc(ty[1])+(t.company?' de '+esc(t.company):'')+'</span>'+(t.ref?'<span class="ref">Reserva '+esc(t.ref)+'</span>':'')+'</div>':'')
+   +((t.company||t.ref||(t.attachments&&t.attachments.length)||(t.links&&t.links.length))?'<div class="meta"><span>'+esc(ty[1])+(t.company?' de '+esc(t.company):'')+'</span>'+(t.ref?'<span class="ref">Reserva '+esc(t.ref)+'</span>':'')+attLinkChips(t)+'</div>':'')
    +(t.notes?'<p class="note">'+esc(t.notes)+'</p>':'')
    +costBlock(t)+'</div></div>';
 }
@@ -372,9 +393,9 @@ function vAlojamiento(){
   if(!L.length)return h+empty('Todavía no cargaron dónde van a dormir','Hotel, departamento o hostel: fechas de entrada y salida, dirección, código de reserva y costo.');
   return h+totLine(costs().filter(function(c){return c.src==='lodging'}))+L.map(function(l){
     var n=(l.in&&l.out)?dayDiff(pd(l.in),pd(l.out)):0;
-    return '<div class="stay" role="button" tabindex="0" data-act="edit" data-k="lodging" data-id="'+l.id+'"><div class="nm">'+esc(l.name||'Alojamiento')+'</div>'
+    return '<div class="stay" role="button" tabindex="0" data-act="edit" data-k="lodging" data-id="'+l.id+'"><div class="nm">'+esc(l.name||'Alojamiento')+(l.airbnb?' <a class="abnb" href="'+esc(l.airbnb)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Airbnb ↗</a>':'')+'</div>'
      +(l.address?'<div class="sub" style="margin:2px 0 0">'+esc(l.address)+'</div>':'')
-     +'<div class="dates"><span>Entrada <b>'+(l.in?esc(fShort(l.in)):'—')+'</b></span><span>Salida <b>'+(l.out?esc(fShort(l.out)):'—')+'</b></span>'+(n>0?'<span><b>'+n+(n===1?' noche':' noches')+'</b></span>':'')+'</div>'
+     +'<div class="dates"><span>Entrada <b>'+(l.in?esc(fShort(l.in)):'—')+'</b></span><span>Salida <b>'+(l.out?esc(fShort(l.out)):'—')+'</b></span>'+(n>0?'<span><b>'+n+(n===1?' noche':' noches')+'</b></span>':'')+attLinkChips(l)+'</div>'
      +(l.ref?'<div class="meta"><span class="ref">Reserva '+esc(l.ref)+'</span></div>':'')
      +(l.notes?'<p class="note">'+esc(l.notes)+'</p>':'')+costBlock(l)+'</div>';
   }).join('');
@@ -382,7 +403,7 @@ function vAlojamiento(){
 
 function expRow(e){
   var a=parseFloat(e.amount)||0,cur=(e.cur||base()).toUpperCase(),b=toBase(a,cur);
-  return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="expenses" data-id="'+e.id+'"><span class="ec" aria-hidden="true">'+(CATS[e.cat]||'📌')+'</span><div class="et"><b>'+esc(e.desc||'Gasto')+'</b><small><span>'+esc(e.cat||'Otros')+'</span>'+(e.paidBy?'<span class="who">'+dot(e.paidBy)+esc(pn(e.paidBy))+'</span>':'')+(e.method?'<span>'+esc(e.method)+'</span>':'')+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(e.status==='pendiente'?'<span class="pill pend">Por pagar</span>':'')+'</div></div>';
+  return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="expenses" data-id="'+e.id+'"><span class="ec" aria-hidden="true">'+(CATS[e.cat]||'📌')+'</span><div class="et"><b>'+esc(e.desc||'Gasto')+'</b><small><span>'+esc(e.cat||'Otros')+'</span>'+(e.paidBy?'<span class="who">'+dot(e.paidBy)+esc(pn(e.paidBy))+'</span>':'')+(e.method?'<span>'+esc(e.method)+'</span>':'')+attLinkChips(e)+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(e.status==='pendiente'?'<span class="pill pend">Por pagar</span>':'')+'</div></div>';
 }
 function vGastos(){
   var L=live('expenses'),g={};
@@ -410,7 +431,7 @@ function daysList(){
   return Array.from(set).sort();
 }
 function autoRow(ic,time,title,sub){return '<div class="pl auto"><span class="t">'+esc(time)+'</span><div><b>'+ic+' '+esc(title)+'<span class="tag">Reserva</span></b>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div></div>';}
-function planRow(p){var ty=ITYPES[p.type]||ITYPES.otro;return '<div class="pl" role="button" tabindex="0" data-act="edit" data-k="plans" data-id="'+p.id+'"><span class="t">'+esc(p.time||'')+'</span><div><b>'+ty[0]+' '+esc(p.title||'Plan')+'</b>'+(p.place?'<small>'+esc(p.place)+'</small>':'')+(p.notes?'<small>'+esc(p.notes)+'</small>':'')+'</div></div>';}
+function planRow(p){var ty=ITYPES[p.type]||ITYPES.otro;return '<div class="pl" role="button" tabindex="0" data-act="edit" data-k="plans" data-id="'+p.id+'"><span class="t">'+esc(p.time||'')+'</span><div><b>'+ty[0]+' '+esc(p.title||'Plan')+attLinkChips(p)+'</b>'+(p.place?'<small>'+esc(p.place)+'</small>':'')+(p.notes?'<small>'+esc(p.notes)+'</small>':'')+'</div></div>';}
 function vItinerario(){
   var days=daysList(),t=today(),s=pd(S.trip.start);
   var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>';
@@ -421,7 +442,7 @@ function vItinerario(){
     live('transports').forEach(function(x){
       var ty=TYPES[x.type]||TYPES.otro,dd=(x.dep||'').slice(0,10),ad=(x.arr||'').slice(0,10);
       if(dd===d)items.push({k:tm(x.dep)||'00:00',h:autoRow(ty[0],tm(x.dep),'Sale: '+(x.from||'?')+' → '+(x.to||'?'),[x.company,x.ref?'Reserva '+x.ref:''].filter(Boolean).join(', '))});
-      if(ad===d&&ad!==dd)items.push({k:tm(x.arr)||'00:00',h:autoRow(ty[0],tm(x.arr),'Llega a '+(x.to||'?'),'')});
+      if(ad===d)items.push({k:tm(x.arr)||'00:01',h:autoRow(ty[0],tm(x.arr),'Llega a '+(x.to||'?'),'')});
     });
     live('lodging').forEach(function(l){
       if(l.out===d)items.push({k:'10:00',h:autoRow('🛏️','','Check-out: '+(l.name||''),'')});
@@ -512,6 +533,7 @@ var SPECS={
   ].concat(costF())}},
   lodging:function(){return {title:['Nuevo alojamiento','Editar alojamiento'],fields:[
     {k:'name',l:'Nombre',t:'text',req:true,ph:'Hotel, depto, hostel…'},
+    {k:'airbnb',l:'Link de Airbnb (opcional)',t:'text',ph:'https://www.airbnb.com.ar/rooms/…'},
     {k:'address',l:'Dirección',t:'text'},
     {k:'in',l:'Entrada',t:'date',half:true},
     {k:'out',l:'Salida',t:'date',half:true},
@@ -538,15 +560,114 @@ var DEFAULTS={
   expenses:function(){return {date:today(),cat:'Comida',cur:base(),status:'pagado',split:'equal'}},
   plans:function(){var s=S.trip.start;return {type:'paseo',date:s&&s>today()?s:today()}}
 };
+function attRow(a){
+  return '<div class="attitem"><a href="'+esc(a.url)+'" target="_blank" rel="noopener"><span class="aic" aria-hidden="true">'+fileIcon(a.type)+'</span><span class="anm">'+esc(a.name||'Archivo')+'</span>'+(a.size?'<span class="asz">'+humanSize(a.size)+'</span>':'')+'</a><button type="button" class="x" data-rmatt="'+esc(a.id)+'" aria-label="Quitar archivo">✕</button></div>';
+}
+function lnkRow(l){
+  return '<div class="lnkitem"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">🔗 '+esc(l.label||l.url)+'</a><button type="button" class="x" data-rmlink="'+esc(l.id)+'" aria-label="Quitar link">✕</button></div>';
+}
+function attsBlock(item){
+  var list=(item&&item.attachments)||[];
+  return '<div class="sideSec" id="attsWrap"><h3>Archivos y fotos</h3><div class="attlist">'+(list.length?list.map(attRow).join(''):'<p class="nada">Sin archivos todavía.</p>')+'</div><label class="ghost filebtn">📎 Agregar archivo o foto<input type="file" data-file accept="image/*,application/pdf" multiple hidden></label><p class="msg" data-attmsg></p></div>';
+}
+function linksBlock(item){
+  var list=(item&&item.links)||[];
+  return '<div class="sideSec" id="lnksWrap"><h3>Links</h3><div class="lnklist">'+(list.length?list.map(lnkRow).join(''):'<p class="nada">Sin links.</p>')+'</div><div class="row"><input data-linklabel placeholder="Título (opcional)" autocomplete="off"><input data-linkurl placeholder="https://…" inputmode="url" autocomplete="off"></div><button type="button" class="ghost" id="addlink">+ Agregar link</button><p class="msg" data-linkmsg></p></div>';
+}
+function addLink(k,id,label,url){
+  var it=S[k].find(function(x){return x.id===id}),links=(it&&it.links)?it.links.slice():[];
+  links.push({id:uid(),label:label||'',url:url});
+  upsert(k,id,{links:links});
+}
+function removeLink(k,id,linkId){
+  var it=S[k].find(function(x){return x.id===id});if(!it)return;
+  upsert(k,id,{links:(it.links||[]).filter(function(l){return l.id!==linkId})});
+}
+function removeAttachment(k,id,attId){
+  var it=S[k].find(function(x){return x.id===id});if(!it)return;
+  var att=(it.attachments||[]).find(function(a){return a.id===attId});
+  upsert(k,id,{attachments:(it.attachments||[]).filter(function(a){return a.id!==attId})});
+  if(att&&att.path&&FB&&FB.st){try{FB.st.deleteObject(FB.st.ref(FB.storage,att.path)).catch(function(){});}catch(e){}}
+}
+async function uploadFiles(k,id,files,onDone,onMsg){
+  if(!FB||!FB.st){onMsg(FIREBASE_CONFIG.apiKey?'Se está conectando con la nube todavía. Probá de nuevo en un segundo.':'Para adjuntar archivos, primero hay que conectar el viaje a la nube.',true);return;}
+  for(var i=0;i<files.length;i++){
+    var file=files[i];
+    if(file.size>20*1024*1024){onMsg('"'+file.name+'" pesa más de 20 MB, no se pudo subir.',true);continue;}
+    onMsg('Subiendo '+file.name+'…');
+    try{
+      var path='trips/'+CODE+'/'+k+'/'+id+'/'+uid()+'_'+file.name.replace(/[^\w.\-]+/g,'_');
+      var r=FB.st.ref(FB.storage,path);
+      await FB.st.uploadBytes(r,file);
+      var url=await FB.st.getDownloadURL(r);
+      var it=S[k].find(function(x){return x.id===id}),atts=(it&&it.attachments)?it.attachments.slice():[];
+      atts.push({id:uid(),name:file.name,url:url,path:path,size:file.size,type:file.type||''});
+      upsert(k,id,{attachments:atts});
+      onDone();
+    }catch(e){onMsg('No se pudo subir "'+file.name+'". Revisá que Storage esté habilitado y las reglas publicadas.',true);}
+  }
+  onMsg('');
+}
 function openItem(k,id,pre){
   var sp=SPECS[k](),ex=id?S[k].find(function(x){return x.id===id}):null;
   var vals=ex||Object.assign({},DEFAULTS[k](),pre||{});
-  sheetForm({title:sp.title[ex?1:0],fields:sp.fields,values:vals,
-    onSave:function(d){
-      if('amount' in d){d.amount=parseFloat(d.amount)||0;d.cur=(d.cur||base()).toUpperCase().slice(0,6);}
-      upsert(k,id,d);
-    },
-    onDelete:ex?function(){remove(k,id)}:null});
+  var curId=id||null;
+  var body='<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
+   +'<hr>'+attsBlock(ex)+'<hr>'+linksBlock(ex);
+  var panel=openSheet(sp.title[ex?1:0],body);
+  var f=$('#sf',panel);
+
+  function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});return d;}
+  function ensureId(){
+    if(curId)return curId;
+    var d=readForm();
+    if('amount' in d){d.amount=parseFloat(d.amount)||0;d.cur=(d.cur||base()).toUpperCase().slice(0,6);}
+    curId=upsert(k,null,d);
+    return curId;
+  }
+  function redraw(){
+    var it=curId?S[k].find(function(x){return x.id===curId}):null;
+    var aw=$('#attsWrap',panel),lw=$('#lnksWrap',panel);
+    if(aw)aw.outerHTML=attsBlock(it);
+    if(lw)lw.outerHTML=linksBlock(it);
+  }
+
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var d=readForm();
+    var req=sp.fields.filter(function(x){return x.req&&!d[x.k]})[0];
+    if(req){var el=$('#f_'+req.k,panel);if(el)el.focus();return;}
+    if('amount' in d){d.amount=parseFloat(d.amount)||0;d.cur=(d.cur||base()).toUpperCase().slice(0,6);}
+    upsert(k,curId,d);
+    closeSheet();
+  });
+  var del=$('#del',panel);
+  if(del)del.addEventListener('click',function(){
+    if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='¿Seguro? Tocá de nuevo';return;}
+    remove(k,curId);closeSheet();
+  });
+
+  panel.addEventListener('click',function(e){
+    var rm=e.target.closest('[data-rmatt]');
+    if(rm){removeAttachment(k,ensureId(),rm.getAttribute('data-rmatt'));redraw();return;}
+    var rl=e.target.closest('[data-rmlink]');
+    if(rl){removeLink(k,ensureId(),rl.getAttribute('data-rmlink'));redraw();return;}
+    if(e.target.closest('#addlink')){
+      var lbl=$('[data-linklabel]',panel).value.trim(),url=$('[data-linkurl]',panel).value.trim(),lm=$('[data-linkmsg]',panel);
+      if(!/^https?:\/\//i.test(url)){lm.textContent='Pegá un link que empiece con http:// o https://';lm.className='msg err';return;}
+      addLink(k,ensureId(),lbl,url);lm.textContent='';lm.className='msg';redraw();
+    }
+  });
+  panel.addEventListener('change',function(e){
+    var fi=e.target.closest('[data-file]');
+    if(fi&&fi.files&&fi.files.length){
+      var id2=ensureId(),msg=$('[data-attmsg]',panel),files=fi.files;
+      uploadFiles(k,id2,files,function(){redraw();},function(t,err){if(msg){msg.textContent=t;msg.className='msg'+(err?' err':'');}});
+      fi.value='';
+    }
+  });
+
+  if(!ex){var first=$('input:not([type=hidden]),select',f);if(first&&window.matchMedia('(min-width:700px)').matches)first.focus();}
 }
 
 function openSettings(){
@@ -595,7 +716,13 @@ function pushTrip(){if(!FB||!CODE)return;try{FB.fs.setDoc(FB.fs.doc(FB.db,'trips
 function pushAll(){if(!FB)return;pushTrip();ITEM_KEYS.forEach(function(k){S[k].forEach(function(it){pushItem(k,it)})});}
 function applyItem(k,d){
   var it={};
-  Object.keys(d).forEach(function(key){if(key==='k')return;var v=d[key];if(v!==null&&typeof v==='object')return;it[key]=(key==='amount'||key==='u'||key==='del')?v:String(v);});
+  Object.keys(d).forEach(function(key){
+    if(key==='k')return;
+    var v=d[key];
+    if(key==='attachments'||key==='links'){it[key]=Array.isArray(v)?v.map(function(x){return Object.assign({},x)}):[];return;}
+    if(v!==null&&typeof v==='object')return;
+    it[key]=(key==='amount'||key==='u'||key==='del')?v:String(v);
+  });
   if(!/^[a-z0-9]{1,24}$/i.test(it.id||''))return false;
   var i=S[k].findIndex(function(x){return x.id===it.id});
   if(i<0){S[k].push(it);return true;}
@@ -607,10 +734,11 @@ async function startCloud(){
   var fs,db;
   try{
     var root='https://www.gstatic.com/firebasejs/'+FB_VER+'/';
-    var mods=await Promise.all([import(root+'firebase-app.js'),import(root+'firebase-firestore.js')]);
-    var app=mods[0].initializeApp(FIREBASE_CONFIG);fs=mods[1];
+    var mods=await Promise.all([import(root+'firebase-app.js'),import(root+'firebase-firestore.js'),import(root+'firebase-storage.js')]);
+    var app=mods[0].initializeApp(FIREBASE_CONFIG);fs=mods[1];var st=mods[2];
     try{db=fs.initializeFirestore(app,{localCache:fs.persistentLocalCache({tabManager:fs.persistentMultipleTabManager()})});}catch(e){db=fs.getFirestore(app);}
-    FB={db:db,fs:fs};
+    var storage=st.getStorage(app);
+    FB={db:db,fs:fs,storage:storage,st:st};
   }catch(e){setSync('err');if(!S.trip.setup)openSettings();return;}
 
   fs.onSnapshot(fs.doc(db,'trips',CODE),function(snap){
