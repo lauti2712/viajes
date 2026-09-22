@@ -254,12 +254,12 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 </header>
 <nav class="tabs" aria-label="Secciones">
   <div class="in" id="tabs">
-    <button class="tab" data-tab="resumen">Resumen</button>
+    <button class="tab" data-tab="itinerario">Itinerario</button>
+    <button class="tab" data-tab="gastos">Gastos</button>
     <button class="tab" data-tab="transportes">Transportes</button>
     <button class="tab" data-tab="alojamiento">Alojamiento</button>
-    <button class="tab" data-tab="gastos">Gastos</button>
-    <button class="tab" data-tab="itinerario">Itinerario</button>
     <button class="tab" data-tab="mochila">Mochila</button>
+    <button class="tab" data-tab="resumen">Resumen</button>
   </div>
 </nav>
 <main id="main"></main>
@@ -439,7 +439,7 @@ function costBlock(x){
 function totLine(list){var t=sumBase(list),p=sumBase(list.filter(function(c){return c.status==='pagado'}));if(!list.length)return '';return '<div class="tot"><span>Total <b>'+money(t.t)+'</b></span><span>Pagado <b>'+money(p.t)+'</b></span><span>Por pagar <b>'+money(t.t-p.t)+'</b></span></div>'+(t.miss.size?warnMiss(t.miss):'');}
 
 /* ---------- Vistas ---------- */
-var tab='resumen';
+var tab='itinerario';
 
 function upcoming(){
   var now=today()+'T'+new Date().toTimeString().slice(0,5),ev=[];
@@ -449,22 +449,23 @@ function upcoming(){
   return ev.sort(function(a,b){return a.k.localeCompare(b.k)}).slice(0,4);
 }
 
+function ratesSectionHtml(){
+  var cs=costs();
+  var curs=Array.from(new Set(cs.map(function(c){return c.cur}))).filter(function(c){return c!==base()});
+  ['USD','BRL'].forEach(function(c){if(c!==base()&&curs.indexOf(c)===-1)curs.push(c);});
+  if(!curs.length)return '';
+  var isArs=base()==='ARS';
+  var updBtns=isArs
+   ?('<div class="row" style="gap:6px"><button type="button" class="ghost'+(S.trip.dollarType==='blue'?' active':'')+'" data-act="fetchusd" data-type="blue" style="padding:6px 10px;font-size:13px">💵 Blue</button><button type="button" class="ghost'+(S.trip.dollarType==='oficial'?' active':'')+'" data-act="fetchusd" data-type="oficial" style="padding:6px 10px;font-size:13px">💵 Oficial</button><button type="button" class="ghost" data-act="fetchrates" data-codes="BRL" style="padding:6px 10px;font-size:13px">🔄 Real</button></div>')
+   :('<button type="button" class="ghost" data-act="fetchrates" data-codes="USD,BRL" style="padding:6px 12px;font-size:13px">🔄 Actualizar cotización</button>');
+  return '<section class="sec"><div class="bar" style="margin-bottom:6px"><h2>Tipos de cambio</h2>'+updBtns+'</div><p class="sub">Cuánto vale 1 unidad de cada moneda en '+esc(base())+'. Con esto se suma todo junto.'+(S.trip.ratesUpdatedAt?(isArs?' Dólar ('+(S.trip.dollarType==='blue'?'blue':'oficial')+') y real':' Dólar y real')+' se actualizaron '+relTime(S.trip.ratesUpdatedAt)+'.':'')+'</p>'
+   +(ratesFetchMsg?'<p class="msg'+(ratesFetchMsg.indexOf('No se pudo')===0?' err':'')+'">'+esc(ratesFetchMsg)+'</p>':'')
+   +'<div class="rates">'+curs.map(function(c){var v=S.trip.rates[c];return '<label class="rate'+(v>0?'':' miss')+'"><span>1 '+esc(c)+' =</span><input type="number" step="any" min="0" inputmode="decimal" data-rate="'+esc(c)+'" value="'+(v>0?v:'')+'" placeholder="0"><span>'+esc(base())+'</span></label>'}).join('')+'</div></section>';
+}
 function vResumen(){
   var cs=costs(),h='',up=upcoming();
   if(S.trip.info)h+='<div class="infobox"><h3>📌 Info útil</h3><p>'+esc(S.trip.info)+'</p></div>';
   if(up.length){h+='<section class="sec"><h2>Lo que sigue</h2><div>'+up.map(function(e){return '<div class="pl auto"><span class="t">'+esc(fShort(e.d))+(e.t?'<br>'+e.t:'')+'</span><div><b>'+esc(e.l)+'</b>'+(e.sub?'<small>'+esc(e.sub)+'</small>':'')+'</div></div>'}).join('')+'</div></section>';}
-
-  var curs=Array.from(new Set(cs.map(function(c){return c.cur}))).filter(function(c){return c!==base()});
-  ['USD','BRL'].forEach(function(c){if(c!==base()&&curs.indexOf(c)===-1)curs.push(c);});
-  if(curs.length){
-    var isArs=base()==='ARS';
-    var updBtns=isArs
-     ?('<div class="row" style="gap:6px"><button type="button" class="ghost'+(S.trip.dollarType==='blue'?' active':'')+'" data-act="fetchusd" data-type="blue" style="padding:6px 10px;font-size:13px">💵 Blue</button><button type="button" class="ghost'+(S.trip.dollarType==='oficial'?' active':'')+'" data-act="fetchusd" data-type="oficial" style="padding:6px 10px;font-size:13px">💵 Oficial</button><button type="button" class="ghost" data-act="fetchrates" data-codes="BRL" style="padding:6px 10px;font-size:13px">🔄 Real</button></div>')
-     :('<button type="button" class="ghost" data-act="fetchrates" data-codes="USD,BRL" style="padding:6px 12px;font-size:13px">🔄 Actualizar cotización</button>');
-    h+='<section class="sec"><div class="bar" style="margin-bottom:6px"><h2>Tipos de cambio</h2>'+updBtns+'</div><p class="sub">Cuánto vale 1 unidad de cada moneda en '+esc(base())+'. Con esto se suma todo junto.'+(S.trip.ratesUpdatedAt?(isArs?' Dólar ('+(S.trip.dollarType==='blue'?'blue':'oficial')+') y real':' Dólar y real')+' se actualizaron '+relTime(S.trip.ratesUpdatedAt)+'.':'')+'</p>'
-     +(ratesFetchMsg?'<p class="msg'+(ratesFetchMsg.indexOf('No se pudo')===0?' err':'')+'">'+esc(ratesFetchMsg)+'</p>':'')
-     +'<div class="rates">'+curs.map(function(c){var v=S.trip.rates[c];return '<label class="rate'+(v>0?'':' miss')+'"><span>1 '+esc(c)+' =</span><input type="number" step="any" min="0" inputmode="decimal" data-rate="'+esc(c)+'" value="'+(v>0?v:'')+'" placeholder="0"><span>'+esc(base())+'</span></label>'}).join('')+'</div></section>';
-  }
 
   if(!cs.length){h+='<section class="sec">'+empty('Acá va a aparecer el resumen de plata','Cargá transportes, alojamiento o gastos con su monto y vamos sumando el total, lo pagado y lo que falta.')+'</section>';return h;}
   var tot=sumBase(cs),pg=sumBase(cs.filter(function(c){return c.status==='pagado'})),pe=tot.t-pg.t;
@@ -543,7 +544,7 @@ function vGastos(){
   });
   var keys=Object.keys(g).sort().reverse();
   var h='<div class="bar"><h2>Gastos</h2><button class="primary" data-act="add" data-k="expenses">+ Anotar gasto</button></div>'+balanceHtml();
-  if(!keys.length)return h+empty('Todavía no anotaron gastos','Cuando estén de viaje, anotá cada gasto: qué fue, cuánto, quién pagó y cómo. Acá se agrupan por día, y también suman los transportes y el alojamiento que cargaste con costo.');
+  if(!keys.length)return h+empty('Todavía no anotaron gastos','Cuando estén de viaje, anotá cada gasto: qué fue, cuánto, quién pagó y cómo. Acá se agrupan por día, y también suman los transportes y el alojamiento que cargaste con costo.')+ratesSectionHtml();
   var allEntries=[].concat.apply([],keys.map(function(k){return g[k]}));
   var all=sumBase(allEntries.map(function(x){return {amount:x.amount,cur:x.cur}}).filter(function(c){return c.amount>0}));
   var nd=keys.filter(function(k){return k!=='0'}).length,dl=parseFloat(S.trip.daily)||0;
@@ -553,6 +554,7 @@ function vGastos(){
     var s=sumBase(items.map(function(x){return {amount:x.amount,cur:x.cur}})),over=dl>0&&s.t>dl;
     return '<section class="day"><div class="dh"><h3>'+(k==='0'?'Sin fecha':esc(fLong(k)))+'</h3><b class="'+(over?'over':'')+'">'+money(s.t)+'</b></div>'+(dl>0?'<div class="prog"><span class="'+(over?'over':'')+'" style="width:'+Math.min(100,s.t/dl*100)+'%"></span></div>':'')+items.map(function(x){return x.row}).join('')+'</section>';
   }).join('');
+  h+=ratesSectionHtml();
   return h;
 }
 
