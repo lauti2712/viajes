@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /trips/{tripId} {
+      // "list" agregado para que admin.html pueda mostrar todos los viajes.
+      // Esto hace que cualquiera con la config de Firebase (que ya es pública)
+      // pueda listar todos los viajes, no solo entrar con el código exacto.
+      allow get, list, create, update: if true;
+      match /items/{itemId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · Viajes</title>
+<style>
+:root{--paper:#F1F3EE;--surface:#FBFCF9;--ink:#16223A;--muted:#5B667A;--line:#D9DED3;--sea:#1E5AA8;--rose:#C0392B;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 18px}
+.warn{background:#FFF4E5;border:1px solid #F0C36D;color:#7A4B00;padding:12px 14px;border-radius:10px;font-size:14px;margin-bottom:18px;line-height:1.4}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+input[type=search]{flex:1;min-width:180px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:15px}
+button{padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:600;font-size:14px}
+button:hover{border-color:var(--muted)}
+.status{color:var(--muted);font-size:14px;margin-bottom:14px}
+.status.err{color:var(--rose)}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top;white-space:nowrap}
+td:first-child,td:nth-child(2){white-space:normal}
+th{background:rgba(0,0,0,.03);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted)}
+a.openlink{color:var(--sea);font-weight:700;text-decoration:none}
+a.openlink:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Viajes creados</h1>
+  <p class="sub">Lista todos los viajes guardados en Firestore, leyendo directo de la base.</p>
+  <div class="warn">⚠️ Esta página no pide contraseña: cualquiera con este link puede ver la lista completa de viajes (nombres, fechas, personas). No la compartas ni la subas a un lugar público. Si necesitás que quede realmente protegida, hay que sumar un login — pedímelo aparte.</div>
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="Buscar por nombre, código o persona…">
+    <button id="refresh" type="button">🔄 Actualizar</button>
+  </div>
+  <p class="status" id="status">Cargando…</p>
+  <div class="tblwrap">
+    <table id="tbl" hidden>
+      <thead><tr><th>Viaje</th><th>Personas</th><th>Fechas</th><th>Ítems</th><th>Código</th><th>Actualizado</th><th></th></tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+</div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+/* Misma configuración que index.html — es pública por diseño de Firebase. */
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyARMDTJSRVhHLlGmK83zJn4fI2fM6R4meQ",
+  authDomain: "viajeiguazu-7104e.firebaseapp.com",
+  projectId: "viajeiguazu-7104e",
+  storageBucket: "viajeiguazu-7104e.firebasestorage.app",
+  messagingSenderId: "783661170294",
+  appId: "1:783661170294:web:192ffe6f0ea7d3bcdfa957"
+};
+
+var app = initializeApp(FIREBASE_CONFIG);
+var db = getFirestore(app);
+
+var statusEl = document.getElementById('status');
+var tbl = document.getElementById('tbl');
+var tb = document.getElementById('tb');
+var q = document.getElementById('q');
+var allRows = [];
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function fmtDate(s){
+  if(!s)return '—';
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m?(m[3]+'/'+m[2]+'/'+m[1]):esc(s);
+}
+function relTime(ts){
+  if(!ts)return '—';
+  var diff=Math.floor((Date.now()-ts)/1000);
+  if(diff<60)return 'recién';
+  var mnt=Math.floor(diff/60);if(mnt<60)return 'hace '+mnt+' min';
+  var h=Math.floor(mnt/60);if(h<24)return 'hace '+h+' h';
+  var d=Math.floor(h/24);return 'hace '+d+' d';
+}
+
+async function load(){
+  statusEl.textContent='Cargando…';
+  statusEl.className='status';
+  tbl.hidden=true;
+  try{
+    var snap=await getDocs(collection(db,'trips'));
+    var rows=[];
+    for(var i=0;i<snap.docs.length;i++){
+      var docSnap=snap.docs[i],t=docSnap.data(),code=docSnap.id;
+      var counts={transports:0,lodging:0,expenses:0,plans:0,packing:0,people:0};
+      try{
+        var itemsSnap=await getDocs(collection(db,'trips',code,'items'));
+        itemsSnap.forEach(function(d){var k=d.data().k;if(k in counts)counts[k]++;});
+      }catch(e){}
+      var totalItems=Object.keys(counts).reduce(function(a,k){return a+counts[k];},0);
+      rows.push({
+        name:t.name||'(sin nombre)',
+        p1:t.p1||'',p2:t.p2||'',
+        start:t.start||'',end:t.end||'',
+        code:code,counts:counts,totalItems:totalItems,
+        u:t.u||0
+      });
+    }
+    rows.sort(function(a,b){return b.u-a.u;});
+    allRows=rows;
+    render();
+    statusEl.textContent=rows.length+' viaje'+(rows.length===1?'':'s')+' encontrados.';
+  }catch(e){
+    statusEl.textContent='No se pudo cargar. Revisá que las reglas de Firestore permitan "list" en la colección trips. ('+(e&&e.message?e.message:e)+')';
+    statusEl.className='status err';
+  }
+}
+
+function render(){
+  var term=q.value.trim().toLowerCase();
+  var rows=allRows.filter(function(r){
+    return !term||r.name.toLowerCase().indexOf(term)>=0||r.code.toLowerCase().indexOf(term)>=0||r.p1.toLowerCase().indexOf(term)>=0||r.p2.toLowerCase().indexOf(term)>=0;
+  });
+  if(!rows.length){
+    tbl.hidden=true;
+    if(allRows.length)statusEl.textContent='Sin resultados para "'+q.value+'".';
+    return;
+  }
+  tbl.hidden=false;
+  tb.innerHTML=rows.map(function(r){
+    return '<tr>'
+     +'<td><b>'+esc(r.name)+'</b></td>'
+     +'<td>'+esc(r.p1)+(r.p2?' y '+esc(r.p2):'')+'</td>'
+     +'<td>'+fmtDate(r.start)+(r.end?' al '+fmtDate(r.end):'')+'</td>'
+     +'<td>'+r.totalItems+'</td>'
+     +'<td class="code">'+esc(r.code)+'</td>'
+     +'<td>'+relTime(r.u)+'</td>'
+     +'<td><a class="openlink" href="index.html?t='+encodeURIComponent(r.code)+'" target="_blank" rel="noopener">Abrir →</a></td>'
+     +'</tr>';
+  }).join('');
+}
+
+q.addEventListener('input',render);
+document.getElementById('refresh').addEventListener('click',load);
+load();
+</script>
+</body>
+</html>

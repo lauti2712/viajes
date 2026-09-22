@@ -11,7 +11,7 @@
 :root{
   --paper:#F1F3EE; --surface:#FBFCF9; --ink:#16223A; --muted:#5B667A; --line:#D9DED3;
   --sea:#1E5AA8; --on-sea:#FFFFFF; --sun:#F4C542; --on-sun:#3A2D00;
-  --mint:#237A58; --rose:#C0392B; --p1:#1E5AA8; --p2:#A63D8C;
+  --mint:#237A58; --rose:#C0392B; --p1:#1E5AA8; --p2:#A63D8C; --p3:#C9762B; --p4:#1B8A8A; --p5:#6B4FA0; --p6:#8C6239; --p7:#4A6B8C; --p8:#9A4B4B;
   --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
   --body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   color-scheme:light;
@@ -23,14 +23,14 @@
   :root:not([data-theme="light"]){
     --paper:#0F1622; --surface:#172033; --ink:#E8ECF4; --muted:#9AA6BC; --line:#2A3652;
     --sea:#6EA8F0; --on-sea:#0F1622; --sun:#F4C542; --on-sun:#3A2D00;
-    --mint:#5CC79A; --rose:#F08A7E; --p1:#6EA8F0; --p2:#E08BCB;
+    --mint:#5CC79A; --rose:#F08A7E; --p1:#6EA8F0; --p2:#E08BCB; --p3:#E0A05C; --p4:#5CC9C9; --p5:#A98FD1; --p6:#C79A6B; --p7:#8CA9C9; --p8:#D18A8A;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --paper:#0F1622; --surface:#172033; --ink:#E8ECF4; --muted:#9AA6BC; --line:#2A3652;
   --sea:#6EA8F0; --on-sea:#0F1622; --sun:#F4C542; --on-sun:#3A2D00;
-  --mint:#5CC79A; --rose:#F08A7E; --p1:#6EA8F0; --p2:#E08BCB;
+  --mint:#5CC79A; --rose:#F08A7E; --p1:#6EA8F0; --p2:#E08BCB; --p3:#E0A05C; --p4:#5CC9C9; --p5:#A98FD1; --p6:#C79A6B; --p7:#8CA9C9; --p8:#D18A8A;
   color-scheme:dark;
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--paper)}
@@ -233,6 +233,8 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 .pksug{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap}
 .pksug input{width:16px;height:16px}
 .pkadd .ghost{padding:8px 13px;font-size:14px}
+.whopick{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.pkadd select{padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);flex:none}
 @media (prefers-reduced-motion:reduce){#sheet .panel{animation:none}}
 </style>
 <script>try{var __t=localStorage.getItem('viaje-de-a-dos:theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
@@ -297,16 +299,16 @@ var FB_VER='10.14.1';
 var CODE_KEY='viaje-de-a-dos:code',MODE_KEY='viaje-de-a-dos:mode';
 var CODE='',LOCAL_ONLY=false,FB=null,syncState='';
 try{CODE=localStorage.getItem(CODE_KEY)||'';LOCAL_ONLY=localStorage.getItem(MODE_KEY)==='local';}catch(e){}
-var ITEM_KEYS=['transports','lodging','expenses','plans','packing'];
+var ITEM_KEYS=['transports','lodging','expenses','plans','packing','people'];
 
 var TYPES={vuelo:['✈️','Vuelo'],bus:['🚌','Micro / bus'],tren:['🚆','Tren'],barco:['⛴️','Barco'],auto:['🚗','Auto alquilado'],traslado:['🚕','Traslado'],otro:['🧭','Otro']};
 var CATS={'Comida':'🍽️','Transporte local':'🚇','Actividades':'🎟️','Compras':'🛍️','Salud':'💊','Otros':'📌'};
 var ITYPES={paseo:['🚶','Paseo'],comida:['🍽️','Comida'],excursion:['🗺️','Excursión'],tramite:['📄','Trámite'],descanso:['🛌','Descanso'],otro:['📌','Otro']};
 
 /* ---------- Estado ---------- */
-function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',p1:'Persona 1',p2:'Persona 2',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[]};}
+function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',p1:'Persona 1',p2:'Persona 2',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[],people:[]};}
 var arr=function(a){return Array.isArray(a)?a.filter(function(x){return x&&x.id}):[]};
-function fix(o){var b=blank();o=o||{};var t=Object.assign(b.trip,o.trip||{});t.rates=Object.assign({},(o.trip&&o.trip.rates)||{});return {v:1,trip:t,transports:arr(o.transports),lodging:arr(o.lodging),expenses:arr(o.expenses),plans:arr(o.plans),packing:arr(o.packing)};}
+function fix(o){var b=blank();o=o||{};var t=Object.assign(b.trip,o.trip||{});t.rates=Object.assign({},(o.trip&&o.trip.rates)||{});return {v:1,trip:t,transports:arr(o.transports),lodging:arr(o.lodging),expenses:arr(o.expenses),plans:arr(o.plans),packing:arr(o.packing),people:arr(o.people)};}
 var S=blank();
 try{var raw=localStorage.getItem(LS);if(raw)S=fix(JSON.parse(raw));}catch(e){}
 function save(){try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){}}
@@ -337,8 +339,9 @@ var base=function(){return (S.trip.base||'ARS').toUpperCase()};
 var fmtC={};
 function money(n,cur){cur=(cur||base()).toUpperCase();try{var f=fmtC[cur]||(fmtC[cur]=new Intl.NumberFormat('es-AR',{style:'currency',currency:cur,minimumFractionDigits:0,maximumFractionDigits:2}));return f.format(n);}catch(e){return cur+' '+(Math.round(n*100)/100).toLocaleString('es-AR');}}
 function toBase(a,cur){cur=(cur||base()).toUpperCase();if(cur===base())return a;var r=parseFloat(S.trip.rates[cur]);return r>0?a*r:null;}
-var pn=function(p){return p==='p1'?S.trip.p1:p==='p2'?S.trip.p2:''};
-var dot=function(p){return (p==='p1'||p==='p2')?'<i class="dot" style="background:var(--'+p+')"></i>':''};
+var pn=function(p){return nameOf(p);};
+function personColorVar(id){var idx=allPeople().findIndex(function(x){return x.id===id;});return idx>=0?'--p'+((idx%8)+1):'';}
+var dot=function(p){var v=personColorVar(p);return v?'<i class="dot" style="background:var('+v+')"></i>':'';};
 
 function costs(){
   var o=[];
@@ -349,12 +352,38 @@ function costs(){
   return o;
 }
 function sumBase(list){var t=0,miss=new Set();list.forEach(function(c){var b=toBase(c.amount,c.cur);if(b==null)miss.add((c.cur||'').toUpperCase());else t+=b;});return {t:t,miss:miss};}
-function balance(){var n1=0,any=false,miss=new Set();costs().forEach(function(c){if(c.status!=='pagado'||!c.paidBy)return;any=true;var b=toBase(c.amount,c.cur);if(b==null){miss.add(c.cur);return;}var s1=c.split==='equal'?b/2:c.split==='p1'?b:0;n1+=(c.paidBy==='p1'?b:0)-s1;});return {n1:n1,any:any,miss:miss};}
+function settleUp(){
+  var people=allPeople(),n=people.length||1,net={},any=false,miss=new Set();
+  people.forEach(function(p){net[p.id]=0;});
+  costs().forEach(function(c){
+    if(c.status!=='pagado'||!c.paidBy)return;
+    any=true;
+    var b=toBase(c.amount,c.cur);
+    if(b==null){miss.add(c.cur);return;}
+    if(c.split&&c.split!=='equal'&&net.hasOwnProperty(c.split)){net[c.split]-=b;}
+    else{var share=b/n;people.forEach(function(p){net[p.id]-=share;});}
+    if(net.hasOwnProperty(c.paidBy))net[c.paidBy]+=b;
+  });
+  return {net:net,any:any,miss:miss,people:people};
+}
+function settlements(){
+  var b=settleUp(),cred=[],deb=[];
+  b.people.forEach(function(p){var v=b.net[p.id]||0;if(v>0.5)cred.push({name:p.name,amt:v});else if(v<-0.5)deb.push({name:p.name,amt:-v});});
+  cred.sort(function(a,b2){return b2.amt-a.amt;});deb.sort(function(a,b2){return b2.amt-a.amt;});
+  var out=[],i=0,j=0;
+  while(i<deb.length&&j<cred.length){
+    var pay=Math.min(deb[i].amt,cred[j].amt);
+    out.push({from:deb[i].name,to:cred[j].name,amt:pay});
+    deb[i].amt-=pay;cred[j].amt-=pay;
+    if(deb[i].amt<0.5)i++;
+    if(cred[j].amt<0.5)j++;
+  }
+  return {list:out,any:b.any,miss:b.miss};
+}
 function balanceHtml(){
-  var b=balance();if(!b.any)return '';
-  if(Math.abs(b.n1)<0.5)return '<div class="balance">Están a mano. Nadie le debe nada a nadie.</div>';
-  var debtor=b.n1>0?S.trip.p2:S.trip.p1,cred=b.n1>0?S.trip.p1:S.trip.p2;
-  return '<div class="balance">'+esc(debtor)+' le debe <b>'+money(Math.abs(b.n1))+'</b> a '+esc(cred)+'</div>'+(b.miss.size?warnMiss(b.miss):'');
+  var s=settlements();if(!s.any)return '';
+  if(!s.list.length)return '<div class="balance">Están a mano. Nadie le debe nada a nadie.</div>'+(s.miss.size?warnMiss(s.miss):'');
+  return '<div class="balance">'+s.list.map(function(x){return esc(x.from)+' le debe <b>'+money(x.amt)+'</b> a '+esc(x.to);}).join('<br>')+'</div>'+(s.miss.size?warnMiss(s.miss):'');
 }
 function warnMiss(set){var l=Array.from(set).filter(Boolean);return l.length?'<p class="warn">Falta el tipo de cambio de '+esc(l.join(', '))+'. Cargalo en Resumen para que la suma sea correcta.</p>':'';}
 function relTime(ts){
@@ -446,7 +475,7 @@ function vResumen(){
     h+='<section class="sec"><h2>Presupuesto total</h2><div class="dh"><span>'+money(tot.t)+' de '+money(bud)+'</span><b class="'+(bover?'over':'')+'">'+Math.round(tot.t/bud*100)+'%</b></div><div class="prog"><span class="'+(bover?'over':'')+'" style="width:'+bpct+'%"></span></div>'+(bover?'<p class="warn">Ya cargaron más de lo presupuestado para todo el viaje.</p>':'')+'</section>';
   }
 
-  var pp=[['p1',S.trip.p1],['p2',S.trip.p2]].map(function(p){return {l:p[1],c:'var(--'+p[0]+')',v:sumBase(cs.filter(function(c){return c.status==='pagado'&&c.paidBy===p[0]})).t}});
+  var pp=allPeople().map(function(p){return {l:p.name,c:'var('+personColorVar(p.id)+')',v:sumBase(cs.filter(function(c){return c.status==='pagado'&&c.paidBy===p.id})).t}});
   h+='<section class="sec"><h2>Quién puso la plata</h2>'+bars(pp)+'</section>';
 
   var byCat={};cs.forEach(function(c){var b=toBase(c.amount,c.cur);if(b!=null)byCat[c.cat]=(byCat[c.cat]||0)+b;});
@@ -559,20 +588,50 @@ function vItinerario(){
   }).join('');
 }
 
-function packRow(it){
-  var other=it.owner==='p1'?S.trip.p2:S.trip.p1;
-  return '<div class="pk'+(it.checked?' done':'')+'"><label class="pkchk"><input type="checkbox" data-pkcheck="'+it.id+'"'+(it.checked?' checked':'')+'><span>'+esc(it.text)+'</span></label>'+(it.suggested?'<span class="chipsm">💡 Idea de '+esc(other)+'</span>':'')+'<button type="button" class="x" data-pkdel="'+it.id+'" aria-label="Quitar">✕</button></div>';
+var WHOAMI_KEY='viaje-de-a-dos:whoami';
+function getWhoAmI(){try{return localStorage.getItem(WHOAMI_KEY)||'';}catch(e){return '';}}
+function setWhoAmI(v){try{if(v)localStorage.setItem(WHOAMI_KEY,v);else localStorage.removeItem(WHOAMI_KEY);}catch(e){}}
+var packSuggestMsg='';
+function allPeople(){return [{id:'p1',name:S.trip.p1},{id:'p2',name:S.trip.p2}].concat(live('people').map(function(p){return {id:p.id,name:p.name};}));}
+function nameOf(id){var p=allPeople().find(function(x){return x.id===id;});return p?p.name:'';}
+function suggesterName(it){
+  if(it.from)return nameOf(it.from);
+  if(it.suggested){if(it.owner==='p1')return S.trip.p2;if(it.owner==='p2')return S.trip.p1;}
+  return '';
 }
-function packList(owner){
-  var name=owner==='p1'?S.trip.p1:S.trip.p2, other=owner==='p1'?S.trip.p2:S.trip.p1;
+function packRow(it){
+  var suggester=suggesterName(it);
+  return '<div class="pk'+(it.checked?' done':'')+'"><label class="pkchk"><input type="checkbox" data-pkcheck="'+it.id+'"'+(it.checked?' checked':'')+'><span>'+esc(it.text)+'</span></label>'+(it.suggested&&suggester?'<span class="chipsm">💡 Idea de '+esc(suggester)+'</span>':'')+'<button type="button" class="x" data-pkdel="'+it.id+'" aria-label="Quitar">✕</button></div>';
+}
+function myPackList(owner){
   var items=live('packing').filter(function(x){return x.owner===owner}).sort(function(a,b){return (a.u||0)-(b.u||0)});
   var done=items.filter(function(x){return x.checked}).length;
-  return '<div class="pklist"><div class="pkhead"><h3>'+dot(owner)+' Mochila de '+esc(name)+'</h3>'+(items.length?'<span class="pkcount">'+done+'/'+items.length+'</span>':'')+'</div>'
+  return '<div class="pklist"><div class="pkhead"><h3>Tu mochila</h3>'+(items.length?'<span class="pkcount">'+done+'/'+items.length+'</span>':'')+'</div>'
    +(items.length?items.map(packRow).join(''):'<p class="nada">Todavía no hay nada acá.</p>')
-   +'<form class="pkadd" data-owner="'+owner+'"><input type="text" data-pktext placeholder="Agregar algo…" autocomplete="off" required><label class="pksug"><input type="checkbox" data-pksug> Idea de '+esc(other)+'</label><button type="submit" class="ghost">+ Agregar</button></form></div>';
+   +'<form class="pkadd" data-owner="'+esc(owner)+'"><input type="text" data-pktext placeholder="Agregar algo…" autocomplete="off" required><button type="submit" class="ghost">+ Agregar</button></form></div>';
 }
 function vMochila(){
-  return '<div class="bar"><h2>Mi mochila</h2></div><p class="sub">La lista de cada uno para no olvidarse nada, y un lugar para sugerirle algo al otro.</p>'+packList('p1')+packList('p2');
+  var people=allPeople(),who=getWhoAmI();
+  if(who&&!people.some(function(p){return p.id===who;}))who='';
+  if(!who){
+    return '<div class="bar"><h2>Mi mochila</h2></div><p class="sub">Elegí quién sos en este dispositivo para armar tu propia lista. Es privada: nadie más la ve.</p>'
+     +'<div class="whopick">'+people.map(function(p){return '<button type="button" class="primary" data-act="whoami" data-who="'+esc(p.id)+'">'+esc(p.name)+'</button>';}).join('')+'</div>'
+     +'<form class="pkadd addperson"><input type="text" data-persontext placeholder="Tu nombre, si no está en la lista" autocomplete="off" required><button type="submit" class="ghost">+ Agregarme</button></form>'
+     +'<p class="hint" style="margin-top:14px">Ojo: es solo una preferencia de este dispositivo, no una contraseña. Cualquiera que use este celular puede tocar "cambiar" y ver otra lista.</p>';
+  }
+  var me=people.find(function(p){return p.id===who;}),others=people.filter(function(p){return p.id!==who;});
+  var sug='';
+  if(others.length){
+    sug='<div class="pklist"><div class="pkhead"><h3>💡 Sugerirle algo'+(others.length===1?(' a '+esc(others[0].name)):'')+'</h3></div>'
+     +'<form class="pkadd pksuggest">'
+     +(others.length>1?('<select data-sugto>'+others.map(function(o){return '<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>';}).join('')+'</select>'):('<input type="hidden" data-sugto value="'+esc(others[0].id)+'">'))
+     +'<input type="text" data-pktext placeholder="Ej: protector solar" autocomplete="off" required>'
+     +'<button type="submit" class="ghost">Sugerir</button></form>'
+     +(packSuggestMsg?'<p class="msg">'+esc(packSuggestMsg)+'</p>':'')+'</div>';
+  }
+  return '<div class="bar"><h2>Mi mochila</h2><button type="button" class="ghost" data-act="whoswitch" style="padding:6px 12px;font-size:13px">Sos '+esc(me.name)+' · cambiar</button></div>'
+   +'<p class="sub">Esta lista es solo tuya: los demás no la ven. Podés sugerirles algo sin ver lo que tienen en la suya.</p>'
+   +myPackList(who)+sug;
 }
 
 var VIEWS={resumen:vResumen,transportes:vTransportes,alojamiento:vAlojamiento,gastos:vGastos,itinerario:vItinerario,mochila:vMochila};
@@ -580,7 +639,7 @@ var VIEWS={resumen:vResumen,transportes:vTransportes,alojamiento:vAlojamiento,ga
 function renderHead(){
   $('#title').textContent=S.trip.name||'Nuestro viaje';
   var tb=$('#themeBtn');if(tb)tb.textContent=themeLabel();
-  $('#who2').innerHTML='<span class="chip">'+dot('p1')+esc(S.trip.p1)+'</span><span class="chip">'+dot('p2')+esc(S.trip.p2)+'</span>'+syncChip();
+  $('#who2').innerHTML=allPeople().map(function(p){return '<span class="chip">'+dot(p.id)+esc(p.name)+'</span>';}).join('')+syncChip();
   var s=pd(S.trip.start),e=pd(S.trip.end),w='';
   if(!s){w='<span>Sin fechas todavía</span>';}
   else{
@@ -638,10 +697,12 @@ function costF(){return [
   {k:'amount',l:'Monto',t:'number',half:true,ph:'0'},
   {k:'cur',l:'Moneda',t:'text',list:'curs',half:true,def:base()},
   {k:'status',l:'Estado del pago',t:'select',half:true,opts:[['pendiente','Por pagar'],['pagado','Pagado']]},
-  {k:'paidBy',l:'Quién pagó',t:'select',half:true,opts:[['','Sin definir'],['p1',S.trip.p1],['p2',S.trip.p2]]},
+  {k:'paidBy',l:'Quién pagó',t:'select',half:true,opts:buildPaidByOptions()},
   {k:'method',l:'Cómo se pagó',t:'text',list:'methods',ph:'Efectivo, Visa 3 cuotas, transferencia…'},
-  {k:'split',l:'Para quién es',t:'select',opts:[['equal','De los dos, a medias'],['p1','Solo de '+S.trip.p1],['p2','Solo de '+S.trip.p2]]}
+  {k:'split',l:'Para quién es',t:'select',opts:buildSplitOptions()}
 ];}
+function buildPaidByOptions(){return [['','Sin definir']].concat(allPeople().map(function(p){return [p.id,p.name];})).concat([['__new__','+ Agregar otra persona…']]);}
+function buildSplitOptions(){return [['equal','De todos, a partes iguales']].concat(allPeople().map(function(p){return [p.id,'Solo de '+p.name];})).concat([['__new__','+ Agregar otra persona…']]);}
 var SPECS={
   transports:function(){return {title:['Nuevo transporte','Editar transporte'],fields:[
     {k:'type',l:'Tipo',t:'select',opts:Object.keys(TYPES).map(function(k){return [k,TYPES[k][0]+' '+TYPES[k][1]]})},
@@ -780,12 +841,31 @@ function openItem(k,id,pre){
       addLink(k,ensureId(),lbl,url);lm.textContent='';lm.className='msg';redraw();
     }
   });
+  function refreshPersonSelects(justAddedId){
+    var pb=f.querySelector('select[name=paidBy]'),sp=f.querySelector('select[name=split]');
+    if(pb){var curPb=pb.value==='__new__'?justAddedId:pb.value;pb.innerHTML=buildPaidByOptions().map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]===curPb?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');pb.dataset.prevValue=pb.value;}
+    if(sp){var curSp=sp.value==='__new__'?justAddedId:sp.value;sp.innerHTML=buildSplitOptions().map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]===curSp?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');sp.dataset.prevValue=sp.value;}
+  }
+  ['paidBy','split'].forEach(function(nm){var el=f.querySelector('select[name='+nm+']');if(el)el.dataset.prevValue=el.value;});
+
   panel.addEventListener('change',function(e){
     var fi=e.target.closest('[data-file]');
     if(fi&&fi.files&&fi.files.length){
       var id2=ensureId(),msg=$('[data-attmsg]',panel),files=fi.files;
       uploadFiles(k,id2,files,function(){redraw();},function(t,err){if(msg){msg.textContent=t;msg.className='msg'+(err?' err':'');}});
       fi.value='';
+      return;
+    }
+    var sel=e.target.closest('select[name=paidBy],select[name=split]');
+    if(sel){
+      if(sel.value==='__new__'){
+        var nm=(window.prompt('¿Cómo se llama la persona?')||'').trim();
+        if(!nm){sel.value=sel.dataset.prevValue||(sel.name==='split'?'equal':'');return;}
+        var pid=upsert('people',null,{name:nm});
+        refreshPersonSelects(pid);
+      }else{
+        sel.dataset.prevValue=sel.value;
+      }
     }
   });
 
@@ -796,7 +876,7 @@ function openSettings(){
   var t=S.trip;
   sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:t.name,start:t.start,end:t.end,p1:t.p1,p2:t.p2,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
     fields:[
-      {k:'name',l:'Nombre del viaje',t:'text',ph:'Ej: Bariloche en pareja'},
+      {k:'name',l:'Nombre del viaje',t:'text',ph:'Ej: Bariloche 2026'},
       {k:'start',l:'Desde',t:'date',half:true},
       {k:'end',l:'Hasta',t:'date',half:true},
       {k:'p1',l:'Nombre de la persona 1',t:'text',half:true,req:true},
@@ -820,7 +900,7 @@ try{if(window.claude&&typeof window.claude.use==='function'){window.claude.use('
 
 function mergeIn(inc){
   inc=fix(inc);
-  ['transports','lodging','expenses','plans','packing'].forEach(function(k){
+  ['transports','lodging','expenses','plans','packing','people'].forEach(function(k){
     var map=new Map(S[k].map(function(x){return [x.id,x]}));
     inc[k].forEach(function(x){var c=map.get(x.id);if(!c||(x.u||0)>(c.u||0))map.set(x.id,x);});
     S[k]=Array.from(map.values());
@@ -915,7 +995,7 @@ function downloadFile(name,text){var a=document.createElement('a'),u=URL.createO
 function openSync(){
   var json=JSON.stringify(S),cloud='';
   if(!FIREBASE_CONFIG.apiKey)cloud='<p class="hint">La nube no está activada: falta pegar la configuración de Firebase en el archivo. Mientras tanto, los datos se guardan solo en este dispositivo.</p>';
-  else if(CODE)cloud='<p class="hint">El viaje se sincroniza en tiempo real. Para sumar a tu pareja, pasale este link. Quien lo tenga puede ver y editar el viaje.</p><label class="fld"><span>Link del viaje</span><input class="box" id="lnk" readonly></label><div class="row"><button type="button" class="primary" id="cplnk">Copiar link</button></div>';
+  else if(CODE)cloud='<p class="hint">El viaje se sincroniza en tiempo real. Pasale este link a quien viaje con vos. Quien lo tenga puede ver y editar el viaje.</p><label class="fld"><span>Link del viaje</span><input class="box" id="lnk" readonly></label><div class="row"><button type="button" class="primary" id="cplnk">Copiar link</button></div>';
   else cloud='<p class="hint">Ahora los datos están solo en este dispositivo.</p><div class="row"><button type="button" class="primary" id="goconnect">Conectar a la nube</button></div>';
   var panel=openSheet('Compartir datos',cloud+'<hr><h3 style="margin-bottom:8px">Copia de seguridad</h3><p class="hint">Podés guardar o pasar una copia de los datos a mano. Al sumar una copia se agrega lo nuevo y, si algo está en los dos lados, queda lo último que se editó.</p>'
    +'<div class="stack"><label class="fld"><span>Tus datos</span><textarea class="box" id="out" rows="3" readonly></textarea></label>'
@@ -932,7 +1012,7 @@ function openSync(){
     else{src.select();try{document.execCommand('copy');ok();}catch(e){fail();}}
   };
   var lnk=$('#lnk',panel);
-  if(lnk){lnk.value=location.origin+location.pathname+'?t='+CODE;$('#cplnk',panel).addEventListener('click',function(){copy(lnk.value,lnk,'Link copiado. Mandáselo a tu pareja.')});}
+  if(lnk){lnk.value=location.origin+location.pathname+'?t='+CODE;$('#cplnk',panel).addEventListener('click',function(){copy(lnk.value,lnk,'Link copiado. Mandáselo a quien viaje con vos.')});}
   var gc=$('#goconnect',panel);if(gc)gc.addEventListener('click',function(){try{localStorage.removeItem(MODE_KEY);}catch(e){}openConnect();});
   $('#cp',panel).addEventListener('click',function(){copy(json,out,'Copiado.')});
   $('#dl',panel).addEventListener('click',function(){
@@ -970,6 +1050,8 @@ document.addEventListener('click',function(e){
   else if(a==='theme')cycleTheme();
   else if(a==='fetchrates')fetchRates((t.dataset.codes||'USD,BRL').split(','));
   else if(a==='fetchusd')fetchBlueUsd(t.dataset.type);
+  else if(a==='whoami'){setWhoAmI(t.dataset.who);render();}
+  else if(a==='whoswitch'){setWhoAmI('');render();}
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&!$('#sheet').hidden){closeSheet();return;}
@@ -982,14 +1064,34 @@ document.addEventListener('change',function(e){
   if(pc){upsert('packing',pc.getAttribute('data-pkcheck'),{checked:pc.checked?'1':''});render();}
 });
 document.addEventListener('submit',function(e){
+  var pform=e.target.closest&&e.target.closest('.addperson');
+  if(pform){
+    e.preventDefault();
+    var nm=pform.querySelector('[data-persontext]').value.trim();
+    if(!nm)return;
+    var pid=upsert('people',null,{name:nm});
+    setWhoAmI(pid);
+    render();
+    return;
+  }
+  var sform=e.target.closest&&e.target.closest('.pksuggest');
+  if(sform){
+    e.preventDefault();
+    var toEl=sform.querySelector('[data-sugto]'),owner2=toEl?toEl.value:'',txt2=sform.querySelector('[data-pktext]').value.trim();
+    if(!txt2||!owner2)return;
+    upsert('packing',null,{owner:owner2,text:txt2,checked:'',suggested:'1',from:getWhoAmI()});
+    packSuggestMsg='Listo, se lo sugerimos.';
+    render();
+    return;
+  }
   var form=e.target.closest&&e.target.closest('.pkadd');
-  if(!form)return;
-  e.preventDefault();
-  var owner=form.dataset.owner,txt=form.querySelector('[data-pktext]').value.trim();
-  if(!txt)return;
-  var sug=form.querySelector('[data-pksug]').checked;
-  upsert('packing',null,{owner:owner,text:txt,checked:'',suggested:sug?'1':''});
-  render();
+  if(form){
+    e.preventDefault();
+    var owner=form.dataset.owner,txt=form.querySelector('[data-pktext]').value.trim();
+    if(!txt)return;
+    upsert('packing',null,{owner:owner,text:txt,checked:'',suggested:'',from:''});
+    render();
+  }
 });
 
 render();
