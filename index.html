@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Viaje de a dos</title>
+<title>Nuestro viaje</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -228,13 +228,27 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 .pkchk span{overflow-wrap:anywhere}
 .pk .x{flex:none;border:0;background:transparent;color:var(--muted);font-size:15px;padding:4px 6px;border-radius:6px}
 .pk .x:hover{color:var(--rose)}
-.pkadd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
-.pkadd input[type=text]{flex:1;min-width:140px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.pkadd,.pplform{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pkadd input[type=text],.pplform input[type=text]{flex:1;min-width:140px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
 .pksug{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap}
 .pksug input{width:16px;height:16px}
-.pkadd .ghost{padding:8px 13px;font-size:14px}
+.pkadd .ghost,.pplform .ghost{padding:8px 13px;font-size:14px}
 .whopick{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .pkadd select{padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);flex:none}
+/* Personas (ajustes) */
+.pplrow{display:flex;align-items:center;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:6px 9px}
+.pplrow input{flex:1;min-width:0;border:0;background:transparent;font-weight:600;padding:4px 2px}
+.pplrow small{font-size:12px;color:var(--muted);flex:none}
+.pplrow .x{flex:none;border:0;background:transparent;color:var(--muted);font-size:15px;padding:4px 6px;border-radius:6px}
+.pplrow .x:hover{color:var(--rose)}
+.whopick button[disabled]{opacity:.55;cursor:not-allowed}
+
+/* Login */
+.gate{max-width:440px;margin:24px auto;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px 20px}
+.gate h2{margin-bottom:6px}
+.gate p{margin:0 0 16px}
+.gate .hint{margin:14px 0 0}
+body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync]{display:none}
 @media (prefers-reduced-motion:reduce){#sheet .panel{animation:none}}
 </style>
 <script>try{var __t=localStorage.getItem('viaje-de-a-dos:theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
@@ -250,6 +264,7 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
     <button class="ghost" data-act="settings">Ajustes del viaje</button>
     <button class="ghost" data-act="sync">Compartir datos</button>
     <button class="ghost" data-act="theme" id="themeBtn"></button>
+    <button class="ghost" data-act="logout" id="logoutBtn" hidden></button>
   </div>
 </header>
 <nav class="tabs" aria-label="Secciones">
@@ -273,6 +288,8 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 'use strict';
 var $=function(s,r){return (r||document).querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+/* Solo links http(s): evita que un dato cargado por otro meta un javascript: en un href. */
+var safeUrl=function(u){u=String(u||'').trim();return /^https?:\/\//i.test(u)?u:''};
 var uid=function(){return Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-4)};
 var LS='viaje-de-a-dos:v1';
 var THEME_KEY='viaje-de-a-dos:theme';
@@ -300,13 +317,16 @@ var CODE_KEY='viaje-de-a-dos:code',MODE_KEY='viaje-de-a-dos:mode';
 var CODE='',LOCAL_ONLY=false,FB=null,syncState='';
 try{CODE=localStorage.getItem(CODE_KEY)||'';LOCAL_ONLY=localStorage.getItem(MODE_KEY)==='local';}catch(e){}
 var ITEM_KEYS=['transports','lodging','expenses','plans','packing','people'];
+/* En la nube la mochila vive en su propia colección (trips/{code}/packing), privada por reglas. */
+var CLOUD_KEYS=ITEM_KEYS.filter(function(k){return k!=='packing'});
+var cloudMode=function(){return !!(FIREBASE_CONFIG.apiKey&&CODE&&!LOCAL_ONLY)};
 
 var TYPES={vuelo:['✈️','Vuelo'],bus:['🚌','Micro / bus'],tren:['🚆','Tren'],barco:['⛴️','Barco'],auto:['🚗','Auto alquilado'],traslado:['🚕','Traslado'],otro:['🧭','Otro']};
 var CATS={'Comida':'🍽️','Transporte local':'🚇','Actividades':'🎟️','Compras':'🛍️','Salud':'💊','Otros':'📌'};
 var ITYPES={paseo:['🚶','Paseo'],comida:['🍽️','Comida'],excursion:['🗺️','Excursión'],tramite:['📄','Trámite'],descanso:['🛌','Descanso'],otro:['📌','Otro']};
 
 /* ---------- Estado ---------- */
-function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',p1:'Persona 1',p2:'Persona 2',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[],people:[]};}
+function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[],people:[]};}
 var arr=function(a){return Array.isArray(a)?a.filter(function(x){return x&&x.id}):[]};
 function fix(o){var b=blank();o=o||{};var t=Object.assign(b.trip,o.trip||{});t.rates=Object.assign({},(o.trip&&o.trip.rates)||{});return {v:1,trip:t,transports:arr(o.transports),lodging:arr(o.lodging),expenses:arr(o.expenses),plans:arr(o.plans),packing:arr(o.packing),people:arr(o.people)};}
 var S=blank();
@@ -381,6 +401,7 @@ function settlements(){
   return {list:out,any:b.any,miss:b.miss};
 }
 function balanceHtml(){
+  if(allPeople().length<2)return '';
   var s=settlements();if(!s.any)return '';
   if(!s.list.length)return '<div class="balance">Están a mano. Nadie le debe nada a nadie.</div>'+(s.miss.size?warnMiss(s.miss):'');
   return '<div class="balance">'+s.list.map(function(x){return esc(x.from)+' le debe <b>'+money(x.amt)+'</b> a '+esc(x.to);}).join('<br>')+'</div>'+(s.miss.size?warnMiss(s.miss):'');
@@ -518,7 +539,7 @@ function vAlojamiento(){
   if(!L.length)return h+empty('Todavía no cargaron dónde van a dormir','Hotel, departamento o hostel: fechas de entrada y salida, dirección, código de reserva y costo.');
   return h+totLine(costs().filter(function(c){return c.src==='lodging'}))+L.map(function(l){
     var n=(l.in&&l.out)?dayDiff(pd(l.in),pd(l.out)):0;
-    return '<div class="stay" role="button" tabindex="0" data-act="edit" data-k="lodging" data-id="'+l.id+'"><div class="nm">'+esc(l.name||'Alojamiento')+(l.airbnb?' <a class="abnb" href="'+esc(l.airbnb)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Airbnb ↗</a>':'')+'</div>'
+    return '<div class="stay" role="button" tabindex="0" data-act="edit" data-k="lodging" data-id="'+l.id+'"><div class="nm">'+esc(l.name||'Alojamiento')+(safeUrl(l.airbnb)?' <a class="abnb" href="'+esc(safeUrl(l.airbnb))+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Airbnb ↗</a>':'')+'</div>'
      +(l.address?'<div class="sub" style="margin:2px 0 0">'+esc(l.address)+'</div>':'')
      +'<div class="dates"><span>Entrada <b>'+(l.in?esc(fShort(l.in)):'—')+'</b></span><span>Salida <b>'+(l.out?esc(fShort(l.out)):'—')+'</b></span>'+(n>0?'<span><b>'+n+(n===1?' noche':' noches')+'</b></span>':'')+attLinkChips(l)+'</div>'
      +(l.ref?'<div class="meta"><span class="ref">Reserva '+esc(l.ref)+'</span></div>':'')
@@ -593,13 +614,26 @@ function vItinerario(){
 var WHOAMI_KEY='viaje-de-a-dos:whoami';
 function getWhoAmI(){try{return localStorage.getItem(WHOAMI_KEY)||'';}catch(e){return '';}}
 function setWhoAmI(v){try{if(v)localStorage.setItem(WHOAMI_KEY,v);else localStorage.removeItem(WHOAMI_KEY);}catch(e){}}
-var packSuggestMsg='';
-function allPeople(){return [{id:'p1',name:S.trip.p1},{id:'p2',name:S.trip.p2}].concat(live('people').map(function(p){return {id:p.id,name:p.name};}));}
+var packSuggestMsg='',claimMsg='';
+/* Personas: todas viven en la lista `people` (1, 2 o las que sean). Los viajes viejos tenían p1/p2 fijos
+   en el trip: se muestran igual hasta que migratePeople() los pasa a `people` con esos mismos ids,
+   así los gastos (paidBy/split) y las mochilas (owner) siguen apuntando bien. */
+function legacyPeople(){return ['p1','p2'].filter(function(k){return S.trip[k]&&!S.people.some(function(x){return x.id===k});}).map(function(k){return {id:k,name:S.trip[k],c:k==='p1'?1:2};});}
+function migratePeople(){['p1','p2'].forEach(function(k,i){if(S.trip[k]&&!S.people.some(function(x){return x.id===k}))upsert('people',null,{id:k,name:S.trip[k],c:i+1});});}
+function allPeople(){
+  return legacyPeople().concat(live('people').map(function(p){return {id:p.id,name:p.name,c:+p.c||1e15};}))
+    .sort(function(a,b){return (a.c-b.c)||a.id.localeCompare(b.id);});
+}
 function nameOf(id){var p=allPeople().find(function(x){return x.id===id;});return p?p.name:'';}
 function suggesterName(it){
   if(it.from)return nameOf(it.from);
-  if(it.suggested){if(it.owner==='p1')return S.trip.p2;if(it.owner==='p2')return S.trip.p1;}
+  if(it.suggested){if(it.owner==='p1')return nameOf('p2');if(it.owner==='p2')return nameOf('p1');}
   return '';
+}
+/* Quién soy: en la nube sale de la cuenta de Google (claims), sin nube es una preferencia del dispositivo. */
+function myPersonId(){
+  var id=cloudMode()?(AUTH==='in'?myClaim:''):getWhoAmI();
+  return id&&allPeople().some(function(p){return p.id===id;})?id:'';
 }
 function packRow(it){
   var suggester=suggesterName(it);
@@ -612,15 +646,24 @@ function myPackList(owner){
    +(items.length?items.map(packRow).join(''):'<p class="nada">Todavía no hay nada acá.</p>')
    +'<form class="pkadd" data-owner="'+esc(owner)+'"><input type="text" data-pktext placeholder="Agregar algo…" autocomplete="off" required><button type="submit" class="ghost">+ Agregar</button></form></div>';
 }
+function pickerHtml(people){
+  var cloud=cloudMode(),h='<div class="bar"><h2>Mi mochila</h2></div>';
+  if(cloud&&AUTH!=='in')return h+'<p class="sub">Sin conexión con la nube: tu mochila aparece cuando vuelva la señal.</p>';
+  if(cloud)h+='<p class="sub">Hola'+(ME.name?' '+esc(ME.name):'')+'. Elegí quién sos en este viaje: queda vinculado a tu cuenta de Google, así en cualquier dispositivo ves tu propia lista. Es privada: nadie más la puede ver.</p>';
+  else h+='<p class="sub">Elegí quién sos en este dispositivo para armar tu propia lista.</p>';
+  h+='<div class="whopick">'+people.map(function(p){
+    var cl=cloud?CLAIMS[p.id]:null,taken=!!(cl&&cl.uid!==ME.uid);
+    return '<button type="button" class="primary" data-act="whoami" data-who="'+esc(p.id)+'"'+(taken?' disabled title="Ya la eligió otra cuenta"':'')+'>'+esc(p.name)+(taken?' · '+esc(cl.name||'otra cuenta'):'')+'</button>';
+  }).join('')+'</div>';
+  var sugName=cloud&&ME.name&&!people.some(function(p){return p.name.trim().toLowerCase()===ME.name.trim().toLowerCase();})?ME.name:'';
+  h+='<form class="pkadd addperson"><input type="text" data-persontext placeholder="Tu nombre, si no está en la lista" value="'+esc(sugName)+'" autocomplete="off" required><button type="submit" class="ghost">+ Agregarme</button></form>';
+  if(claimMsg)h+='<p class="msg err">'+esc(claimMsg)+'</p>';
+  if(!cloud)h+='<p class="hint" style="margin-top:14px">Ojo: es solo una preferencia de este dispositivo, no una contraseña. Cualquiera que use este celular puede tocar "cambiar" y ver otra lista.</p>';
+  return h;
+}
 function vMochila(){
-  var people=allPeople(),who=getWhoAmI();
-  if(who&&!people.some(function(p){return p.id===who;}))who='';
-  if(!who){
-    return '<div class="bar"><h2>Mi mochila</h2></div><p class="sub">Elegí quién sos en este dispositivo para armar tu propia lista. Es privada: nadie más la ve.</p>'
-     +'<div class="whopick">'+people.map(function(p){return '<button type="button" class="primary" data-act="whoami" data-who="'+esc(p.id)+'">'+esc(p.name)+'</button>';}).join('')+'</div>'
-     +'<form class="pkadd addperson"><input type="text" data-persontext placeholder="Tu nombre, si no está en la lista" autocomplete="off" required><button type="submit" class="ghost">+ Agregarme</button></form>'
-     +'<p class="hint" style="margin-top:14px">Ojo: es solo una preferencia de este dispositivo, no una contraseña. Cualquiera que use este celular puede tocar "cambiar" y ver otra lista.</p>';
-  }
+  var people=allPeople(),who=myPersonId();
+  if(!who)return pickerHtml(people);
   var me=people.find(function(p){return p.id===who;}),others=people.filter(function(p){return p.id!==who;});
   var sug='';
   if(others.length){
@@ -632,7 +675,7 @@ function vMochila(){
      +(packSuggestMsg?'<p class="msg">'+esc(packSuggestMsg)+'</p>':'')+'</div>';
   }
   return '<div class="bar"><h2>Mi mochila</h2><button type="button" class="ghost" data-act="whoswitch" style="padding:6px 12px;font-size:13px">Sos '+esc(me.name)+' · cambiar</button></div>'
-   +'<p class="sub">Esta lista es solo tuya: los demás no la ven. Podés sugerirles algo sin ver lo que tienen en la suya.</p>'
+   +'<p class="sub">'+(cloudMode()?'Esta lista es solo tuya: está vinculada a tu cuenta de Google y nadie más la puede ver.':'Esta lista es solo tuya: los demás no la ven.')+(others.length?' Podés sugerirles algo a los demás sin ver lo que tienen en la suya.':'')+'</p>'
    +myPackList(who)+sug;
 }
 
@@ -641,7 +684,8 @@ var VIEWS={resumen:vResumen,transportes:vTransportes,alojamiento:vAlojamiento,ga
 function renderHead(){
   $('#title').textContent=S.trip.name||'Nuestro viaje';
   var tb=$('#themeBtn');if(tb)tb.textContent=themeLabel();
-  $('#who2').innerHTML=allPeople().map(function(p){return '<span class="chip">'+dot(p.id)+esc(p.name)+'</span>';}).join('')+syncChip();
+  var lo=$('#logoutBtn');if(lo){lo.hidden=!(ME&&AUTH==='in');if(ME)lo.textContent='Salir'+(ME.name?' ('+ME.name.split(' ')[0]+')':'');}
+  $('#who2').innerHTML=(gated()?[]:allPeople()).map(function(p){return '<span class="chip">'+dot(p.id)+esc(p.name)+'</span>';}).join('')+syncChip();
   var s=pd(S.trip.start),e=pd(S.trip.end),w='';
   if(!s){w='<span>Sin fechas todavía</span>';}
   else{
@@ -653,10 +697,24 @@ function renderHead(){
     w='<span class="cal" aria-hidden="true">📅</span><span>'+esc(fShort(S.trip.start))+(e?' al '+esc(fShort(S.trip.end)):'')+'</span><b>'+st+'</b>';
   }
   $('#when').innerHTML=w;
-  document.title=(S.trip.name||'Viaje de a dos');
+  document.title=(S.trip.name||'Nuestro viaje');
+}
+/* Con nube hay que iniciar sesión con Google antes de ver el viaje. Si Firebase ni siquiera cargó
+   (sin señal), AUTH queda 'offline' y se muestra lo guardado en el dispositivo. */
+var loginMsg='';
+function gated(){return cloudMode()&&(AUTH==='pending'||AUTH==='out');}
+function vGate(){
+  if(AUTH!=='out')return '<p class="sub" style="text-align:center;margin-top:30px">Cargando…</p>';
+  return '<div class="gate"><h2>Entrá con Google</h2><p>Para ver y editar este viaje, iniciá sesión con tu cuenta de Google.</p>'
+   +'<button type="button" class="primary" data-act="login">Continuar con Google</button>'
+   +(loginMsg?'<p class="msg err">'+esc(loginMsg)+'</p>':'')
+   +'<p class="hint">Si abriste el link desde Instagram o Facebook y no te deja entrar, abrilo en Chrome o Safari.</p></div>';
 }
 function render(){
+  var g=gated();
+  document.body.classList.toggle('gated',g);
   renderHead();
+  if(g){$('#main').innerHTML=vGate();return;}
   $('#main').innerHTML=VIEWS[tab]();
   Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
@@ -678,8 +736,9 @@ function openSheet(title,body){
 function closeSheet(){var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');render();}
 function sheetForm(o){
   var v=o.values||{};
-  var panel=openSheet(o.title,'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>');
+  var panel=openSheet(o.title,'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));
   var f=$('#sf',panel);
+  if(o.onReady)o.onReady(panel);
   f.addEventListener('submit',function(e){
     e.preventDefault();
     var d={};new FormData(f).forEach(function(val,k){d[k]=String(val).trim()});
@@ -746,10 +805,10 @@ var DEFAULTS={
   plans:function(){var s=S.trip.start;return {type:'paseo',date:s&&s>today()?s:today()}}
 };
 function attRow(a){
-  return '<div class="attitem"><a href="'+esc(a.url)+'" target="_blank" rel="noopener"><span class="aic" aria-hidden="true">'+fileIcon(a.type)+'</span><span class="anm">'+esc(a.name||'Archivo')+'</span>'+(a.size?'<span class="asz">'+humanSize(a.size)+'</span>':'')+'</a><button type="button" class="x" data-rmatt="'+esc(a.id)+'" aria-label="Quitar archivo">✕</button></div>';
+  return '<div class="attitem"><a href="'+esc(safeUrl(a.url)||'#')+'" target="_blank" rel="noopener"><span class="aic" aria-hidden="true">'+fileIcon(a.type)+'</span><span class="anm">'+esc(a.name||'Archivo')+'</span>'+(a.size?'<span class="asz">'+humanSize(a.size)+'</span>':'')+'</a><button type="button" class="x" data-rmatt="'+esc(a.id)+'" aria-label="Quitar archivo">✕</button></div>';
 }
 function lnkRow(l){
-  return '<div class="lnkitem"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">🔗 '+esc(l.label||l.url)+'</a><button type="button" class="x" data-rmlink="'+esc(l.id)+'" aria-label="Quitar link">✕</button></div>';
+  return '<div class="lnkitem"><a href="'+esc(safeUrl(l.url)||'#')+'" target="_blank" rel="noopener">🔗 '+esc(l.label||l.url)+'</a><button type="button" class="x" data-rmlink="'+esc(l.id)+'" aria-label="Quitar link">✕</button></div>';
 }
 function attsBlock(item){
   var list=(item&&item.attachments)||[];
@@ -863,7 +922,7 @@ function openItem(k,id,pre){
       if(sel.value==='__new__'){
         var nm=(window.prompt('¿Cómo se llama la persona?')||'').trim();
         if(!nm){sel.value=sel.dataset.prevValue||(sel.name==='split'?'equal':'');return;}
-        var pid=upsert('people',null,{name:nm});
+        var pid=upsert('people',null,{name:nm,c:Date.now()});
         refreshPersonSelects(pid);
       }else{
         sel.dataset.prevValue=sel.value;
@@ -874,25 +933,71 @@ function openItem(k,id,pre){
   if(!ex){var first=$('input:not([type=hidden]),select',f);if(first&&window.matchMedia('(min-width:700px)').matches)first.focus();}
 }
 
+function peopleUsed(id){return costs().some(function(c){return c.paidBy===id||c.split===id;});}
+/* Los p1/p2 de viajes viejos pueden no estar todavía en `people`: se crean con su mismo id. */
+function savePerson(id,data){
+  if(S.people.some(function(x){return x.id===id}))return upsert('people',id,data);
+  var lp=legacyPeople().find(function(x){return x.id===id});
+  return upsert('people',null,Object.assign({id:id,name:lp?lp.name:'',c:lp?lp.c:Date.now()},data));
+}
+function pplBlock(){
+  var ppl=allPeople();
+  return '<div class="sideSec" id="pplWrap"><h3>Personas del viaje</h3><p class="hint">Pueden ser una o varias. Para cambiar un nombre, tocalo y escribí.</p><div class="attlist">'
+   +(ppl.length?ppl.map(function(p){
+      var cl=cloudMode()?CLAIMS[p.id]:null;
+      return '<div class="pplrow">'+dot(p.id)+'<input type="text" data-pname="'+esc(p.id)+'" value="'+esc(p.name)+'" aria-label="Nombre" autocomplete="off">'
+       +(cl?'<small title="Vinculada a una cuenta de Google">🔗 '+esc(cl.name||'cuenta')+'</small>':'')
+       +'<button type="button" class="x" data-pdel="'+esc(p.id)+'" aria-label="Quitar a '+esc(p.name)+'">✕</button></div>';
+    }).join(''):'<p class="nada">'+(cloudMode()&&ME?'Al guardar, quedás vos'+(ME.name?' ('+esc(ME.name)+')':'')+' como primera persona. Después podés sumar a los demás.':'Todavía no hay nadie.')+'</p>')
+   +'</div><form class="pplform"><input type="text" data-pnew placeholder="Nombre" autocomplete="off" required><button type="submit" class="ghost">+ Agregar persona</button></form><p class="msg" data-pplmsg></p></div>';
+}
+function bindPeople(panel){
+  function redraw(msg,err){var w=$('#pplWrap',panel);if(w)w.outerHTML=pplBlock();var m=$('[data-pplmsg]',panel);if(m&&msg){m.textContent=msg;m.className='msg'+(err?' err':'');}renderHead();}
+  panel.addEventListener('change',function(e){
+    var inp=e.target.closest('[data-pname]');if(!inp)return;
+    var nm=inp.value.trim(),id=inp.getAttribute('data-pname');
+    if(!nm){inp.value=nameOf(id);return;}
+    if(nm!==nameOf(id)){savePerson(id,{name:nm});renderHead();}
+  });
+  panel.addEventListener('click',function(e){
+    var b=e.target.closest('[data-pdel]');if(!b)return;
+    var id=b.getAttribute('data-pdel'),nm=nameOf(id);
+    if(peopleUsed(id)){redraw('No se puede quitar a '+nm+': tiene gastos a su nombre (pagó o son solo suyos). Cambiá esos gastos primero.',true);return;}
+    if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='¿Quitar?';return;}
+    savePerson(id,{});remove('people',id);
+    if(cloudMode()&&myClaim===id)releaseClaim();
+    if(!cloudMode()&&getWhoAmI()===id)setWhoAmI('');
+    redraw();
+  });
+  panel.addEventListener('submit',function(e){
+    var f=e.target.closest('.pplform');if(!f)return;
+    e.preventDefault();
+    var nm=$('[data-pnew]',f).value.trim();if(!nm)return;
+    upsert('people',null,{name:nm,c:Date.now()});
+    redraw();var n=$('[data-pnew]',panel);if(n)n.focus();
+  });
+}
 function openSettings(){
-  var t=S.trip;
-  sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:t.name,start:t.start,end:t.end,p1:t.p1,p2:t.p2,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
+  var t=S.trip,first=!t.setup;
+  sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:t.name,start:t.start,end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
     fields:[
       {k:'name',l:'Nombre del viaje',t:'text',ph:'Ej: Bariloche 2026'},
       {k:'start',l:'Desde',t:'date',half:true},
       {k:'end',l:'Hasta',t:'date',half:true},
-      {k:'p1',l:'Nombre de la persona 1',t:'text',half:true,req:true},
-      {k:'p2',l:'Nombre de la persona 2',t:'text',half:true,req:true},
       {k:'base',l:'Moneda para los totales',t:'text',list:'curs',half:true,ph:'ARS'},
       {k:'daily',l:'Presupuesto diario (opcional)',t:'number',half:true,ph:'0'},
       {k:'budget',l:'Presupuesto total del viaje (opcional)',t:'number',half:true,ph:'0'},
       {k:'info',l:'Info útil (seguro de viaje, contacto de emergencia, dirección del alojamiento…)',t:'textarea',ph:'Lo que quieran tener a mano aunque no haya señal'}
     ],
+    extra:'<hr>'+pplBlock(),
+    onReady:bindPeople,
     onSave:function(d){
       var nb=(d.base||'ARS').toUpperCase().slice(0,6);
       if(nb!==base())S.trip.rates={};
-      Object.assign(S.trip,{name:d.name||'Nuestro viaje',start:d.start,end:d.end,p1:d.p1||'Persona 1',p2:d.p2||'Persona 2',base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true,u:Date.now()});
+      Object.assign(S.trip,{name:d.name||'Nuestro viaje',start:d.start,end:d.end,base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true,u:Date.now()});
       save();pushTrip();
+      /* Quien arma un viaje nuevo en la nube queda como su primera persona, ya vinculada a su cuenta. */
+      if(first&&cloudMode()&&ME&&!myClaim&&!allPeople().length)claimPerson(upsert('people',null,{name:ME.name||'Yo',c:Date.now()}));
     }});
 }
 
@@ -911,15 +1016,29 @@ function mergeIn(inc){
   else{S.trip.rates=Object.assign({},inc.trip.rates,S.trip.rates);}
   save();pushAll();
 }
-/* ---------- Nube (Firestore) ---------- */
-var SYNC={ok:['var(--mint)','Sincronizado'],saving:['var(--sun)','Guardando…'],connecting:['var(--sun)','Conectando…'],offline:['var(--rose)','Sin conexión'],err:['var(--rose)','Error de conexión'],denied:['var(--rose)','Sin permiso: revisá las reglas de Firestore'],local:['var(--muted)','Solo en este dispositivo'],none:['var(--rose)','Sin conectar']};
+/* ---------- Nube (Firestore + Auth) ---------- */
+var SYNC={ok:['var(--mint)','Sincronizado'],saving:['var(--sun)','Guardando…'],connecting:['var(--sun)','Conectando…'],offline:['var(--rose)','Sin conexión'],err:['var(--rose)','Error de conexión'],denied:['var(--rose)','Sin permiso: revisá las reglas de Firestore'],local:['var(--muted)','Solo en este dispositivo'],none:['var(--rose)','Sin conectar'],login:['var(--muted)','Falta iniciar sesión']};
 function syncChip(){var x=SYNC[syncState];return x?'<span class="chip" role="status"><i class="dot" style="background:'+x[0]+'"></i>'+x[1]+'</span>':'';}
 function setSync(st){syncState=st;renderHead();}
 var clean=function(o){return JSON.parse(JSON.stringify(o))};
 function fbErr(e){if(e&&e.code==='permission-denied')setSync('denied');}
-function pushItem(k,it){if(!FB||!CODE)return;try{FB.fs.setDoc(FB.fs.doc(FB.db,'trips',CODE,'items',it.id),clean(Object.assign({k:k},it))).catch(fbErr);}catch(e){}}
-function pushTrip(){if(!FB||!CODE)return;try{FB.fs.setDoc(FB.fs.doc(FB.db,'trips',CODE),clean(S.trip)).catch(fbErr);}catch(e){}}
-function pushAll(){if(!FB)return;pushTrip();ITEM_KEYS.forEach(function(k){S[k].forEach(function(it){pushItem(k,it)})});}
+/* AUTH: '' sin nube · 'pending' esperando Firebase · 'out' sin sesión · 'in' logueado · 'offline' Firebase no cargó */
+var AUTH='',ME=null,loggingOut=false;
+/* CLAIMS: personId -> {uid,name}. Cada persona del viaje la puede "reclamar" una sola cuenta de Google;
+   las reglas usan ese vínculo para que la mochila de cada uno sea privada. */
+var CLAIMS={},myClaim='',packUnsub=null,LEGACY_PACK={},itemsReady=false;
+var fdoc=function(){return FB.fs.doc.apply(null,[FB.db,'trips',CODE].concat([].slice.call(arguments)))};
+function pushItem(k,it){
+  if(!FB||!CODE||AUTH!=='in')return;
+  if(k==='packing'){pushPacking(it);return;}
+  try{FB.fs.setDoc(fdoc('items',it.id),clean(Object.assign({k:k},it))).catch(fbErr);}catch(e){}
+}
+function pushPacking(it){
+  if(!myClaim||it.owner!==myClaim)return; /* solo la propia; las sugerencias van por sendSuggestion */
+  try{FB.fs.setDoc(fdoc('packing',it.id),clean(it)).catch(fbErr);}catch(e){}
+}
+function pushTrip(){if(!FB||!CODE||AUTH!=='in')return;try{FB.fs.setDoc(fdoc(),clean(S.trip)).catch(fbErr);}catch(e){}}
+function pushAll(){if(!FB||AUTH!=='in')return;pushTrip();ITEM_KEYS.forEach(function(k){S[k].forEach(function(it){pushItem(k,it)})});}
 function applyItem(k,d){
   var it={};
   Object.keys(d).forEach(function(key){
@@ -927,7 +1046,7 @@ function applyItem(k,d){
     var v=d[key];
     if(key==='attachments'||key==='links'){it[key]=Array.isArray(v)?v.map(function(x){return Object.assign({},x)}):[];return;}
     if(v!==null&&typeof v==='object')return;
-    it[key]=(key==='amount'||key==='u'||key==='del')?v:String(v);
+    it[key]=(key==='amount'||key==='u'||key==='del'||key==='c')?v:String(v);
   });
   if(!/^[a-z0-9]{1,24}$/i.test(it.id||''))return false;
   var i=S[k].findIndex(function(x){return x.id===it.id});
@@ -935,19 +1054,106 @@ function applyItem(k,d){
   if((it.u||0)>(S[k][i].u||0)){S[k][i]=it;return true;}
   return false;
 }
+function sendSuggestion(owner,text){
+  var it={id:uid(),u:Date.now(),owner:owner,text:text,checked:'',suggested:'1',from:myPersonId()};
+  if(!cloudMode()){S.packing.push(it);save();return;}
+  /* No se guarda localmente: es de la mochila del otro, que no podemos leer. */
+  try{FB.fs.setDoc(fdoc('packing',it.id),it).catch(fbErr);}catch(e){}
+}
+function claimPerson(pid){
+  claimMsg='';
+  if(!FB||AUTH!=='in'||!pid)return;
+  if(myClaim&&myClaim!==pid)releaseClaim();
+  if(CLAIMS[pid]&&CLAIMS[pid].uid===ME.uid)return;
+  FB.fs.setDoc(fdoc('claims',pid),{uid:ME.uid,name:ME.name||'',u:Date.now()}).catch(function(e){
+    claimMsg=e&&e.code==='permission-denied'?'Esa persona ya la eligió otra cuenta. Elegí otra o agregate con tu nombre.':'No se pudo guardar. Probá de nuevo.';
+    render();
+  });
+}
+function releaseClaim(){
+  if(!FB||!myClaim)return;
+  var pid=myClaim;
+  try{FB.fs.deleteDoc(fdoc('claims',pid)).catch(fbErr);}catch(e){}
+}
+function subscribePacking(){
+  if(packUnsub){packUnsub();packUnsub=null;}
+  S.packing=[];save();
+  if(!myClaim)return;
+  var fs=FB.fs,owner=myClaim;
+  packUnsub=fs.onSnapshot(fs.query(fs.collection(FB.db,'trips',CODE,'packing'),fs.where('owner','==',owner)),function(snap){
+    var changed=false;
+    snap.docChanges().forEach(function(ch){if(ch.type!=='removed'&&applyItem('packing',ch.doc.data()))changed=true;});
+    if(changed){save();render();}
+  },function(err){fbErr(err);});
+  migrateLegacyPacking();
+}
+/* Antes la mochila se guardaba en `items`, visible para todos. Cuando su dueño entra, se copia a
+   `packing` (privada) y en `items` queda solo una lápida sin texto. */
+function migrateLegacyPacking(){
+  if(!myClaim||!itemsReady)return;
+  Object.keys(LEGACY_PACK).forEach(function(id){
+    var it=LEGACY_PACK[id];
+    if(it.owner!==myClaim)return;
+    delete LEGACY_PACK[id];
+    var copy=Object.assign({},it);delete copy.k;
+    FB.fs.setDoc(fdoc('packing',id),clean(copy)).then(function(){
+      return FB.fs.setDoc(fdoc('items',id),{k:'packing',id:id,del:true,u:Date.now()});
+    }).catch(fbErr);
+  });
+}
 async function startCloud(){
   setSync('connecting');
-  var fs,db;
+  AUTH='pending';render();
   try{
     var root='https://www.gstatic.com/firebasejs/'+FB_VER+'/';
-    var mods=await Promise.all([import(root+'firebase-app.js'),import(root+'firebase-firestore.js'),import(root+'firebase-storage.js')]);
-    var app=mods[0].initializeApp(FIREBASE_CONFIG);fs=mods[1];var st=mods[2];
+    var mods=await Promise.all([import(root+'firebase-app.js'),import(root+'firebase-firestore.js'),import(root+'firebase-storage.js'),import(root+'firebase-auth.js')]);
+    var app=mods[0].initializeApp(FIREBASE_CONFIG),fs=mods[1],st=mods[2],au=mods[3],db;
     try{db=fs.initializeFirestore(app,{localCache:fs.persistentLocalCache({tabManager:fs.persistentMultipleTabManager()})});}catch(e){db=fs.getFirestore(app);}
-    var storage=st.getStorage(app);
-    FB={db:db,fs:fs,storage:storage,st:st};
-  }catch(e){setSync('err');if(!S.trip.setup)openSettings();return;}
+    FB={db:db,fs:fs,storage:st.getStorage(app),st:st,au:au,auth:au.getAuth(app)};
+  }catch(e){AUTH='offline';setSync('err');render();return;}
 
-  fs.onSnapshot(fs.doc(db,'trips',CODE),function(snap){
+  var listening=false;
+  FB.au.onAuthStateChanged(FB.auth,function(u){
+    if(u){
+      ME={uid:u.uid,name:u.displayName||''};AUTH='in';loginMsg='';
+      if(!listening){listening=true;listen();}
+      render();
+    }else{
+      if(AUTH==='in'){if(!loggingOut)location.reload();return;}
+      ME=null;AUTH='out';setSync('login');render();
+    }
+  });
+}
+function login(){
+  loginMsg='';
+  if(!FB){loginMsg='Todavía se está conectando. Probá de nuevo en un segundo.';render();return;}
+  var p=new FB.au.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});
+  FB.au.signInWithPopup(FB.auth,p).catch(function(e){
+    var c=e&&e.code||'';
+    if(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request')return;
+    loginMsg=c==='auth/popup-blocked'?'El navegador bloqueó la ventana de Google. Permití ventanas emergentes y tocá de nuevo.'
+      :c==='auth/unauthorized-domain'?'Este sitio no está autorizado en Firebase (Authentication → Settings → Dominios autorizados).'
+      :c==='auth/operation-not-allowed'?'Falta habilitar el acceso con Google en Firebase Authentication.'
+      :c==='auth/network-request-failed'?'Sin conexión. Probá de nuevo cuando tengas señal.'
+      :'No se pudo iniciar sesión ('+(c||'error')+').';
+    render();
+  });
+}
+/* Al salir se borra lo guardado en este dispositivo (la copia local y la caché de Firestore):
+   todo sigue en la nube, y así quien use el dispositivo después no ve la mochila de otro. */
+function logout(){
+  if(!FB)return;
+  loggingOut=true;
+  FB.au.signOut(FB.auth).catch(function(){}).then(function(){
+    try{localStorage.removeItem(LS);localStorage.removeItem(WHOAMI_KEY);}catch(e){}
+    return FB.fs.terminate(FB.db).then(function(){return FB.fs.clearIndexedDbPersistence(FB.db);}).catch(function(){});
+  }).then(function(){location.reload();});
+}
+function listen(){
+  var fs=FB.fs,db=FB.db,tripReady=false;
+  function maybeMigratePeople(){if(tripReady&&itemsReady)migratePeople();}
+
+  fs.onSnapshot(fdoc(),function(snap){
     if(snap.exists()){
       var r=fix({trip:snap.data()}).trip;
       if((!S.trip.setup&&r.setup)||(r.u||0)>(S.trip.u||0)){S.trip=r;save();render();}
@@ -955,24 +1161,39 @@ async function startCloud(){
     }else if(!snap.metadata.fromCache){
       if(S.trip.setup)pushTrip();else if($('#sheet').hidden)openSettings();
     }
+    if(!snap.metadata.fromCache&&!tripReady){tripReady=true;maybeMigratePeople();}
   },function(err){fbErr(err);if(!err||err.code!=='permission-denied')setSync('err');});
 
-  var reconciled=false;
   fs.onSnapshot(fs.collection(db,'trips',CODE,'items'),{includeMetadataChanges:true},function(snap){
     var changed=false;
     snap.docChanges().forEach(function(ch){
       if(ch.type==='removed')return;
       var d=ch.doc.data();
-      if(d&&ITEM_KEYS.indexOf(d.k)>=0&&applyItem(d.k,d))changed=true;
+      if(!d)return;
+      if(d.k==='packing'){if(d.del||!d.owner)delete LEGACY_PACK[ch.doc.id];else LEGACY_PACK[ch.doc.id]=d;return;}
+      if(CLOUD_KEYS.indexOf(d.k)>=0&&applyItem(d.k,d))changed=true;
     });
-    if(!reconciled&&!snap.metadata.fromCache){
-      reconciled=true;
+    if(!itemsReady&&!snap.metadata.fromCache){
+      itemsReady=true;
       var rem={};snap.docs.forEach(function(x){rem[x.id]=x.data().u||0});
-      ITEM_KEYS.forEach(function(k){S[k].forEach(function(it){if(rem[it.id]===undefined||(it.u||0)>rem[it.id])pushItem(k,it);});});
+      CLOUD_KEYS.forEach(function(k){S[k].forEach(function(it){if(rem[it.id]===undefined||(it.u||0)>rem[it.id])pushItem(k,it);});});
+      maybeMigratePeople();
     }
+    migrateLegacyPacking();
     if(changed){save();render();}
     setSync(snap.metadata.fromCache?(navigator.onLine?'connecting':'offline'):(snap.metadata.hasPendingWrites?'saving':'ok'));
   },function(err){fbErr(err);if(!err||err.code!=='permission-denied')setSync('err');});
+
+  var claimsSeen=false;
+  /* La mochila se suscribe recién cuando el vínculo está confirmado por el servidor: si la consulta
+     sale antes, las reglas todavía no lo ven, la rechazan y el listener muere. */
+  fs.onSnapshot(fs.collection(db,'trips',CODE,'claims'),{includeMetadataChanges:true},function(snap){
+    var c={},mine='';
+    snap.docs.forEach(function(x){var d=x.data()||{};c[x.id]={uid:d.uid||'',name:d.name||''};if(d.uid===ME.uid&&!x.metadata.hasPendingWrites&&(!mine||x.id<mine))mine=x.id;});
+    CLAIMS=c;
+    if(mine!==myClaim||!claimsSeen){claimsSeen=true;myClaim=mine;subscribePacking();}
+    render();
+  },function(err){fbErr(err);});
 
   window.addEventListener('offline',function(){setSync('offline')});
   window.addEventListener('online',function(){setSync('connecting')});
@@ -982,7 +1203,7 @@ function genCode(){var a='abcdefghjkmnpqrstuvwxyz23456789',b=new Uint8Array(20),
 function connectTo(code){try{localStorage.setItem(CODE_KEY,code);localStorage.removeItem(MODE_KEY);}catch(e){}location.href=location.pathname;}
 function openConnect(){
   var panel=openSheet('Conectar el viaje',
-   '<p class="hint">Para que los dos vean lo mismo en tiempo real, el viaje se guarda en la nube con un código secreto.</p><div class="stack">'
+   '<p class="hint">Para que todos vean lo mismo en tiempo real, el viaje se guarda en la nube con un código secreto. Cada uno entra con su cuenta de Google.</p><div class="stack">'
    +'<button type="button" class="primary" id="newtrip">Crear un viaje nuevo</button><hr>'
    +'<label class="fld"><span>¿Te pasaron un link o un código?</span><input class="box" id="joinc" placeholder="Pegá el link o el código" autocomplete="off"></label>'
    +'<button type="button" class="ghost" id="join">Unirme a ese viaje</button><p class="msg err" id="msg" role="status"></p><hr>'
@@ -1018,8 +1239,8 @@ function openSync(){
   var gc=$('#goconnect',panel);if(gc)gc.addEventListener('click',function(){try{localStorage.removeItem(MODE_KEY);}catch(e){}openConnect();});
   $('#cp',panel).addEventListener('click',function(){copy(json,out,'Copiado.')});
   $('#dl',panel).addEventListener('click',function(){
-    if(DL){DL.save({filename:'viaje-de-a-dos.json',data:json}).then(function(){say('Archivo guardado.')}).catch(function(e){if(!e||e.code!=='declined')say('No se pudo guardar el archivo.',true)});}
-    else downloadFile('viaje-de-a-dos.json',json);
+    if(DL){DL.save({filename:'viaje.json',data:json}).then(function(){say('Archivo guardado.')}).catch(function(e){if(!e||e.code!=='declined')say('No se pudo guardar el archivo.',true)});}
+    else downloadFile('viaje.json',json);
   });
   function doMerge(text){
     try{var o=JSON.parse(text);if(!o||typeof o!=='object'||!o.trip)throw new Error('x');mergeIn(o);say('Listo, se sumaron los datos.');out.value=JSON.stringify(S);json=out.value;renderHead();}
@@ -1052,8 +1273,10 @@ document.addEventListener('click',function(e){
   else if(a==='theme')cycleTheme();
   else if(a==='fetchrates')fetchRates((t.dataset.codes||'USD,BRL').split(','));
   else if(a==='fetchusd')fetchBlueUsd(t.dataset.type);
-  else if(a==='whoami'){setWhoAmI(t.dataset.who);render();}
-  else if(a==='whoswitch'){setWhoAmI('');render();}
+  else if(a==='whoami'){if(cloudMode())claimPerson(t.dataset.who);else setWhoAmI(t.dataset.who);render();}
+  else if(a==='whoswitch'){claimMsg='';if(cloudMode())releaseClaim();else setWhoAmI('');render();}
+  else if(a==='login')login();
+  else if(a==='logout')logout();
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&!$('#sheet').hidden){closeSheet();return;}
@@ -1071,8 +1294,8 @@ document.addEventListener('submit',function(e){
     e.preventDefault();
     var nm=pform.querySelector('[data-persontext]').value.trim();
     if(!nm)return;
-    var pid=upsert('people',null,{name:nm});
-    setWhoAmI(pid);
+    var pid=upsert('people',null,{name:nm,c:Date.now()});
+    if(cloudMode())claimPerson(pid);else setWhoAmI(pid);
     render();
     return;
   }
@@ -1081,7 +1304,7 @@ document.addEventListener('submit',function(e){
     e.preventDefault();
     var toEl=sform.querySelector('[data-sugto]'),owner2=toEl?toEl.value:'',txt2=sform.querySelector('[data-pktext]').value.trim();
     if(!txt2||!owner2)return;
-    upsert('packing',null,{owner:owner2,text:txt2,checked:'',suggested:'1',from:getWhoAmI()});
+    sendSuggestion(owner2,txt2);
     packSuggestMsg='Listo, se lo sugerimos.';
     render();
     return;
@@ -1096,6 +1319,7 @@ document.addEventListener('submit',function(e){
   }
 });
 
+if(!cloudMode())migratePeople();
 render();
 if(!FIREBASE_CONFIG.apiKey){if(!S.trip.setup)openSettings();}
 else if(LOCAL_ONLY){syncState='local';renderHead();if(!S.trip.setup)openSettings();}

@@ -1,13 +1,57 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    // Único que puede listar todos los viajes (admin.html).
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'lautarom87@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
     match /trips/{tripId} {
-      // "list" agregado para que admin.html pueda mostrar todos los viajes.
-      // Esto hace que cualquiera con la config de Firebase (que ya es pública)
-      // pueda listar todos los viajes, no solo entrar con el código exacto.
-      allow get, list, create, update: if true;
+      // Para entrar a un viaje hay que tener el código y haber iniciado sesión con Google.
+      // Listar todos los viajes queda solo para el admin.
+      allow get, create, update: if signedIn();
+      allow list: if isAdmin();
+
+      function claimPath(personId) {
+        return /databases/$(database)/documents/trips/$(tripId)/claims/$(personId);
+      }
+      // La persona `personId` del viaje está vinculada a la cuenta que hace el pedido.
+      function owns(personId) {
+        return personId is string && personId != ''
+          && exists(claimPath(personId))
+          && get(claimPath(personId)).data.uid == request.auth.uid;
+      }
+
+      // Transportes, alojamiento, gastos, planes y personas: compartidos entre quienes tengan el código.
+      // No hay delete: la app borra marcando del:true.
       match /items/{itemId} {
-        allow read, write: if true;
+        allow read, create, update: if signedIn();
+      }
+
+      // Vínculo persona del viaje -> cuenta de Google. Cada persona la puede tomar una sola cuenta.
+      match /claims/{personId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+        allow update: if signedIn() && resource.data.uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid;
+        allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      }
+
+      // Mochila: cada lista la lee y edita solo su dueño. Los demás pueden crear sugerencias
+      // (suggested == '1' y from == su propia persona), pero no leerlas después.
+      match /packing/{itemId} {
+        allow read: if signedIn() && owns(resource.data.owner);
+        allow create: if signedIn() && (
+          owns(request.resource.data.owner)
+          || (request.resource.data.get('suggested', '') == '1' && owns(request.resource.data.get('from', '')))
+        );
+        allow update: if signedIn() && owns(resource.data.owner)
+          && request.resource.data.owner == resource.data.owner;
       }
     }
   }

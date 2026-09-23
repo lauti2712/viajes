@@ -33,10 +33,15 @@ a.openlink:hover{text-decoration:underline}
 <div class="wrap">
   <h1>Viajes creados</h1>
   <p class="sub">Lista todos los viajes guardados en Firestore, leyendo directo de la base.</p>
-  <div class="warn">⚠️ Esta página no pide contraseña: cualquiera con este link puede ver la lista completa de viajes (nombres, fechas, personas). No la compartas ni la subas a un lugar público. Si necesitás que quede realmente protegida, hay que sumar un login — pedímelo aparte.</div>
+  <div id="gate" hidden>
+    <p class="status" id="gateMsg"></p>
+    <button id="login" type="button" hidden>Entrar con Google</button>
+  </div>
+  <div id="panel" hidden>
   <div class="toolbar">
     <input type="search" id="q" placeholder="Buscar por nombre, código o persona…">
     <button id="refresh" type="button">🔄 Actualizar</button>
+    <button id="logout" type="button">Salir</button>
   </div>
   <p class="status" id="status">Cargando…</p>
   <div class="tblwrap">
@@ -45,10 +50,12 @@ a.openlink:hover{text-decoration:underline}
       <tbody id="tb"></tbody>
     </table>
   </div>
+  </div>
 </div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 /* Misma configuración que index.html — es pública por diseño de Firebase. */
 var FIREBASE_CONFIG = {
@@ -62,12 +69,24 @@ var FIREBASE_CONFIG = {
 
 var app = initializeApp(FIREBASE_CONFIG);
 var db = getFirestore(app);
+var auth = getAuth(app);
 
 var statusEl = document.getElementById('status');
 var tbl = document.getElementById('tbl');
 var tb = document.getElementById('tb');
 var q = document.getElementById('q');
 var allRows = [];
+var gate = document.getElementById('gate');
+var gateMsg = document.getElementById('gateMsg');
+var loginBtn = document.getElementById('login');
+var panel = document.getElementById('panel');
+
+/* La protección real está en las reglas de Firestore: solo la cuenta admin puede listar los viajes.
+   Esta página solo decide qué mostrar según lo que responda Firestore. */
+function showGate(msg, btnLabel){
+  panel.hidden = true; gate.hidden = false;
+  gateMsg.textContent = msg; loginBtn.hidden = false; loginBtn.textContent = btnLabel;
+}
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function fmtDate(s){
@@ -93,15 +112,18 @@ async function load(){
     var rows=[];
     for(var i=0;i<snap.docs.length;i++){
       var docSnap=snap.docs[i],t=docSnap.data(),code=docSnap.id;
-      var counts={transports:0,lodging:0,expenses:0,plans:0,packing:0,people:0};
+      var counts={transports:0,lodging:0,expenses:0,plans:0,people:0},people=[];
       try{
         var itemsSnap=await getDocs(collection(db,'trips',code,'items'));
-        itemsSnap.forEach(function(d){var k=d.data().k;if(k in counts)counts[k]++;});
+        itemsSnap.forEach(function(d){var x=d.data();if(x.del)return;if(x.k in counts)counts[x.k]++;if(x.k==='people'&&x.id)people.push({id:x.id,name:x.name||'',c:+x.c||1e15});});
       }catch(e){}
+      /* Viajes viejos: p1/p2 en el trip hasta que alguien los abre con la versión nueva. */
+      ['p1','p2'].forEach(function(k,i){if(t[k]&&!people.some(function(p){return p.id===k;}))people.push({id:k,name:t[k],c:i+1});});
+      people.sort(function(a,b){return a.c-b.c;});
       var totalItems=Object.keys(counts).reduce(function(a,k){return a+counts[k];},0);
       rows.push({
         name:t.name||'(sin nombre)',
-        p1:t.p1||'',p2:t.p2||'',
+        people:people.map(function(p){return p.name;}).join(', '),
         start:t.start||'',end:t.end||'',
         code:code,counts:counts,totalItems:totalItems,
         u:t.u||0
@@ -112,7 +134,8 @@ async function load(){
     render();
     statusEl.textContent=rows.length+' viaje'+(rows.length===1?'':'s')+' encontrados.';
   }catch(e){
-    statusEl.textContent='No se pudo cargar. Revisá que las reglas de Firestore permitan "list" en la colección trips. ('+(e&&e.message?e.message:e)+')';
+    if(e&&e.code==='permission-denied'){showGate('La cuenta '+((auth.currentUser&&auth.currentUser.email)||'')+' no tiene acceso a este panel.','Usar otra cuenta');return;}
+    statusEl.textContent='No se pudo cargar. ('+(e&&e.message?e.message:e)+')';
     statusEl.className='status err';
   }
 }
@@ -120,7 +143,7 @@ async function load(){
 function render(){
   var term=q.value.trim().toLowerCase();
   var rows=allRows.filter(function(r){
-    return !term||r.name.toLowerCase().indexOf(term)>=0||r.code.toLowerCase().indexOf(term)>=0||r.p1.toLowerCase().indexOf(term)>=0||r.p2.toLowerCase().indexOf(term)>=0;
+    return !term||r.name.toLowerCase().indexOf(term)>=0||r.code.toLowerCase().indexOf(term)>=0||r.people.toLowerCase().indexOf(term)>=0;
   });
   if(!rows.length){
     tbl.hidden=true;
@@ -131,7 +154,7 @@ function render(){
   tb.innerHTML=rows.map(function(r){
     return '<tr>'
      +'<td><b>'+esc(r.name)+'</b></td>'
-     +'<td>'+esc(r.p1)+(r.p2?' y '+esc(r.p2):'')+'</td>'
+     +'<td>'+(r.people?esc(r.people):'—')+'</td>'
      +'<td>'+fmtDate(r.start)+(r.end?' al '+fmtDate(r.end):'')+'</td>'
      +'<td>'+r.totalItems+'</td>'
      +'<td class="code">'+esc(r.code)+'</td>'
@@ -143,7 +166,19 @@ function render(){
 
 q.addEventListener('input',render);
 document.getElementById('refresh').addEventListener('click',load);
-load();
+document.getElementById('logout').addEventListener('click',function(){signOut(auth);});
+loginBtn.addEventListener('click',function(){
+  /* select_account deja elegir otra cuenta aunque ya haya una sesión abierta. */
+  var p=new GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});
+  signInWithPopup(auth,p).catch(function(e){
+    if(e&&(e.code==='auth/popup-closed-by-user'||e.code==='auth/cancelled-popup-request'))return;
+    gateMsg.textContent='No se pudo iniciar sesión ('+(e&&e.code||e)+').';
+  });
+});
+onAuthStateChanged(auth,function(u){
+  if(!u){showGate('Iniciá sesión con la cuenta de administrador.','Entrar con Google');return;}
+  gate.hidden=true;panel.hidden=false;load();
+});
 </script>
 </body>
 </html>
