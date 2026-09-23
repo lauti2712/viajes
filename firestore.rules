@@ -11,6 +11,11 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
+    // Formas de pago de cada cuenta (tarjetas, cuentas): solo las ve y edita su dueño.
+    match /users/{userId}/{document=**} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
     match /trips/{tripId} {
       // Para entrar a un viaje hay que tener el código y haber iniciado sesión con Google.
       // Listar todos los viajes queda solo para el admin.
