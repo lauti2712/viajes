@@ -390,7 +390,7 @@ function costs(){
 }
 function sumBase(list){var t=0,miss=new Set();list.forEach(function(c){var b=toBase(c.amount,c.cur);if(b==null)miss.add((c.cur||'').toUpperCase());else t+=b;});return {t:t,miss:miss};}
 /* Reparto de un costo (ya pasado a moneda base `b`) entre personas.
-   split: 'equal' = todas las personas del viaje (también las que se sumen después) ·
+   split: 'equal' = las personas que había al cargarlo (splitWith; vacío en gastos viejos = todas) ·
    'some' = las de splitWith, por igual · 'amounts' = proporcional a shares [{p,a}] ·
    un id de persona = viejo "solo de X". */
 function splitIds(x){return String(x.splitWith||'').split(',').filter(Boolean);}
@@ -400,7 +400,7 @@ function shareMap(c,b){
     var sh=(c.shares||[]).filter(function(x){return (parseFloat(x.a)||0)>0;}),tot=sh.reduce(function(t,x){return t+parseFloat(x.a);},0);
     if(tot>0){sh.forEach(function(x){out[x.p]=(out[x.p]||0)+b*parseFloat(x.a)/tot;});return out;}
   }
-  var who=sp==='some'?splitIds(c).filter(function(id){return ids.indexOf(id)>=0;}):(sp!=='equal'&&sp!=='amounts'&&ids.indexOf(sp)>=0?[sp]:ids);
+  var who=(sp==='some'||(sp==='equal'&&c.splitWith))?splitIds(c).filter(function(id){return ids.indexOf(id)>=0;}):(sp!=='equal'&&sp!=='amounts'&&ids.indexOf(sp)>=0?[sp]:ids);
   if(!who.length)who=ids;
   who.forEach(function(id){out[id]=b/who.length;});
   return out;
@@ -440,9 +440,10 @@ function settlements(){
   }
   return {list:out,any:b.any,miss:b.miss};
 }
-function balanceHtml(){
+function balanceHtml(who){
   if(allPeople().length<2)return '';
   var s=settlements();if(!s.any)return '';
+  if(who){var wn=nameOf(who);s.list=s.list.filter(function(x){return x.from===wn||x.to===wn;});if(!s.list.length)return '<div class="balance">'+esc(wn)+' está a mano con todos.</div>';}
   if(!s.list.length)return '<div class="balance">Están a mano. Nadie le debe nada a nadie.</div>'+(s.miss.size?warnMiss(s.miss):'');
   return '<div class="balance">'+s.list.map(function(x){return esc(x.from)+' le debe <b>'+money(x.amt)+'</b> a '+esc(x.to);}).join('<br>')+'</div>'+(s.miss.size?warnMiss(s.miss):'');
 }
@@ -591,28 +592,49 @@ function vAlojamiento(){
   }).join('');
 }
 
-function costRow(k,item,desc,icon,catLabel){
+function costRow(k,item,desc,icon,catLabel,extra){
   var a=parseFloat(item.amount)||0,cur=(item.cur||base()).toUpperCase(),b=toBase(a,cur);
-  return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="'+k+'" data-id="'+item.id+'"><span class="ec" aria-hidden="true">'+icon+'</span><div class="et"><b>'+esc(desc)+'</b><small><span>'+esc(catLabel)+'</span>'+(item.paidBy?'<span class="who">'+dot(item.paidBy)+esc(pn(item.paidBy))+'</span>':'')+(item.method?'<span>'+esc(item.method)+'</span>':'')+attLinkChips(item)+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(item.status==='pendiente'?'<span class="pill pend">Por pagar</span>':'')+'</div></div>';
+  return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="'+k+'" data-id="'+item.id+'"><span class="ec" aria-hidden="true">'+icon+'</span><div class="et"><b>'+esc(desc)+'</b><small><span>'+esc(catLabel)+'</span>'+(item.paidBy?'<span class="who">'+dot(item.paidBy)+esc(pn(item.paidBy))+'</span>':'')+(item.method?'<span>'+esc(item.method)+'</span>':'')+attLinkChips(item)+(extra||'')+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(item.status==='pendiente'?'<span class="pill pend">Por pagar</span>':'')+'</div></div>';
 }
-function expRow(e){return costRow('expenses',e,e.desc||'Gasto',CATS[e.cat]||'📌',e.cat||'Otros');}
+function expRow(e,extra){return costRow('expenses',e,e.desc||'Gasto',CATS[e.cat]||'📌',e.cat||'Otros',extra);}
+/* Filtro "Ver gastos de": muestra solo lo que esa persona pagó o donde le toca una parte, y suma su parte. */
+var gastosWho='';
 function vGastos(){
-  var g={};
-  function add(dateKey,row,amount,cur,u){(g[dateKey]=g[dateKey]||[]).push({row:row,amount:amount,cur:cur,u:u||0});}
-  live('expenses').forEach(function(e){add(e.date||'0',expRow(e),parseFloat(e.amount)||0,e.cur,e.u);});
+  var g={},ppl=allPeople();
+  if(gastosWho&&!ppl.some(function(p){return p.id===gastosWho;}))gastosWho='';
+  var who=gastosWho;
+  function add(dateKey,item,rowFn,u){
+    var amt=parseFloat(item.amount)||0,extra='';
+    if(who){
+      var part=shareMap(item,amt)[who]||0,cur=(item.cur||base()).toUpperCase();
+      if(part<=0&&item.paidBy!==who)return;
+      extra='<span><b>'+(part>0?'Le toca '+esc(money(part,cur)):'No le toca parte')+'</b></span>';
+      amt=part;
+    }
+    (g[dateKey]=g[dateKey]||[]).push({row:rowFn(extra),amount:amt,cur:item.cur,u:u||0});
+  }
+  live('expenses').forEach(function(e){add(e.date||'0',e,function(x){return expRow(e,x);},e.u);});
   live('transports').filter(function(t){return (parseFloat(t.amount)||0)>0}).forEach(function(t){
     var ty=TYPES[t.type]||TYPES.otro;
-    add((t.dep||'').slice(0,10)||'0',costRow('transports',t,(t.from||'?')+' → '+(t.to||'?'),ty[0],ty[1]),parseFloat(t.amount)||0,t.cur,t.u);
+    add((t.dep||'').slice(0,10)||'0',t,function(x){return costRow('transports',t,(t.from||'?')+' → '+(t.to||'?'),ty[0],ty[1],x);},t.u);
   });
   live('lodging').filter(function(l){return (parseFloat(l.amount)||0)>0}).forEach(function(l){
-    add(l.in||'0',costRow('lodging',l,l.name||'Alojamiento','🛏️','Alojamiento'),parseFloat(l.amount)||0,l.cur,l.u);
+    add(l.in||'0',l,function(x){return costRow('lodging',l,l.name||'Alojamiento','🛏️','Alojamiento',x);},l.u);
   });
   var keys=Object.keys(g).sort().reverse();
-  var h='<div class="bar"><h2>Gastos</h2><button class="primary" data-act="add" data-k="expenses">+ Anotar gasto</button></div>'+balanceHtml();
+  var h='<div class="bar"><h2>Gastos</h2><button class="primary" data-act="add" data-k="expenses">+ Anotar gasto</button></div>';
+  if(ppl.length>1)h+='<div class="whopick" style="margin:0 0 14px;gap:6px"><button type="button" class="ghost'+(!who?' active':'')+'" data-act="gwho" data-who="" style="padding:5px 12px;font-size:14px">Todos</button>'
+    +ppl.map(function(p){return '<button type="button" class="ghost'+(who===p.id?' active':'')+'" data-act="gwho" data-who="'+esc(p.id)+'" style="padding:5px 12px;font-size:14px">'+dot(p.id)+esc(p.name)+'</button>';}).join('')+'</div>';
+  h+=balanceHtml(who);
+  if(who&&!keys.length)return h+empty('No hay gastos de '+esc(nameOf(who)),'Ningún gasto cargado lo pagó '+esc(nameOf(who))+' ni le toca una parte.')+ratesSectionHtml();
   if(!keys.length)return h+empty('Todavía no anotaron gastos','Cuando estén de viaje, anotá cada gasto: qué fue, cuánto, quién pagó y cómo. Acá se agrupan por día, y también suman los transportes y el alojamiento que cargaste con costo.')+ratesSectionHtml();
   var allEntries=[].concat.apply([],keys.map(function(k){return g[k]}));
   var all=sumBase(allEntries.map(function(x){return {amount:x.amount,cur:x.cur}}).filter(function(c){return c.amount>0}));
   var nd=keys.filter(function(k){return k!=='0'}).length,dl=parseFloat(S.trip.daily)||0;
+  if(who){
+    var paid=sumBase(costs().filter(function(c){return c.status==='pagado'&&c.paidBy===who;})).t,net=settleUp().net[who]||0;
+    h+='<dl class="stats" style="margin-top:12px"><div><dt>Le toca en total</dt><dd>'+money(all.t)+'</dd></div><div><dt>Pagó</dt><dd>'+money(paid)+'</dd></div><div><dt>'+(net>0.5?'Le deben':net<-0.5?'Debe':'Saldo')+'</dt><dd>'+money(Math.abs(net))+'</dd></div></dl>'+(all.miss.size?warnMiss(all.miss):'')+'<div style="height:14px"></div>';
+  }else
   h+='<dl class="stats" style="margin-top:12px"><div><dt>Gastos anotados</dt><dd>'+money(all.t)+'</dd></div>'+(nd?'<div><dt>Promedio por día</dt><dd>'+money(all.t/nd)+'</dd></div>':'')+(dl>0?'<div><dt>Presupuesto diario</dt><dd>'+money(dl)+'</dd></div>':'')+'</dl>'+(all.miss.size?warnMiss(all.miss):'')+'<div style="height:14px"></div>';
   h+=keys.map(function(k){
     var items=g[k].slice().sort(function(a,b){return (b.u||0)-(a.u||0)});
@@ -728,7 +750,6 @@ var METHODS=[];
 var MTYPES={credito:['💳','Tarjeta de crédito'],debito:['💳','Tarjeta de débito'],banco:['🏦','Cuenta bancaria'],billetera:['📱','Billetera virtual'],efectivo:['💵','Efectivo'],otro:['🧾','Otro']};
 var mtype=function(m){return MTYPES[m.type]||MTYPES.otro};
 var methodLabel=function(m){return (m.name||'Sin nombre')+(m.last4?' ••'+m.last4:'')};
-function addMonth(s){var d=pd(s);if(!d)return '';var y=d.getFullYear(),mo=d.getMonth()+1,last=new Date(y,mo+1,0).getDate();return iso(new Date(y,mo,Math.min(d.getDate(),last)));}
 function totalsText(lines){var t={};lines.forEach(function(l){t[l.cur]=(t[l.cur]||0)+l.amt;});var ks=Object.keys(t);return ks.length?ks.map(function(c){return money(t[c],c);}).join(' + '):money(0);}
 /* Reparte los cargos de una tarjeta en sus resúmenes: cada compra (o cuota) cae en el primer resumen
    que cierra el día de la compra o después; la cuota 2 en el siguiente, etc. */
@@ -800,7 +821,7 @@ function openMethod(id){
   panel.addEventListener('click',function(e){
     var rm=e.target.closest('[data-strm]');
     if(rm){st.splice(+rm.getAttribute('data-strm'),1);$('#stRows',panel).innerHTML=stRows();return;}
-    if(e.target.closest('#staddrow')){var last=st[st.length-1];st.push(last?{c:addMonth(last.c),v:addMonth(last.v)}:{c:'',v:''});$('#stRows',panel).innerHTML=stRows();}
+    if(e.target.closest('#staddrow')){st.push({c:'',v:''});$('#stRows',panel).innerHTML=stRows();}
   });
   f.addEventListener('submit',function(e){
     e.preventDefault();
@@ -879,7 +900,7 @@ function openSheet(title,body){
   host.hidden=false;document.body.classList.add('lock');
   return $('.panel',host);
 }
-function closeSheet(){var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');render();}
+function closeSheet(){var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');render();if(pendingJoin.length)setTimeout(askJoin,0);}
 function sheetForm(o){
   var v=o.values||{};
   var panel=openSheet(o.title,'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));
@@ -927,7 +948,8 @@ function normalizeCost(d,ex){
     if(k.indexOf('sw_')===0){sw.push(k.slice(3));delete d[k];}
     else if(k.indexOf('sh_')===0){var a=parseFloat(d[k])||0;if(a>0)sh.push({p:k.slice(3),a:a});delete d[k];}
   });
-  d.splitWith=d.split==='some'?sw.join(','):'';
+  /* "Todos" guarda quiénes eran: si después se suma alguien, se pregunta (askJoin) en vez de sumarlo solo. */
+  d.splitWith=d.split==='some'?sw.join(','):d.split==='equal'?((ex&&(ex.split||'equal')==='equal'&&ex.splitWith)?ex.splitWith:allPeople().map(function(p){return p.id;}).join(',')):'';
   d.shares=d.split==='amounts'?sh:[];
   if('methodId' in d){
     if(d.methodId==='__other')d.methodId='';
@@ -1076,7 +1098,11 @@ function openItem(k,id,pre){
   function drawSplit(){
     if(!box)return;
     var mode=el('split').value,ppl=allPeople(),st=splitState(),h='';
-    if(mode==='equal')h='<p class="hint" style="margin:0">Se divide entre todas las personas del viaje'+(ppl.length?' ('+ppl.map(function(p){return esc(p.name);}).join(', ')+')':'')+', también las que se sumen después.</p>';
+    if(mode==='equal'){
+      var fixed=ex&&(ex.split||'equal')==='equal'&&ex.splitWith?splitIds(ex).map(nameOf).filter(Boolean):null;
+      h='<p class="hint" style="margin:0">'+(fixed?'Se divide entre '+esc(fixed.join(', '))+' (los que estaban cuando se cargó). Para sumar o sacar a alguien, elegí "Algunos".'
+        :'Se divide entre todas las personas del viaje'+(ppl.length?' ('+ppl.map(function(p){return esc(p.name);}).join(', ')+')':'')+'. Si después se suma alguien, te vamos a preguntar si entra en este gasto.')+'</p>';
+    }
     else if(mode==='some'){
       var none=!Object.keys(st.sel).length;
       h='<div class="row">'+ppl.map(function(p){return '<label class="pksug"><input type="checkbox" name="sw_'+esc(p.id)+'"'+(st.sel[p.id]||none?' checked':'')+'>'+esc(p.name)+'</label>';}).join('')+'</div>';
@@ -1163,7 +1189,7 @@ function openItem(k,id,pre){
       if(sel.value==='__new__'){
         var nm=(window.prompt('¿Cómo se llama la persona?')||'').trim();
         if(!nm){sel.value=sel.dataset.prevValue||'';return;}
-        var pid=upsert('people',null,{name:nm,c:Date.now()});
+        var pid=addPerson(nm);
         sel.innerHTML=buildPaidByOptions().map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]===pid?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
         drawSplit();
       }
@@ -1175,7 +1201,40 @@ function openItem(k,id,pre){
   if(!ex){var first=$('input:not([type=hidden]),select',f);if(first&&window.matchMedia('(min-width:700px)').matches)first.focus();}
 }
 
-function peopleUsed(id){return costs().some(function(c){return c.paidBy===id||c.split===id||(c.split==='some'&&splitIds(c).indexOf(id)>=0)||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
+/* Alta de persona: antes se congelan los "todos por igual" viejos (sin splitWith) con quienes estaban,
+   y después se pregunta en cuáles entra la nueva. */
+var pendingJoin=[];
+function freezeEqual(){
+  var ids=allPeople().map(function(p){return p.id;}).join(',');
+  ['transports','lodging','expenses'].forEach(function(k){live(k).forEach(function(x){
+    if((x.split||'equal')==='equal'&&!x.splitWith&&(parseFloat(x.amount)||0)>0)upsert(k,x.id,{split:'equal',splitWith:ids});
+  });});
+}
+function addPerson(name){
+  freezeEqual();
+  var pid=upsert('people',null,{name:name,c:Date.now()});
+  pendingJoin.push(pid);
+  return pid;
+}
+function askJoin(){
+  if(!pendingJoin.length||!$('#sheet').hidden)return;
+  var pid=pendingJoin.shift(),nm=nameOf(pid);
+  var list=nm?costs().filter(function(c){return c.split==='equal'&&splitIds(c).indexOf(pid)<0;}):[];
+  if(!list.length){askJoin();return;}
+  var panel=openSheet('¿'+nm+' entra en gastos anteriores?','<p class="hint">Estos gastos ya estaban cargados y se dividían entre todos los que había. Tildá los que también le tocan a '+esc(nm)+'. Los que no tildes quedan como estaban.</p>'
+    +'<div class="row" style="margin-bottom:10px"><button type="button" class="ghost" id="jall" style="padding:6px 12px;font-size:13px">Tildar todos</button></div>'
+    +'<div class="stack">'+list.map(function(c){return '<label class="pkchk"><input type="checkbox" data-join="'+c.src+'|'+c.id+'"><span>'+esc(c.title)+' · '+money(c.amount,c.cur)+(c.date?' · '+esc(fShort(c.date)):'')+'</span></label>';}).join('')+'</div>'
+    +'<div class="acts" style="margin-top:14px"><button type="button" class="ghost" data-close>Ninguno</button><button type="button" class="primary" id="jok">Listo</button></div>');
+  $('#jall',panel).addEventListener('click',function(){Array.prototype.forEach.call(panel.querySelectorAll('[data-join]'),function(c){c.checked=true;});});
+  $('#jok',panel).addEventListener('click',function(){
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-join]:checked'),function(c){
+      var kk=c.getAttribute('data-join').split('|'),it=S[kk[0]].find(function(x){return x.id===kk[1];});
+      if(it&&splitIds(it).indexOf(pid)<0)upsert(kk[0],kk[1],{splitWith:splitIds(it).concat([pid]).join(',')});
+    });
+    closeSheet();
+  });
+}
+function peopleUsed(id){return costs().some(function(c){return c.paidBy===id||c.split===id||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
 /* Los p1/p2 de viajes viejos pueden no estar todavía en `people`: se crean con su mismo id. */
 function savePerson(id,data){
   if(S.people.some(function(x){return x.id===id}))return upsert('people',id,data);
@@ -1204,7 +1263,7 @@ function bindPeople(panel){
   panel.addEventListener('click',function(e){
     var b=e.target.closest('[data-pdel]');if(!b)return;
     var id=b.getAttribute('data-pdel'),nm=nameOf(id);
-    if(peopleUsed(id)){redraw('No se puede quitar a '+nm+': tiene gastos a su nombre (pagó o son solo suyos). Cambiá esos gastos primero.',true);return;}
+    if(peopleUsed(id)){redraw('No se puede quitar a '+nm+': participa de gastos (pagó alguno o le toca una parte). Sacalo de esos gastos primero.',true);return;}
     if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='¿Quitar?';return;}
     savePerson(id,{});remove('people',id);
     if(cloudMode()&&myClaim===id)releaseClaim();
@@ -1215,7 +1274,7 @@ function bindPeople(panel){
     var f=e.target.closest('.pplform');if(!f)return;
     e.preventDefault();
     var nm=$('[data-pnew]',f).value.trim();if(!nm)return;
-    upsert('people',null,{name:nm,c:Date.now()});
+    addPerson(nm);
     redraw();var n=$('[data-pnew]',panel);if(n)n.focus();
   });
 }
@@ -1527,6 +1586,7 @@ document.addEventListener('click',function(e){
   else if(a==='theme')cycleTheme();
   else if(a==='fetchrates')fetchRates((t.dataset.codes||'USD,BRL').split(','));
   else if(a==='fetchusd')fetchBlueUsd(t.dataset.type);
+  else if(a==='gwho'){gastosWho=t.dataset.who||'';render();}
   else if(a==='whoami'){if(cloudMode())claimPerson(t.dataset.who);else setWhoAmI(t.dataset.who);render();}
   else if(a==='whoswitch'){claimMsg='';if(cloudMode())releaseClaim();else setWhoAmI('');render();}
   else if(a==='login')login();
@@ -1550,9 +1610,9 @@ document.addEventListener('submit',function(e){
     e.preventDefault();
     var nm=pform.querySelector('[data-persontext]').value.trim();
     if(!nm)return;
-    var pid=upsert('people',null,{name:nm,c:Date.now()});
+    var pid=addPerson(nm);
     if(cloudMode())claimPerson(pid);else setWhoAmI(pid);
-    render();
+    render();askJoin();
     return;
   }
   var sform=e.target.closest&&e.target.closest('.pksuggest');
