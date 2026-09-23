@@ -92,6 +92,14 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 /* Balance */
 .balance{background:var(--sun);color:var(--on-sun);border-radius:14px;padding:14px 16px;margin-bottom:6px;font-weight:600}
 .balance b{font-family:var(--display);font-size:20px}
+.bline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 0}
+.bline+.bline{border-top:1px dashed rgba(58,45,0,.25)}
+.bline>span:first-child{flex:1;min-width:180px}
+.balance .ghost{border-color:rgba(58,45,0,.45);color:var(--on-sun);padding:4px 10px;font-size:13px}
+.cobro{flex-basis:100%;font-size:13px;font-weight:500}
+.cobro b,.hint .cobro b{font-family:var(--body);font-size:14px;overflow-wrap:anywhere}
+.cobro .ghost{padding:2px 8px;font-size:12px;margin-left:4px}
+.hint .cobro .ghost{color:var(--ink);border-color:var(--line)}
 
 /* Bars */
 .bars{list-style:none;margin:0;padding:0;display:grid;gap:10px}
@@ -107,6 +115,7 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 .rate input{width:130px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .rate.miss input{border-color:var(--rose)}
 .rate .dot{margin-right:6px}
+.whopick .ghost .dot{margin-right:5px}
 
 /* Ticket */
 .ticket{display:grid;grid-template-columns:74px 1fr;background:var(--surface);border:1px solid var(--line);border-radius:16px;margin:0 0 14px;overflow:hidden;cursor:pointer}
@@ -332,7 +341,7 @@ var FB_VER='10.14.1';
 var CODE_KEY='viaje-de-a-dos:code',MODE_KEY='viaje-de-a-dos:mode';
 var CODE='',LOCAL_ONLY=false,FB=null,syncState='';
 try{CODE=localStorage.getItem(CODE_KEY)||'';LOCAL_ONLY=localStorage.getItem(MODE_KEY)==='local';}catch(e){}
-var ITEM_KEYS=['transports','lodging','expenses','plans','packing','people'];
+var ITEM_KEYS=['transports','lodging','expenses','plans','packing','people','payments'];
 /* En la nube la mochila vive en su propia colección (trips/{code}/packing), privada por reglas. */
 var CLOUD_KEYS=ITEM_KEYS.filter(function(k){return k!=='packing'});
 var cloudMode=function(){return !!(FIREBASE_CONFIG.apiKey&&CODE&&!LOCAL_ONLY)};
@@ -342,9 +351,9 @@ var CATS={'Comida':'🍽️','Transporte local':'🚇','Actividades':'🎟️','
 var ITYPES={paseo:['🚶','Paseo'],comida:['🍽️','Comida'],excursion:['🗺️','Excursión'],tramite:['📄','Trámite'],descanso:['🛌','Descanso'],otro:['📌','Otro']};
 
 /* ---------- Estado ---------- */
-function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[],people:[]};}
+function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[],people:[],payments:[]};}
 var arr=function(a){return Array.isArray(a)?a.filter(function(x){return x&&x.id}):[]};
-function fix(o){var b=blank();o=o||{};var t=Object.assign(b.trip,o.trip||{});t.rates=Object.assign({},(o.trip&&o.trip.rates)||{});return {v:1,trip:t,transports:arr(o.transports),lodging:arr(o.lodging),expenses:arr(o.expenses),plans:arr(o.plans),packing:arr(o.packing),people:arr(o.people)};}
+function fix(o){var b=blank();o=o||{};var t=Object.assign(b.trip,o.trip||{});t.rates=Object.assign({},(o.trip&&o.trip.rates)||{});return {v:1,trip:t,transports:arr(o.transports),lodging:arr(o.lodging),expenses:arr(o.expenses),plans:arr(o.plans),packing:arr(o.packing),people:arr(o.people),payments:arr(o.payments)};}
 var S=blank();
 try{var raw=localStorage.getItem(LS);if(raw)S=fix(JSON.parse(raw));}catch(e){}
 function save(){try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){}}
@@ -424,29 +433,111 @@ function settleUp(){
     Object.keys(sm).forEach(function(id){if(net.hasOwnProperty(id))net[id]-=sm[id];});
     if(net.hasOwnProperty(c.paidBy))net[c.paidBy]+=b;
   });
+  /* Pagos entre personas (saldar deudas): no son gastos, solo mueven el balance. */
+  live('payments').forEach(function(x){
+    var a=parseFloat(x.amount)||0;if(a<=0||!x.from||!x.to)return;
+    any=true;
+    var b=toBase(a,x.cur);
+    if(b==null){miss.add((x.cur||'').toUpperCase());return;}
+    if(net.hasOwnProperty(x.from))net[x.from]+=b;
+    if(net.hasOwnProperty(x.to))net[x.to]-=b;
+  });
   return {net:net,any:any,miss:miss,people:people};
 }
+/* Quién le paga a quién para quedar a mano, con la menor cantidad de transferencias.
+   Se buscan grupos de personas cuyos saldos se cancelan entre sí (cada grupo de k personas
+   se salda con k-1 transferencias); cuantos más grupos, menos transferencias. Exacto hasta
+   16 personas con saldo; con más, se usa directamente el método simple. */
 function settlements(){
-  var b=settleUp(),cred=[],deb=[];
-  b.people.forEach(function(p){var v=b.net[p.id]||0;if(v>0.5)cred.push({name:p.name,amt:v});else if(v<-0.5)deb.push({name:p.name,amt:-v});});
-  cred.sort(function(a,b2){return b2.amt-a.amt;});deb.sort(function(a,b2){return b2.amt-a.amt;});
-  var out=[],i=0,j=0;
-  while(i<deb.length&&j<cred.length){
-    var pay=Math.min(deb[i].amt,cred[j].amt);
-    out.push({from:deb[i].name,to:cred[j].name,amt:pay});
-    deb[i].amt-=pay;cred[j].amt-=pay;
-    if(deb[i].amt<0.5)i++;
-    if(cred[j].amt<0.5)j++;
+  var b=settleUp(),nm={};
+  b.people.forEach(function(p){nm[p.id]=p.name;});
+  var bal=b.people.map(function(p){return {id:p.id,v:Math.round((b.net[p.id]||0)*100)};}).filter(function(x){return Math.abs(x.v)>=50;});
+  if(bal.length){  /* los redondeos no pueden dejar plata suelta */
+    var res=-bal.reduce(function(t,x){return t+x.v;},0);
+    bal.slice().sort(function(x,y){return Math.abs(y.v)-Math.abs(x.v);})[0].v+=res;
   }
+  var groups=[bal];
+  var n=bal.length;
+  if(n>2&&n<=16){
+    var full=(1<<n)-1,sum=new Array(full+1),dp=new Array(full+1);
+    sum[0]=0;dp[0]=0;
+    for(var m=1;m<=full;m++){
+      var low=m&-m,i=31-Math.clz32(low);
+      sum[m]=sum[m^low]+bal[i].v;
+      var best=-1;
+      for(var j=0;j<n;j++)if(m&(1<<j)){var d=dp[m^(1<<j)];if(d>best)best=d;}
+      dp[m]=best+(sum[m]===0?1:0);
+    }
+    groups=[];var cur=full,g=[];
+    while(cur){
+      var add=sum[cur]===0?1:0;
+      for(var k=0;k<n;k++)if((cur&(1<<k))&&dp[cur^(1<<k)]+add===dp[cur]){g.push(bal[k]);cur^=1<<k;break;}
+      if(sum[cur]===0){groups.push(g);g=[];}
+    }
+  }
+  var out=[];
+  groups.forEach(function(grp){
+    var cred=grp.filter(function(x){return x.v>0;}).map(function(x){return {id:x.id,amt:x.v};}).sort(function(x,y){return y.amt-x.amt;});
+    var deb=grp.filter(function(x){return x.v<0;}).map(function(x){return {id:x.id,amt:-x.v};}).sort(function(x,y){return y.amt-x.amt;});
+    var i=0,j=0;
+    while(i<deb.length&&j<cred.length){
+      var pay=Math.min(deb[i].amt,cred[j].amt);
+      if(pay>0)out.push({fromId:deb[i].id,toId:cred[j].id,from:nm[deb[i].id],to:nm[cred[j].id],amt:pay/100});
+      deb[i].amt-=pay;cred[j].amt-=pay;
+      if(deb[i].amt<=0)i++;
+      if(cred[j].amt<=0)j++;
+    }
+  });
+  out.sort(function(x,y){return y.amt-x.amt;});
   return {list:out,any:b.any,miss:b.miss};
+}
+/* Datos para cobrar que cada uno publica en el viaje (alias/CBU), vía su vínculo con la cuenta. */
+function cobroOf(pid){var c=cloudMode()?CLAIMS[pid]:null;return c&&c.cobro&&c.cobro.length?c.cobro:[];}
+function cobroHtml(pid){
+  var l=cobroOf(pid);if(!l.length)return '';
+  return '<span class="cobro">'+l.map(function(x){return esc(x.n?x.n+': ':'')+'<b>'+esc(x.a)+'</b> <button type="button" class="ghost" data-copy="'+esc(x.a)+'">Copiar</button>';}).join(' · ')+'</span>';
 }
 function balanceHtml(who){
   if(allPeople().length<2)return '';
   var s=settlements();if(!s.any)return '';
-  if(who){var wn=nameOf(who);s.list=s.list.filter(function(x){return x.from===wn||x.to===wn;});if(!s.list.length)return '<div class="balance">'+esc(wn)+' está a mano con todos.</div>';}
+  if(who){s.list=s.list.filter(function(x){return x.fromId===who||x.toId===who;});if(!s.list.length)return '<div class="balance">'+esc(nameOf(who))+' está a mano con todos.</div>';}
   if(!s.list.length)return '<div class="balance">Están a mano. Nadie le debe nada a nadie.</div>'+(s.miss.size?warnMiss(s.miss):'');
-  return '<div class="balance">'+s.list.map(function(x){return esc(x.from)+' le debe <b>'+money(x.amt)+'</b> a '+esc(x.to);}).join('<br>')+'</div>'+(s.miss.size?warnMiss(s.miss):'');
+  return '<div class="balance">'+s.list.map(function(x){
+    return '<div class="bline"><span>'+esc(x.from)+' le debe <b>'+money(x.amt)+'</b> a '+esc(x.to)+'</span>'
+     +'<button type="button" class="ghost" data-act="settle" data-from="'+esc(x.fromId)+'" data-to="'+esc(x.toId)+'" data-amt="'+x.amt+'">Registrar pago</button>'
+     +cobroHtml(x.toId)+'</div>';
+  }).join('')+'</div>'+(s.miss.size?warnMiss(s.miss):'');
 }
+function payRow(x){
+  return '<div class="exp" role="button" tabindex="0" data-act="editpay" data-id="'+x.id+'"><span class="ec" aria-hidden="true">🤝</span><div class="et"><b>'+esc(nameOf(x.from)||'?')+' le pagó a '+esc(nameOf(x.to)||'?')+'</b><small>'+(x.date?'<span>'+esc(fShort(x.date))+'</span>':'')+(x.method?'<span>'+esc(x.method)+'</span>':'')+(x.note?'<span>'+esc(x.note)+'</span>':'')+'</small></div><div class="ea"><b>'+money(parseFloat(x.amount)||0,x.cur)+'</b></div></div>';
+}
+function paymentsHtml(who){
+  var L=live('payments').filter(function(x){return !who||x.from===who||x.to===who;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||(b.u||0)-(a.u||0);});
+  if(!L.length)return '';
+  return '<section class="sec"><h2>Pagos entre ustedes</h2><p class="sub">Lo que se fueron devolviendo para saldar deudas. No cuenta como gasto del viaje.</p>'+L.map(payRow).join('')+'</section>';
+}
+function openPayment(id,pre){
+  var ex=id?S.payments.find(function(x){return x.id===id;}):null,ppl=allPeople().map(function(p){return [p.id,p.name];});
+  var v=ex||Object.assign({date:today(),cur:base()},pre||{});
+  var intro=function(to){var c=cobroHtml(to);return c?'<p class="hint">Datos de '+esc(nameOf(to))+' para transferirle: '+c+'</p>':'';};
+  sheetForm({title:ex?'Editar pago':'Registrar pago',values:v,
+    intro:'<div id="payintro">'+intro(v.to)+'</div>',
+    fields:[
+      {k:'from',l:'Quién pagó',t:'select',half:true,opts:ppl},
+      {k:'to',l:'A quién',t:'select',half:true,opts:ppl},
+      {k:'amount',l:'Monto',t:'number',half:true,req:true,ph:'0'},
+      {k:'cur',l:'Moneda',t:'text',list:'curs',half:true},
+      {k:'date',l:'Fecha',t:'date',half:true},
+      {k:'method',l:'Cómo',t:'text',half:true,list:'methods',ph:'Transferencia, efectivo…'},
+      {k:'note',l:'Nota (opcional)',t:'text'}
+    ],
+    onReady:function(panel){panel.addEventListener('change',function(e){if(e.target.name==='to')$('#payintro',panel).innerHTML=intro(e.target.value);});},
+    validate:function(d){if(d.from===d.to)return 'Quién paga y quién recibe tienen que ser personas distintas.';if(!(parseFloat(d.amount)>0))return 'Poné un monto mayor a cero.';return '';},
+    onSave:function(d){d.amount=parseFloat(d.amount)||0;d.cur=(d.cur||base()).toUpperCase().slice(0,6);upsert('payments',ex?ex.id:null,d);},
+    onDelete:ex?function(){remove('payments',ex.id);}:null
+  });
+}
+
 function warnMiss(set){var l=Array.from(set).filter(Boolean);return l.length?'<p class="warn">Falta el tipo de cambio de '+esc(l.join(', '))+'. Cargalo en Resumen para que la suma sea correcta.</p>':'';}
 function relTime(ts){
   var s=Math.floor((Date.now()-ts)/1000);
@@ -626,7 +717,7 @@ function vGastos(){
   if(ppl.length>1)h+='<div class="whopick" style="margin:0 0 14px;gap:6px"><button type="button" class="ghost'+(!who?' active':'')+'" data-act="gwho" data-who="" style="padding:5px 12px;font-size:14px">Todos</button>'
     +ppl.map(function(p){return '<button type="button" class="ghost'+(who===p.id?' active':'')+'" data-act="gwho" data-who="'+esc(p.id)+'" style="padding:5px 12px;font-size:14px">'+dot(p.id)+esc(p.name)+'</button>';}).join('')+'</div>';
   h+=balanceHtml(who);
-  if(who&&!keys.length)return h+empty('No hay gastos de '+esc(nameOf(who)),'Ningún gasto cargado lo pagó '+esc(nameOf(who))+' ni le toca una parte.')+ratesSectionHtml();
+  if(who&&!keys.length)return h+empty('No hay gastos de '+esc(nameOf(who)),'Ningún gasto cargado lo pagó '+esc(nameOf(who))+' ni le toca una parte.')+paymentsHtml(who)+ratesSectionHtml();
   if(!keys.length)return h+empty('Todavía no anotaron gastos','Cuando estén de viaje, anotá cada gasto: qué fue, cuánto, quién pagó y cómo. Acá se agrupan por día, y también suman los transportes y el alojamiento que cargaste con costo.')+ratesSectionHtml();
   var allEntries=[].concat.apply([],keys.map(function(k){return g[k]}));
   var all=sumBase(allEntries.map(function(x){return {amount:x.amount,cur:x.cur}}).filter(function(c){return c.amount>0}));
@@ -641,7 +732,7 @@ function vGastos(){
     var s=sumBase(items.map(function(x){return {amount:x.amount,cur:x.cur}})),over=dl>0&&s.t>dl;
     return '<section class="day"><div class="dh"><h3>'+(k==='0'?'Sin fecha':esc(fLong(k)))+'</h3><b class="'+(over?'over':'')+'">'+money(s.t)+'</b></div>'+(dl>0?'<div class="prog"><span class="'+(over?'over':'')+'" style="width:'+Math.min(100,s.t/dl*100)+'%"></span></div>':'')+items.map(function(x){return x.row}).join('')+'</section>';
   }).join('');
-  h+=ratesSectionHtml();
+  h+=paymentsHtml(who)+ratesSectionHtml();
   return h;
 }
 
@@ -777,7 +868,7 @@ function vPagos(){
   var cs=costs(),t=today();
   return h+METHODS.map(function(m){
     var ty=mtype(m),charges=cs.filter(function(c){return c.methodId===m.id;});
-    var out='<section class="sec"><div class="mhead"><h3>'+ty[0]+' '+esc(m.name||'Sin nombre')+'</h3><small>'+esc([ty[1],m.bank,m.last4?'••'+m.last4:''].filter(Boolean).join(' · '))+'</small><span class="sp"></span><button type="button" class="ghost" data-act="editmethod" data-id="'+esc(m.id)+'">Editar</button></div>';
+    var out='<section class="sec"><div class="mhead"><h3>'+ty[0]+' '+esc(m.name||'Sin nombre')+'</h3><small>'+esc([ty[1],m.bank,m.last4?'••'+m.last4:'',m.alias?'Alias '+m.alias+(m.share?' (visible para tus viajes)':''):''].filter(Boolean).join(' · '))+'</small><span class="sp"></span><button type="button" class="ghost" data-act="editmethod" data-id="'+esc(m.id)+'">Editar</button></div>';
     if(m.type==='credito'){
       var sc=cardSchedule(m,charges),shown=sc.buckets.filter(function(b){return b.lines.length||b.s.v>=t||b.s.c>=t;});
       var nextIdx=shown.findIndex(function(b){return (b.s.v||b.s.c)>=t;});
@@ -804,14 +895,20 @@ function openMethod(id){
     {k:'type',l:'Tipo',t:'select',opts:Object.keys(MTYPES).map(function(k){return [k,MTYPES[k][0]+' '+MTYPES[k][1]];})},
     {k:'name',l:'Nombre para reconocerla',t:'text',req:true,ph:'Ej: Visa Galicia, Cuenta Brubank'},
     {k:'bank',l:'Banco o emisor (opcional)',t:'text',half:true},
-    {k:'last4',l:'Últimos 4 dígitos (opcional)',t:'text',half:true,ph:'1234'}
+    {k:'last4',l:'Últimos 4 dígitos (opcional)',t:'text',half:true,ph:'1234'},
+    {k:'alias',l:'Alias o CBU/CVU para que te transfieran',t:'text',ph:'Ej: lauti.viajes.mp'},
+    {k:'_share',t:'html',html:'<label class="fld pksug" id="shareWrap" style="flex-direction:row;white-space:normal"><input type="checkbox" name="share"'+(v.share?' checked':'')+'> Mostrarlo a los demás de mis viajes, para que vean a dónde pagarme cuando me deban</label>'}
   ];
   var panel=openSheet(m?'Editar forma de pago':'Nueva forma de pago','<form id="mf" class="grid" novalidate>'+fields.map(function(f){return fieldHtml(f,v);}).join('')
     +'<div class="fld" id="stWrap"><span>Resúmenes de la tarjeta</span><p class="hint" style="margin:0 0 6px">Fecha de cierre y de vencimiento (cuándo hay que pagarlo) de cada resumen, como las publica el banco.</p><div id="stRows">'+stRows()+'</div><div><button type="button" class="ghost" id="staddrow" style="padding:6px 12px;font-size:13px">+ Agregar resumen</button></div></div>'
     +'<p class="msg err" id="mmsg" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(m?'<button type="button" class="danger" id="mdel">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>');
   var f=$('#mf',panel),l4=$('#f_last4',panel);
   l4.setAttribute('inputmode','numeric');l4.setAttribute('maxlength','4');
-  function syncType(){$('#stWrap',panel).hidden=$('#f_type',panel).value!=='credito';}
+  function syncType(){
+    var t=$('#f_type',panel).value,cobra=t==='banco'||t==='billetera';
+    $('#stWrap',panel).hidden=t!=='credito';
+    $('#f_alias',panel).closest('.fld').hidden=!cobra;$('#shareWrap',panel).hidden=!cobra;
+  }
   syncType();
   panel.addEventListener('change',function(e){if(e.target.id==='f_type')syncType();});
   panel.addEventListener('input',function(e){
@@ -832,7 +929,8 @@ function openMethod(id){
     if(d.last4&&digits.length!==4){msg.textContent='En "últimos 4 dígitos" poné solo 4 números, nunca el número completo.';return;}
     var stc=d.type==='credito'?st.filter(function(x){return x.c;}).sort(function(a,b){return a.c.localeCompare(b.c);}):[];
     if(stc.some(function(x){return x.v&&x.v<x.c;})){msg.textContent='Hay un resumen que vence antes de cerrar. Revisá las fechas.';return;}
-    saveMethod(Object.assign({},m||{},{id:m?m.id:uid(),type:d.type,name:d.name,bank:d.bank||'',last4:digits,statements:stc,u:Date.now()}));
+    var cobra=d.type==='banco'||d.type==='billetera';
+    saveMethod(Object.assign({},m||{},{id:m?m.id:uid(),type:d.type,name:d.name,bank:d.bank||'',last4:digits,statements:stc,alias:cobra?(d.alias||''):'',share:cobra&&d.alias&&d.share?'1':'',u:Date.now()}));
     closeSheet();
   });
   var del=$('#mdel',panel);
@@ -903,7 +1001,7 @@ function openSheet(title,body){
 function closeSheet(){var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');render();if(pendingJoin.length)setTimeout(askJoin,0);}
 function sheetForm(o){
   var v=o.values||{};
-  var panel=openSheet(o.title,'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));
+  var panel=openSheet(o.title,(o.intro||'')+'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<p class="msg err" id="sfmsg" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));
   var f=$('#sf',panel);
   if(o.onReady)o.onReady(panel);
   f.addEventListener('submit',function(e){
@@ -911,6 +1009,8 @@ function sheetForm(o){
     var d={};new FormData(f).forEach(function(val,k){d[k]=String(val).trim()});
     var req=o.fields.filter(function(x){return x.req&&!d[x.k]})[0];
     if(req){var el=$('#f_'+req.k,panel);if(el)el.focus();return;}
+    var bad=o.validate?o.validate(d):'';
+    if(bad){var m=$('#sfmsg',panel);if(m)m.textContent=bad;return;}
     o.onSave(d);closeSheet();
   });
   var del=$('#del',panel);
@@ -1234,7 +1334,7 @@ function askJoin(){
     closeSheet();
   });
 }
-function peopleUsed(id){return costs().some(function(c){return c.paidBy===id||c.split===id||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
+function peopleUsed(id){if(live('payments').some(function(x){return x.from===id||x.to===id;}))return true;return costs().some(function(c){return c.paidBy===id||c.split===id||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
 /* Los p1/p2 de viajes viejos pueden no estar todavía en `people`: se crean con su mismo id. */
 function savePerson(id,data){
   if(S.people.some(function(x){return x.id===id}))return upsert('people',id,data);
@@ -1308,7 +1408,7 @@ try{if(window.claude&&typeof window.claude.use==='function'){window.claude.use('
 
 function mergeIn(inc){
   inc=fix(inc);
-  ['transports','lodging','expenses','plans','packing','people'].forEach(function(k){
+  ITEM_KEYS.forEach(function(k){
     var map=new Map(S[k].map(function(x){return [x.id,x]}));
     inc[k].forEach(function(x){var c=map.get(x.id);if(!c||(x.u||0)>(c.u||0))map.set(x.id,x);});
     S[k]=Array.from(map.values());
@@ -1361,18 +1461,28 @@ function sendSuggestion(owner,text){
   /* No se guarda localmente: es de la mochila del otro, que no podemos leer. */
   try{FB.fs.setDoc(fdoc('packing',it.id),it).catch(fbErr);}catch(e){}
 }
+/* Alias visibles: se copian al vínculo (claims) de este viaje, que ven los demás del viaje. */
+function myCobro(){return METHODS.filter(function(m){return m.share&&m.alias&&(m.type==='banco'||m.type==='billetera');}).map(function(m){return {n:String(m.name||''),a:String(m.alias)};});}
+var methodsReady=false;
+function syncCobro(){
+  if(!FB||AUTH!=='in'||!methodsReady||!myClaim||!CLAIMS[myClaim])return;
+  var want=myCobro();
+  if(JSON.stringify(want)===JSON.stringify(CLAIMS[myClaim].cobro||[]))return;
+  try{FB.fs.updateDoc(fdoc('claims',myClaim),{cobro:want}).catch(fbErr);}catch(e){}
+}
 function saveMethod(m){
   if(!FB||AUTH!=='in')return;
   var i=METHODS.findIndex(function(x){return x.id===m.id;});
   if(m.del){if(i>=0)METHODS.splice(i,1);}else if(i>=0)METHODS[i]=m;else METHODS.push(m);
   try{FB.fs.setDoc(FB.fs.doc(FB.db,'users',ME.uid,'methods',m.id),clean(m)).catch(fbErr);}catch(e){}
+  syncCobro();
 }
 function claimPerson(pid){
   claimMsg='';
   if(!FB||AUTH!=='in'||!pid)return;
   if(myClaim&&myClaim!==pid)releaseClaim();
   if(CLAIMS[pid]&&CLAIMS[pid].uid===ME.uid)return;
-  FB.fs.setDoc(fdoc('claims',pid),{uid:ME.uid,name:ME.name||'',u:Date.now()}).catch(function(e){
+  FB.fs.setDoc(fdoc('claims',pid),{uid:ME.uid,name:ME.name||'',cobro:myCobro(),u:Date.now()}).catch(function(e){
     claimMsg=e&&e.code==='permission-denied'?'Esa persona ya la eligió otra cuenta. Elegí otra o agregate con tu nombre.':'No se pudo guardar. Probá de nuevo.';
     render();
   });
@@ -1494,6 +1604,7 @@ function listen(){
   fs.onSnapshot(fs.collection(db,'users',ME.uid,'methods'),function(snap){
     METHODS=snap.docs.map(function(x){return x.data()||{};}).filter(function(m){return m.id&&!m.del&&/^[a-z0-9]{1,24}$/i.test(m.id);})
       .sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
+    if(!snap.metadata.fromCache){methodsReady=true;syncCobro();}
     render();
   },function(err){fbErr(err);});
 
@@ -1502,9 +1613,10 @@ function listen(){
      sale antes, las reglas todavía no lo ven, la rechazan y el listener muere. */
   fs.onSnapshot(fs.collection(db,'trips',CODE,'claims'),{includeMetadataChanges:true},function(snap){
     var c={},mine='';
-    snap.docs.forEach(function(x){var d=x.data()||{};c[x.id]={uid:d.uid||'',name:d.name||''};if(d.uid===ME.uid&&!x.metadata.hasPendingWrites&&(!mine||x.id<mine))mine=x.id;});
+    snap.docs.forEach(function(x){var d=x.data()||{};c[x.id]={uid:d.uid||'',name:d.name||'',cobro:Array.isArray(d.cobro)?d.cobro.filter(function(y){return y&&typeof y.a==='string'&&y.a;}).map(function(y){return {n:String(y.n||''),a:y.a};}):[]};if(d.uid===ME.uid&&!x.metadata.hasPendingWrites&&(!mine||x.id<mine))mine=x.id;});
     CLAIMS=c;
     if(mine!==myClaim||!claimsSeen){claimsSeen=true;myClaim=mine;subscribePacking();}
+    if(!snap.metadata.hasPendingWrites)syncCobro();
     render();
   },function(err){fbErr(err);});
 
@@ -1573,6 +1685,10 @@ function openSync(){
 
 /* ---------- Eventos ---------- */
 document.addEventListener('click',function(e){
+  var cp=e.target.closest&&e.target.closest('[data-copy]');
+  if(cp){var txt=cp.getAttribute('data-copy'),done=function(){cp.textContent='¡Copiado!';setTimeout(function(){cp.textContent='Copiar';},1500);};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done).catch(function(){});
+    e.stopPropagation();return;}
   var pd=e.target.closest&&e.target.closest('[data-pkdel]');
   if(pd){remove('packing',pd.getAttribute('data-pkdel'));render();return;}
   var t=e.target.closest('[data-tab],[data-act],[data-close]');if(!t)return;
@@ -1586,6 +1702,8 @@ document.addEventListener('click',function(e){
   else if(a==='theme')cycleTheme();
   else if(a==='fetchrates')fetchRates((t.dataset.codes||'USD,BRL').split(','));
   else if(a==='fetchusd')fetchBlueUsd(t.dataset.type);
+  else if(a==='settle')openPayment(null,{from:t.dataset.from,to:t.dataset.to,amount:Math.round(parseFloat(t.dataset.amt)*100)/100,method:'Transferencia'});
+  else if(a==='editpay')openPayment(t.dataset.id);
   else if(a==='gwho'){gastosWho=t.dataset.who||'';render();}
   else if(a==='whoami'){if(cloudMode())claimPerson(t.dataset.who);else setWhoAmI(t.dataset.who);render();}
   else if(a==='whoswitch'){claimMsg='';if(cloudMode())releaseClaim();else setWhoAmI('');render();}
