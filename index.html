@@ -273,6 +273,7 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync]{displ
 .strow label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;color:var(--muted);min-width:0}
 .strow input{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--paper)}
 .strow .x{border:0;background:transparent;color:var(--muted);font-size:15px;padding:8px 6px}
+.updbar{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));background:var(--sun);color:var(--on-sun);font-weight:700;font-size:14px;padding:10px 16px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:calc(100% - 32px);text-align:center}
 @media (prefers-reduced-motion:reduce){#sheet .panel{animation:none}}
 </style>
 <script>try{var __t=localStorage.getItem('viaje-de-a-dos:theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
@@ -304,6 +305,7 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync]{displ
 </nav>
 <main id="main"></main>
 <div id="sheet" hidden></div>
+<div id="updbar" class="updbar" role="status" hidden>Hay una versión nueva de la app: se actualiza cuando cierres esta ventana.</div>
 
 <datalist id="curs"><option value="ARS"><option value="USD"><option value="EUR"><option value="BRL"><option value="CLP"><option value="UYU"><option value="PYG"><option value="BOB"><option value="COP"><option value="MXN"><option value="GBP"></datalist>
 <datalist id="methods"><option value="Efectivo"><option value="Tarjeta de crédito"><option value="Tarjeta de débito"><option value="Transferencia"><option value="Mercado Pago"><option value="Millas / puntos"></datalist>
@@ -366,6 +368,7 @@ try{
     localStorage.setItem(CODE_KEY,CODE);localStorage.removeItem(MODE_KEY);
     history.replaceState(null,'',location.pathname);
   }
+  if(new URLSearchParams(location.search).has('v'))history.replaceState(null,'',location.pathname);
 }catch(e){}
 var live=function(k){return S[k].filter(function(x){return !x.del})};
 function upsert(k,id,data){var now=Date.now(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:now});}else{it=Object.assign({id:uid(),u:now},data);S[k].push(it);}save();pushItem(k,it);return it.id;}
@@ -1009,7 +1012,7 @@ function openSheet(title,body){
   return $('.panel',host);
 }
 var formRefresh=null;
-function closeSheet(){formRefresh=null;var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');render();if(pendingJoin.length)setTimeout(askJoin,0);}
+function closeSheet(){formRefresh=null;var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');if(reloadPending){forceReload(reloadPending);return;}render();if(pendingJoin.length)setTimeout(askJoin,0);}
 function sheetForm(o){
   var v=o.values||{};
   var panel=openSheet(o.title,(o.intro||'')+'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<p class="msg err" id="sfmsg" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));
@@ -1592,6 +1595,8 @@ async function startCloud(){
     }
   });
 }
+var RELOAD_KEY='viaje-de-a-dos:reloadToken',reloadPending='';
+function forceReload(tok){try{localStorage.setItem(RELOAD_KEY,tok);}catch(e){}location.replace(location.pathname+'?v='+encodeURIComponent(tok));}
 function login(){
   loginMsg='';
   if(!FB){loginMsg='Todavía se está conectando. Probá de nuevo en un segundo.';render();return;}
@@ -1658,6 +1663,18 @@ function listen(){
     if(!snap.metadata.fromCache){methodsReady=true;syncCobro();}
     render();if(formRefresh)formRefresh();
   },function(err){fbErr(err);});
+
+  /* Actualización forzada desde admin.html: meta/app.reloadToken cambia -> cada app abierta se recarga.
+     El ?v= evita que el navegador o GitHub Pages devuelvan el HTML viejo desde caché. */
+  fs.onSnapshot(fs.doc(db,'meta','app'),{includeMetadataChanges:true},function(snap){
+    if(snap.metadata.fromCache&&!snap.exists())return;
+    var tok=(snap.exists()&&snap.data().reloadToken)||'-';  /* '-' = todavía nunca se forzó */
+    var seen='';try{seen=localStorage.getItem(RELOAD_KEY)||'';}catch(e){}
+    if(!seen){try{localStorage.setItem(RELOAD_KEY,tok);}catch(e){}return;}
+    if(tok===seen)return;
+    if($('#sheet').hidden)forceReload(tok);
+    else{reloadPending=tok;var b=$('#updbar');if(b)b.hidden=false;}
+  },function(){});
 
   var claimsSeen=false;
   /* La mochila se suscribe recién cuando el vínculo está confirmado por el servidor: si la consulta

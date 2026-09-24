@@ -24,6 +24,11 @@ th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font
 td:first-child,td:nth-child(2){white-space:normal}
 th{background:rgba(0,0,0,.03);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 tr:last-child td{border-bottom:0}
+.cfg{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:22px}
+.cfg h2{font-size:17px;margin:0 0 10px}
+.cfgrow{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.cfgrow>div{flex:1;min-width:220px}
+#forceUpd.armed{background:var(--rose);color:#fff;border-color:var(--rose)}
 .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted)}
 a.openlink{color:var(--sea);font-weight:700;text-decoration:none}
 a.openlink:hover{text-decoration:underline}
@@ -38,6 +43,14 @@ a.openlink:hover{text-decoration:underline}
     <button id="login" type="button" hidden>Entrar con Google</button>
   </div>
   <div id="panel" hidden>
+  <section class="cfg">
+    <h2>Configuración</h2>
+    <div class="cfgrow">
+      <div><b>Forzar actualización a todos</b><p class="status" id="updInfo" style="margin:2px 0 0">Recarga la app en todos los dispositivos que la tengan abierta, para que tomen la última versión publicada. Si alguien tiene un formulario abierto, se actualiza al cerrarlo.</p></div>
+      <button id="forceUpd" type="button">🔄 Forzar actualización</button>
+    </div>
+    <p class="status" id="updMsg"></p>
+  </section>
   <div class="toolbar">
     <input type="search" id="q" placeholder="Buscar por nombre, código o persona…">
     <button id="refresh" type="button">🔄 Actualizar</button>
@@ -54,7 +67,7 @@ a.openlink:hover{text-decoration:underline}
 </div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 /* Misma configuración que index.html — es pública por diseño de Firebase. */
@@ -166,6 +179,23 @@ function render(){
 
 q.addEventListener('input',render);
 document.getElementById('refresh').addEventListener('click',load);
+
+/* Actualización forzada: cambia meta/app.reloadToken y cada app abierta se recarga (ver index.html). */
+var forceBtn=document.getElementById('forceUpd'),updMsg=document.getElementById('updMsg');
+async function loadUpdInfo(){
+  try{var d=await getDoc(doc(db,'meta','app'));var at=d.exists()&&d.data().at;updMsg.textContent=at?'Última actualización forzada: '+new Date(at).toLocaleString('es-AR')+'.':'Todavía no se forzó ninguna actualización.';updMsg.className='status';}catch(e){}
+}
+forceBtn.addEventListener('click',async function(){
+  if(!forceBtn.classList.contains('armed')){forceBtn.classList.add('armed');forceBtn.textContent='¿Seguro? Tocá de nuevo';return;}
+  forceBtn.classList.remove('armed');forceBtn.textContent='🔄 Forzar actualización';forceBtn.disabled=true;
+  try{
+    await setDoc(doc(db,'meta','app'),{reloadToken:Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:Date.now(),by:(auth.currentUser&&auth.currentUser.email)||''},{merge:true});
+    updMsg.textContent='Listo: las apps abiertas se están actualizando.';updMsg.className='status';
+  }catch(e){
+    updMsg.textContent=e&&e.code==='permission-denied'?'Sin permiso: publicá las reglas nuevas de Firestore (meta).':'No se pudo: '+(e&&e.message||e);updMsg.className='status err';
+  }
+  forceBtn.disabled=false;
+});
 document.getElementById('logout').addEventListener('click',function(){signOut(auth);});
 loginBtn.addEventListener('click',function(){
   /* select_account deja elegir otra cuenta aunque ya haya una sesión abierta. */
@@ -177,7 +207,7 @@ loginBtn.addEventListener('click',function(){
 });
 onAuthStateChanged(auth,function(u){
   if(!u){showGate('Iniciá sesión con la cuenta de administrador.','Entrar con Google');return;}
-  gate.hidden=true;panel.hidden=false;load();
+  gate.hidden=true;panel.hidden=false;load();loadUpdInfo();
 });
 </script>
 </body>

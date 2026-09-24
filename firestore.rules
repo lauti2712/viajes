@@ -16,6 +16,12 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == userId;
     }
 
+    // Config global de la app. reloadToken: al cambiarlo (admin.html) todas las apps abiertas se recargan.
+    match /meta/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
     match /trips/{tripId} {
       // Para entrar a un viaje hay que tener el código y haber iniciado sesión con Google.
       // Listar todos los viajes queda solo para el admin.
