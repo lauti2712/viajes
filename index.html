@@ -963,6 +963,15 @@ function renderHead(){
 /* Con nube hay que iniciar sesión con Google antes de ver el viaje. Si Firebase ni siquiera cargó
    (sin señal), AUTH queda 'offline' y se muestra lo guardado en el dispositivo. */
 var loginMsg='';
+/* Logueado pero sin elegir quién es en el viaje: sin eso no aparecen sus formas de pago ni su mochila. */
+var whoLater=false;
+function whoBanner(){
+  if(!cloudMode()||AUTH!=='in'||!claimsLoaded||whoLater||tab==='mochila'||myPersonId())return '';
+  var free=allPeople().filter(function(p){return !CLAIMS[p.id]||CLAIMS[p.id].uid===ME.uid;});
+  return '<div class="infobox" style="border-left-color:var(--sun)"><h3>¿Quién sos en este viaje?</h3><p style="margin-bottom:10px">Elegilo una vez y queda vinculado a tu cuenta de Google: así los demás pueden elegir tus formas de pago al cargar un gasto, ven tu alias y tenés tu mochila.</p>'
+   +'<div class="whopick" style="margin:0">'+free.map(function(p){return '<button type="button" class="primary" data-act="whoami" data-who="'+esc(p.id)+'">Soy '+esc(p.name)+'</button>';}).join('')
+   +'<button type="button" class="ghost" data-tab="mochila">No estoy en la lista</button><button type="button" class="ghost" data-act="wholater">Ahora no</button></div>'+(claimMsg?'<p class="msg err">'+esc(claimMsg)+'</p>':'')+'</div>';
+}
 function gated(){return cloudMode()&&(AUTH==='pending'||AUTH==='out');}
 function vGate(){
   if(AUTH!=='out')return '<p class="sub" style="text-align:center;margin-top:30px">Cargando…</p>';
@@ -979,7 +988,7 @@ function render(){
   var canPay=cloudMode()&&AUTH==='in';
   $('#tabPagos').hidden=!canPay;
   if(tab==='pagos'&&!canPay)tab='itinerario';
-  $('#main').innerHTML=VIEWS[tab]();
+  $('#main').innerHTML=whoBanner()+VIEWS[tab]();
   Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
 
@@ -993,12 +1002,14 @@ function fieldHtml(f,v){
   return '<label class="fld'+(f.half?' half':'')+'"><span>'+esc(f.l)+'</span>'+inp+'</label>';
 }
 function openSheet(title,body){
+  formRefresh=null;
   var host=$('#sheet');
   host.innerHTML='<div class="scrim" data-close></div><div class="panel" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><div class="ph"><h2>'+esc(title)+'</h2><button type="button" class="x" data-close aria-label="Cerrar">✕</button></div>'+body+'</div>';
   host.hidden=false;document.body.classList.add('lock');
   return $('.panel',host);
 }
-function closeSheet(){var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');render();if(pendingJoin.length)setTimeout(askJoin,0);}
+var formRefresh=null;
+function closeSheet(){formRefresh=null;var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');render();if(pendingJoin.length)setTimeout(askJoin,0);}
 function sheetForm(o){
   var v=o.values||{};
   var panel=openSheet(o.title,(o.intro||'')+'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<p class="msg err" id="sfmsg" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));
@@ -1246,17 +1257,22 @@ function openItem(k,id,pre){
 
   /* --- Forma de pago --- */
   var lastPayer=null;
-  function fillMethods(payer){
+  function fillMethods(payer,keep){
     var ms=el('methodId'),list=payerMethods(payer)||[];
-    var cur=lastPayer===null?(vals.methodId||''):'';
+    var cur=keep?ms.value:(lastPayer===null?(vals.methodId||''):'');
     var opts=[['','Elegí…']].concat(list.map(function(m){return [m.id,(MTYPES[m.type]||MTYPES.otro)[0]+' '+m.label];}));
     if(cur&&cur!=='__other'&&!list.some(function(m){return m.id===cur;}))opts.push([cur,'💳 '+(vals.method||'Forma de pago')]);
     opts.push(['__other','Otro (escribir)']);
     ms.innerHTML=opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]===cur?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
     var w=ms.closest('.fld'),hint=w.querySelector('.mhint');
     if(!hint){hint=document.createElement('small');hint.className='mhint hint';hint.style.margin='0';w.appendChild(hint);}
-    hint.textContent=list.length?'':(payer===myPersonId()?'Todavía no cargaste tus formas de pago: agregalas en "Mis pagos".':nameOf(payer)+' todavía no cargó sus formas de pago en la app.');
+    var nm=esc(nameOf(payer)),linked=!!CLAIMS[payer];
+    hint.innerHTML=list.length?'':payer===myPersonId()?'Todavía no cargaste tus formas de pago: agregalas en "Mis pagos".'
+      :linked?nm+' todavía no cargó sus formas de pago en la app.'
+      :nm+' todavía no vinculó su cuenta de Google en este viaje.'+(!myPersonId()?' <button type="button" class="ghost" data-claimhere="'+esc(payer)+'" style="padding:3px 10px;font-size:13px">Soy '+nm+'</button>':'');
   }
+  /* Si llegan formas de pago o vínculos con el formulario abierto, se actualiza el desplegable. */
+  formRefresh=function(){var ms=el('methodId'),pb=el('paidBy');if(ms&&pb&&pb.value){fillMethods(pb.value,true);syncPay();}};
   function syncPay(){
     var pb=el('paidBy'),ms=el('methodId'),payer=pb?pb.value:'';
     if(ms&&payer!==lastPayer){fillMethods(payer);lastPayer=payer;}
@@ -1285,6 +1301,8 @@ function openItem(k,id,pre){
   });
 
   panel.addEventListener('click',function(e){
+    var ch=e.target.closest('[data-claimhere]');
+    if(ch){claimPerson(ch.getAttribute('data-claimhere'));ch.textContent='Vinculando…';ch.disabled=true;return;}
     var rm=e.target.closest('[data-rmatt]');
     if(rm){removeAttachment(k,ensureId(),rm.getAttribute('data-rmatt'));redraw();return;}
     var rl=e.target.closest('[data-rmlink]');
@@ -1458,7 +1476,7 @@ function fbErr(e){if(e&&e.code==='permission-denied')setSync('denied');}
 var AUTH='',ME=null,loggingOut=false;
 /* CLAIMS: personId -> {uid,name}. Cada persona del viaje la puede "reclamar" una sola cuenta de Google;
    las reglas usan ese vínculo para que la mochila de cada uno sea privada. */
-var CLAIMS={},myClaim='',packUnsub=null,LEGACY_PACK={},itemsReady=false;
+var claimsLoaded=false,CLAIMS={},myClaim='',packUnsub=null,LEGACY_PACK={},itemsReady=false;
 var fdoc=function(){return FB.fs.doc.apply(null,[FB.db,'trips',CODE].concat([].slice.call(arguments)))};
 function pushItem(k,it){
   if(!FB||!CODE||AUTH!=='in')return;
@@ -1638,7 +1656,7 @@ function listen(){
     METHODS=snap.docs.map(function(x){return x.data()||{};}).filter(function(m){return m.id&&!m.del&&/^[a-z0-9]{1,24}$/i.test(m.id);})
       .sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
     if(!snap.metadata.fromCache){methodsReady=true;syncCobro();}
-    render();
+    render();if(formRefresh)formRefresh();
   },function(err){fbErr(err);});
 
   var claimsSeen=false;
@@ -1651,7 +1669,8 @@ function listen(){
     CLAIMS=c;
     if(mine!==myClaim||!claimsSeen){claimsSeen=true;myClaim=mine;subscribePacking();}
     if(!snap.metadata.hasPendingWrites)syncCobro();
-    render();
+    claimsLoaded=true;
+    render();if(formRefresh)formRefresh();
   },function(err){fbErr(err);});
 
   window.addEventListener('offline',function(){setSync('offline')});
@@ -1738,6 +1757,7 @@ document.addEventListener('click',function(e){
   else if(a==='fetchusd')fetchBlueUsd(t.dataset.type);
   else if(a==='settle')openPayment(null,{from:t.dataset.from,to:t.dataset.to,amount:Math.round(parseFloat(t.dataset.amt)*100)/100,method:'Transferencia'});
   else if(a==='editpay')openPayment(t.dataset.id);
+  else if(a==='wholater'){whoLater=true;render();}
   else if(a==='gwho'){gastosWho=t.dataset.who||'';render();}
   else if(a==='whoami'){if(cloudMode())claimPerson(t.dataset.who);else setWhoAmI(t.dataset.who);render();}
   else if(a==='whoswitch'){claimMsg='';if(cloudMode())releaseClaim();else setWhoAmI('');render();}
