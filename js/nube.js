@@ -30,7 +30,7 @@ function applyItem(k,d){
     var v=d[key];
     if(key==='attachments'||key==='links'||key==='shares'){it[key]=Array.isArray(v)?v.map(function(x){return Object.assign({},x)}):[];return;}
     if(v!==null&&typeof v==='object')return;
-    it[key]=(key==='amount'||key==='u'||key==='del'||key==='c')?v:String(v);
+    it[key]=(key==='amount'||key==='u'||key==='del'||key==='c'||key==='ct')?v:String(v);
   });
   if(!/^[a-z0-9]{1,24}$/i.test(it.id||''))return false;
   var i=S[k].findIndex(function(x){return x.id===it.id});
@@ -85,7 +85,7 @@ function subscribePacking(){
   packUnsub=fs.onSnapshot(fs.query(fs.collection(FB.db,'trips',CODE,'packing'),fs.where('owner','==',owner)),function(snap){
     var changed=false;
     snap.docChanges().forEach(function(ch){if(ch.type!=='removed'&&applyItem('packing',ch.doc.data()))changed=true;});
-    if(changed){save();render();}
+    if(changed){save();render();checkNewAvisos();}
   },function(err){fbErr(err);});
   migrateLegacyPacking();
 }
@@ -136,22 +136,35 @@ async function startCloud(){
 var RELOAD_KEY='viaje-de-a-dos:reloadToken',reloadPending='';
 function forceReload(tok){try{localStorage.setItem(RELOAD_KEY,tok);}catch(e){}location.replace(location.pathname+'?v='+encodeURIComponent(tok));}
 /* ---------- Mis viajes: users/{uid}/trips/{code}, se anota solo cada viaje que se abre ---------- */
-var MYTRIPS=[],tripsLoaded=false,lastTripRec='';
+/* tripsLoaded: ya hay lista para mostrar (aunque sea de caché). tripsServer: confirmada por el servidor;
+   recién ahí se puede decidir si un viaje ya tenía "visto" (una caché vacía no lo sabe). */
+var MYTRIPS=[],tripsLoaded=false,tripsServer=false,lastTripRec='';
 function listenTrips(){
-  FB.fs.onSnapshot(FB.fs.collection(FB.db,'users',ME.uid,'trips'),function(snap){
+  FB.fs.onSnapshot(FB.fs.collection(FB.db,'users',ME.uid,'trips'),{includeMetadataChanges:true},function(snap){
     MYTRIPS=snap.docs.map(function(x){return x.data()||{};}).filter(function(t){return /^[a-z0-9]{12,40}$/.test(t.code||'');})
       .sort(function(a,b){return (b.lastOpen||0)-(a.lastOpen||0);});
     tripsLoaded=true;
+    if(!snap.metadata.fromCache)tripsServer=true;
+    if(recordPending)recordTrip();
     if(homeMode())setSync('');
     render();if(formRefresh)formRefresh();
+    maybeLoadOthers();
   },function(err){fbErr(err);});
 }
+/* Para los avisos de vencimiento hacen falta los gastos de los otros viajes: se buscan una vez. */
+var othersAsked=false;
+function maybeLoadOthers(){if(othersAsked||!CODE||!tripsServer||!methodsReady||!METHODS.some(function(m){return m.type==='credito';}))return;othersAsked=true;loadOtherCharges(true);}
+var recordPending=false;
 function recordTrip(){
   if(!FB||AUTH!=='in'||!CODE)return;
+  if(!tripsServer){recordPending=true;return;}   /* hay que saber si ya tenía "visto" antes de escribir */
+  recordPending=false;
   var t=S.trip,key=[t.name,t.start,t.end].join('|');
   if(key===lastTripRec)return;
   lastTripRec=key;
-  try{FB.fs.setDoc(FB.fs.doc(FB.db,'users',ME.uid,'trips',CODE),{code:CODE,name:t.name||'',start:t.start||'',end:t.end||'',lastOpen:Date.now()},{merge:true}).catch(fbErr);}catch(e){}
+  var prev=MYTRIPS.find(function(x){return x.code===CODE;}),data={code:CODE,name:t.name||'',start:t.start||'',end:t.end||'',lastOpen:Date.now()};
+  if(!prev||!prev.seen)data.seen=Date.now();   /* los avisos arrancan desde que se abre el viaje por primera vez */
+  try{FB.fs.setDoc(FB.fs.doc(FB.db,'users',ME.uid,'trips',CODE),data,{merge:true}).catch(fbErr);}catch(e){}
 }
 function forgetTrip(code){
   MYTRIPS=MYTRIPS.filter(function(t){return t.code!==code;});
@@ -232,14 +245,14 @@ function listen(){
       maybeMigratePeople();
     }
     migrateLegacyPacking();
-    if(changed){save();render();}
+    if(changed){save();render();checkNewAvisos();}
     setSync(snap.metadata.fromCache?(navigator.onLine?'connecting':'offline'):(snap.metadata.hasPendingWrites?'saving':'ok'));
   },function(err){fbErr(err);if(!err||err.code!=='permission-denied')setSync('err');});
 
   fs.onSnapshot(fs.collection(db,'users',ME.uid,'methods'),function(snap){
     METHODS=snap.docs.map(function(x){return x.data()||{};}).filter(function(m){return m.id&&!m.del&&/^[a-z0-9]{1,24}$/i.test(m.id);})
       .sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
-    if(!snap.metadata.fromCache){methodsReady=true;syncCobro();}
+    if(!snap.metadata.fromCache){methodsReady=true;syncCobro();maybeLoadOthers();}
     render();if(formRefresh)formRefresh();
   },function(err){fbErr(err);});
 

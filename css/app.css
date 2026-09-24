@@ -250,6 +250,7 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 .gate .hint{margin:14px 0 0}
 body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.home .tabs,body.home [data-act=settings],body.home [data-act=sync]{display:none}
 .trow .ec{font-size:20px}
+.badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:var(--rose);color:#fff;font-size:12px;line-height:20px;text-align:center;margin-left:2px}
 .trow .here{font-size:12px;font-weight:800;background:var(--sun);color:var(--on-sun);padding:1px 8px;border-radius:99px;margin-left:6px}
 /* Mis pagos */
 .mhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}

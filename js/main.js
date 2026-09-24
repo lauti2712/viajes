@@ -24,6 +24,10 @@ document.addEventListener('click',function(e){
   else if(a==='settle')openPayment(null,{from:t.dataset.from,to:t.dataset.to,amount:Math.round(parseFloat(t.dataset.amt)*100)/100,method:'Transferencia'});
   else if(a==='editpay')openPayment(t.dataset.id);
   else if(a==='mytrips')openTrips();
+  else if(a==='avisos')openAvisos();
+  else if(a==='gopagos'){tab='pagos';closeSheet();}
+  else if(a==='gomochila'){tab='mochila';closeSheet();}
+  else if(a==='notifon'){if('Notification' in window)Notification.requestPermission().then(function(){closeSheet();openAvisos();});}
   else if(a==='pscope'){pagosScope=t.dataset.scope;if(pagosScope==='all'&&(t.dataset.reload||!otherState))loadOtherCharges();else render();}
   else if(a==='newtrip')connectTo(genCode());
   else if(a==='gotrip'){if(t.dataset.code===CODE)closeSheet();else connectTo(t.dataset.code);}

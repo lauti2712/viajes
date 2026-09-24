@@ -49,5 +49,7 @@ try{
   if(new URLSearchParams(location.search).has('v'))history.replaceState(null,'',location.pathname);
 }catch(e){}
 var live=function(k){return S[k].filter(function(x){return !x.del})};
-function upsert(k,id,data){var now=Date.now(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:now});}else{it=Object.assign({id:uid(),u:now},data);S[k].push(it);}save();pushItem(k,it);return it.id;}
-function remove(k,id){var x=S[k].find(function(y){return y.id===id});if(x){x.del=true;x.u=Date.now();save();pushItem(k,x);}}
+/* eb = persona que hizo el último cambio, ct = cuándo se creó (para los avisos). */
+function upsert(k,id,data){var now=Date.now(),by=editorId(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:now,eb:by});}else{it=Object.assign({id:uid(),u:now,ct:now,eb:by},data);S[k].push(it);}save();pushItem(k,it);return it.id;}
+function remove(k,id){var x=S[k].find(function(y){return y.id===id});if(x){x.del=true;x.u=Date.now();x.eb=editorId();save();pushItem(k,x);}}
+function editorId(){try{return myPersonId()||'';}catch(e){return '';}}

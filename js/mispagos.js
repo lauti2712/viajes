@@ -30,10 +30,11 @@ function chargeRow(l){
 /* Mis pagos de todos los viajes: en cada viaje de "Mis viajes" se buscan los gastos pagados con mis
    formas de pago (consulta en vivo, sin copias). El viaje abierto sale de los datos locales. */
 var pagosScope='trip',OTHER_CHARGES=[],otherState='';
-async function loadOtherCharges(){
+async function loadOtherCharges(quiet){
   if(!FB||AUTH!=='in')return;
   var ids=METHODS.map(function(m){return m.id;}),trips=MYTRIPS.filter(function(t){return t.code!==CODE;});
-  otherState='loading';render();
+  if(!ids.length)return;
+  if(!quiet){otherState='loading';render();}
   var out=[],fs=FB.fs,failed=0;
   for(var i=0;i<trips.length;i++){
     for(var j=0;j<ids.length;j+=30){

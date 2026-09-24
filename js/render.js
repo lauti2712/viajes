@@ -7,6 +7,7 @@ function renderHead(){
   $('#title').textContent=S.trip.name||'Nuestro viaje';
   var tb=$('#themeBtn');if(tb)tb.textContent=themeLabel();
   var mt=$('#tripsBtn');if(mt)mt.hidden=!(cloudMode()&&AUTH==='in');
+  var bb=$('#bellBtn');if(bb){var n=cloudMode()&&AUTH==='in'?avisosCount():0;bb.hidden=!(cloudMode()&&AUTH==='in');bb.innerHTML='🔔'+(n?' <b class="badge">'+n+'</b>':'');bb.setAttribute('aria-label',n?n+' avisos nuevos':'Avisos');}
   var lo=$('#logoutBtn');if(lo){lo.hidden=!(ME&&AUTH==='in');if(ME)lo.textContent='Salir'+(ME.name?' ('+ME.name.split(' ')[0]+')':'');}
   $('#who2').innerHTML=(gated()?[]:allPeople()).map(function(p){return '<span class="chip">'+dot(p.id)+esc(p.name)+'</span>';}).join('')+syncChip();
   var s=pd(S.trip.start),e=pd(S.trip.end),w='';
