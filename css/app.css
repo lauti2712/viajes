@@ -330,3 +330,11 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .leaflet-popup-content .ghost{color:#16223A;border-color:#ccc}
 
 .wxbox .wxoff{order:9;margin-left:auto;padding:2px 9px!important;font-size:12px!important}
+
+/* Alojamientos con huéspedes y autos con pasajeros */
+.guests{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:14px}
+.guests>span{color:var(--muted);min-width:0}
+.guests b{color:var(--ink)}
+.vehs{margin-bottom:18px}
+.vehs .stay{border-left-color:var(--mint)}
+.grps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}

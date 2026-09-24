@@ -24,6 +24,13 @@ document.addEventListener('click',function(e){
   else if(a==='editpay')openPayment(t.dataset.id);
   else if(a==='mytrips')openTrips();
   else if(a==='profile')openProfile();
+  else if(a==='lodgejoin')toggleGuest(t.dataset.id);
+  else if(a==='ride')toggleRide(t.dataset.id);
+  else if(a==='vehadd')openVehAdd();
+  else if(a==='vehfrom')addVehFromProfile(t.dataset.vid);
+  else if(a==='vehedit')openVehicle(t.dataset.id);
+  else if(a==='myvehadd')openMyVehicle(null);
+  else if(a==='myvehedit')openMyVehicle(t.dataset.id);
   else if(a==='wxoff')setPref('showWeather',false);
   else if(a==='final')openFinal();
   else if(a==='avisos')openAvisos();

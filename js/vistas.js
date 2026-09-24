@@ -16,7 +16,7 @@ var tab='itinerario';
 
 function upcoming(){
   var now=today()+'T'+new Date().toTimeString().slice(0,5),ev=[];
-  live('transports').forEach(function(t){if(t.dep&&t.dep>=now){var dd=t.dep.slice(0,10),ad=(t.arr||'').slice(0,10),arrTxt=t.arr?('Llega '+(ad!==dd?fShort(ad)+' ':'')+tm(t.arr)+' a '+(t.to||'?')):'';ev.push({k:t.dep,d:dd,t:tm(t.dep),l:(TYPES[t.type]||TYPES.otro)[0]+' Sale '+(t.from||'?')+' → '+(t.to||'?'),sub:arrTxt});}});
+  live('transports').forEach(function(t){if(t.dep&&t.dep>=now){var dd=t.dep.slice(0,10),ad=(t.arr||'').slice(0,10),arrTxt=t.arr?('Llega '+(ad!==dd?fShort(ad)+' ':'')+tm(t.arr)+' a '+(t.to||'?')):'';if(t.type==='auto'){arrTxt=t.arr?('Devolución '+(ad!==dd?fShort(ad)+' ':'')+tm(t.arr)+' en '+(t.to||t.from||'?')):'';}ev.push({k:t.dep,d:dd,t:tm(t.dep),l:(TYPES[t.type]||TYPES.otro)[0]+(t.type==='auto'?' Retiro del auto en '+(t.from||'?'):' Sale '+(t.from||'?')+' → '+(t.to||'?')),sub:arrTxt});}});
   live('plans').forEach(function(p){var k=(p.date||'')+'T'+(p.time||'00:00');if(p.date&&k>=now)ev.push({k:k,d:p.date,t:p.time||'',l:(ITYPES[p.type]||ITYPES.otro)[0]+' '+(p.title||'Plan')});});
   live('lodging').forEach(function(l){if(l.in&&l.in+'T15:00'>=now)ev.push({k:l.in+'T15:00',d:l.in,t:'',l:'🛏️ Check-in: '+(l.name||'')});});
   return ev.sort(function(a,b){return a.k.localeCompare(b.k)}).slice(0,4);
@@ -73,18 +73,18 @@ function attLinkChips(item){
 function fileIcon(type){return type&&type.indexOf('pdf')>=0?'📄':(type&&type.indexOf('image')>=0?'🖼️':'📎')}
 function humanSize(n){n=n||0;if(n<1024)return n+' B';if(n<1048576)return Math.round(n/1024)+' KB';return (n/1048576).toFixed(1)+' MB';}
 function ticket(t){
-  var ty=TYPES[t.type]||TYPES.otro,dd=(t.dep||'').slice(0,10),ad=(t.arr||'').slice(0,10),dday=pd(dd);
+  var ty=TYPES[t.type]||TYPES.otro,dd=(t.dep||'').slice(0,10),ad=(t.arr||'').slice(0,10),dday=pd(dd),car=t.type==='auto',same=car&&(t.same==='1'||t.from===t.to);
   return '<div class="ticket" role="button" tabindex="0" data-act="edit" data-k="transports" data-id="'+t.id+'">'
    +'<div class="stub"><span class="ic" aria-hidden="true">'+ty[0]+'</span>'+(dday?'<b>'+dday.getDate()+'</b><small>'+esc(mon(dd))+'</small>':'<small>Sin fecha</small>')+'</div>'
-   +'<div class="tb"><div class="route">'+esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?')+'</div>'
-   +((t.dep||t.arr)?'<div class="times"><div><span>Sale</span><b>'+(t.dep?esc(fShort(dd))+' '+tm(t.dep):'—')+'</b></div><div><span>Llega</span><b>'+(t.arr?esc(fShort(ad))+' '+tm(t.arr):'—')+'</b></div></div>':'')
+   +'<div class="tb"><div class="route">'+(car?(same?'Retiro y devolución en '+esc(t.from||'?'):esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?')):esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?'))+'</div>'
+   +((t.dep||t.arr)?'<div class="times"><div><span>'+(car?'Retiro':'Sale')+'</span><b>'+(t.dep?esc(fShort(dd))+' '+tm(t.dep):'—')+'</b></div><div><span>'+(car?'Devolución':'Llega')+'</span><b>'+(t.arr?esc(fShort(ad))+' '+tm(t.arr):'—')+'</b></div></div>':'')
    +((t.company||t.ref||(t.attachments&&t.attachments.length)||(t.links&&t.links.length))?'<div class="meta"><span>'+esc(ty[1])+(t.company?' de '+esc(t.company):'')+'</span>'+(t.ref?'<span class="ref">Reserva '+esc(t.ref)+'</span>':'')+attLinkChips(t)+'</div>':'')
    +(t.notes?'<p class="note">'+esc(t.notes)+'</p>':'')
    +costBlock(t)+'</div></div>';
 }
 function vTransportes(){
   var L=live('transports').sort(function(a,b){return (a.dep||'9999').localeCompare(b.dep||'9999')});
-  var h='<div class="bar"><h2>Transportes</h2><button class="primary" data-act="add" data-k="transports">+ Agregar</button></div>';
+  var h='<div class="bar"><h2>Transportes</h2><button class="primary" data-act="add" data-k="transports">+ Agregar</button></div>'+vehiclesHtml();
   if(!L.length)return h+empty('Todavía no cargaron ningún transporte','Vuelos, micros, trenes, barcos, auto alquilado o traslados. Anotá horarios, código de reserva y cuánto costó.');
   return h+totLine(costs().filter(function(c){return c.src==='transports'}))+L.map(ticket).join('');
 }
@@ -92,14 +92,14 @@ function vTransportes(){
 function vAlojamiento(){
   var L=live('lodging').sort(function(a,b){return (a.in||'9999').localeCompare(b.in||'9999')});
   var h='<div class="bar"><h2>Alojamiento</h2><button class="primary" data-act="add" data-k="lodging">+ Agregar</button></div>';
-  if(!L.length)return h+empty('Todavía no cargaron dónde van a dormir','Hotel, departamento o hostel: fechas de entrada y salida, dirección, código de reserva y costo.');
+  if(!L.length)return h+empty('Todavía no cargaron dónde van a dormir','Hotel, departamento o hostel: fechas, dirección, reserva y costo. Pueden ser varios: cada uno marca en cuál se queda y el costo se reparte entre los de ese alojamiento.');
   return h+totLine(costs().filter(function(c){return c.src==='lodging'}))+L.map(function(l){
     var n=(l.in&&l.out)?dayDiff(pd(l.in),pd(l.out)):0;
     return '<div class="stay" role="button" tabindex="0" data-act="edit" data-k="lodging" data-id="'+l.id+'"><div class="nm">'+esc(l.name||'Alojamiento')+(safeUrl(l.airbnb)?' <a class="abnb" href="'+esc(safeUrl(l.airbnb))+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Airbnb ↗</a>':'')+'</div>'
      +(l.address?'<div class="sub" style="margin:2px 0 0">'+esc(l.address)+'</div>':'')
      +'<div class="dates"><span>Entrada <b>'+(l.in?esc(fShort(l.in)):'—')+'</b></span><span>Salida <b>'+(l.out?esc(fShort(l.out)):'—')+'</b></span>'+(n>0?'<span><b>'+n+(n===1?' noche':' noches')+'</b></span>':'')+attLinkChips(l)+'</div>'
      +(l.ref?'<div class="meta"><span class="ref">Reserva '+esc(l.ref)+'</span></div>':'')
-     +(l.notes?'<p class="note">'+esc(l.notes)+'</p>':'')+costBlock(l)+'</div>';
+     +(l.notes?'<p class="note">'+esc(l.notes)+'</p>':'')+guestsLine(l)+costBlock(l)+'</div>';
   }).join('');
 }
 
@@ -177,8 +177,9 @@ function vItinerario(){
     live('plans').filter(function(p){return p.date===d}).forEach(function(p){items.push({k:p.time||'99:98',h:planRow(p)})});
     live('transports').forEach(function(x){
       var ty=TYPES[x.type]||TYPES.otro,dd=(x.dep||'').slice(0,10),ad=(x.arr||'').slice(0,10);
-      if(dd===d)items.push({k:tm(x.dep)||'00:00',h:autoRow(ty[0],tm(x.dep),'Sale: '+(x.from||'?')+' → '+(x.to||'?'),[x.company,x.ref?'Reserva '+x.ref:''].filter(Boolean).join(', '))});
-      if(ad===d)items.push({k:tm(x.arr)||'00:01',h:autoRow(ty[0],tm(x.arr),'Llega a '+(x.to||'?'),'')});
+      var car=x.type==='auto',sub=[x.company,x.ref?'Reserva '+x.ref:''].filter(Boolean).join(', ');
+      if(dd===d)items.push({k:tm(x.dep)||'00:00',h:autoRow(ty[0],tm(x.dep),car?'Retiro del auto en '+(x.from||'?'):'Sale: '+(x.from||'?')+' → '+(x.to||'?'),sub)});
+      if(ad===d)items.push({k:tm(x.arr)||'00:01',h:autoRow(ty[0],tm(x.arr),car?'Devolución del auto en '+(x.to||x.from||'?'):'Llega a '+(x.to||'?'),car?sub:'')});
     });
     live('lodging').forEach(function(l){
       if(l.out===d)items.push({k:'10:00',h:autoRow('🛏️','','Check-out: '+(l.name||''),'')});

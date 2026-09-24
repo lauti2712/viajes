@@ -104,6 +104,7 @@ var SPECS={
     {k:'to',l:'Destino',t:'text',half:true,req:true,ph:'Ej: Bariloche'},
     {k:'dep',l:'Sale',t:'datetime-local'},
     {k:'arr',l:'Llega',t:'datetime-local'},
+    {k:'_same',t:'html',html:'<label class="fld pksug" id="sameWrap" style="flex-direction:row;white-space:normal" hidden><input type="checkbox" name="same"> Se devuelve en el mismo lugar donde se retira</label>'},
     {k:'company',l:'Empresa',t:'text',half:true,ph:'Aerolínea, bus…'},
     {k:'ref',l:'Código de reserva',t:'text',half:true},
     {k:'notes',l:'Notas',t:'textarea',ph:'Terminal, asiento, equipaje, hora de check-in…'}
@@ -115,8 +116,9 @@ var SPECS={
     {k:'in',l:'Entrada',t:'date',half:true},
     {k:'out',l:'Salida',t:'date',half:true},
     {k:'ref',l:'Código de reserva',t:'text'},
-    {k:'notes',l:'Notas',t:'textarea',ph:'Horario de check-in, contacto, cómo llegar…'}
-  ].concat(costF())}},
+    {k:'notes',l:'Notas',t:'textarea',ph:'Horario de check-in, contacto, cómo llegar…'},
+    {k:'_guests',t:'html',html:''}   /* se completa en openItem con los huéspedes */
+  ].concat(costF().map(function(f){return f.k==='split'?Object.assign({},f,{opts:[['guests','Los que se quedan acá']].concat(f.opts)}):f;}))}},
   expenses:function(){return {title:['Anotar gasto','Editar gasto'],fields:[
     {k:'desc',l:'Qué fue',t:'text',req:true,ph:'Almuerzo, taxi, entradas…'},
     {k:'date',l:'Fecha',t:'date',half:true},
@@ -133,7 +135,7 @@ var SPECS={
 };
 var DEFAULTS={
   transports:function(){return {type:'vuelo',cur:base(),status:'pendiente',split:'equal',paidBy:myPersonId(),payDate:today()}},
-  lodging:function(){return {cur:base(),status:'pendiente',split:'equal',paidBy:myPersonId(),payDate:today()}},
+  lodging:function(){return {cur:base(),status:'pendiente',split:'guests',guests:myPersonId(),paidBy:myPersonId(),payDate:today()}},
   expenses:function(){return {date:today(),cat:'Comida',cur:base(),status:'pagado',split:'equal',paidBy:myPersonId(),payDate:today()}},
   plans:function(){var s=S.trip.start;return {type:'paseo',date:s&&s>today()?s:today()}}
 };
@@ -189,10 +191,11 @@ function openItem(k,id,pre){
   var sp=SPECS[k](),ex=id?S[k].find(function(x){return x.id===id}):null;
   var vals=Object.assign({},ex||Object.assign({},DEFAULTS[k](),pre||{}));
   /* Gastos viejos "solo de X": se muestran como "algunos" con esa sola persona. */
-  if(vals.split&&['equal','some','amounts'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
+  if(vals.split&&['equal','some','amounts','guests'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
   if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="hint" id="tkmsg" style="margin:0"></span></div>':'';
+  if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');});
   var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="msg err" id="formmsg" role="status" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
    +'<hr>'+attsBlock(ex)+'<hr>'+linksBlock(ex);
   var panel=openSheet(sp.title[ex?1:0],body);
@@ -200,7 +203,19 @@ function openItem(k,id,pre){
   var el=function(nm){return f.querySelector('[name='+nm+']');};
   function showFld(input,on){if(!input)return;var w=input.closest('.fld');if(w)w.hidden=!on;input.disabled=!on;}
 
-  function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});return d;}
+  function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging')d.guests=takeChecks(d,'g');
+    if(k==='transports'){if(d.type==='auto'&&d.same){d.to=d.from;d.same='1';}else d.same='';}
+    return d;}
+  /* Alquiler de auto: los mismos campos del transporte, con nombres de retiro y devolución. */
+  var TLBL={from:['Origen','Lugar de retiro'],to:['Destino','Lugar de devolución'],dep:['Sale','Retiro (fecha y hora)'],arr:['Llega','Devolución (fecha y hora)'],company:['Empresa','Empresa de alquiler']};
+  function syncTType(){
+    if(k!=='transports')return;
+    var car=el('type').value==='auto',same=car&&f.querySelector('[name=same]').checked;
+    Object.keys(TLBL).forEach(function(n){var i=el(n);if(i)i.closest('.fld').querySelector('span').textContent=TLBL[n][car?1:0];});
+    el('from').placeholder=car?'Ej: Aeropuerto de Iguazú':'Ej: Rosario';el('to').placeholder=car?'Ej: Centro de Puerto Iguazú':'Ej: Bariloche';el('company').placeholder=car?'Localiza, Hertz…':'Aerolínea, bus…';
+    $('#sameWrap',panel).hidden=!car;
+    var tw=el('to').closest('.fld');tw.hidden=same;el('to').required=!same;
+  }
   function ensureId(){
     if(curId)return curId;
     var d=normalizeCost(readForm(),null);
@@ -226,7 +241,11 @@ function openItem(k,id,pre){
   function drawSplit(){
     if(!box)return;
     var mode=el('split').value,ppl=allPeople(),st=splitState(),h='';
-    if(mode==='equal'){
+    if(mode==='guests'){
+      var gn=Array.prototype.filter.call(f.querySelectorAll('[name^=g_]'),function(c){return c.checked;}).map(function(c){return nameOf(c.name.slice(2));});
+      h='<p class="hint" style="margin:0">'+(gn.length?'Se divide entre los que se quedan acá: '+esc(gn.join(', '))+'.':'Todavía no marcaste quiénes se quedan: se divide entre todos.')+' Si alguien se suma o se va del alojamiento, se actualiza solo.</p>';
+    }
+    else if(mode==='equal'){
       var fixed=ex&&(ex.split||'equal')==='equal'&&ex.splitWith?splitIds(ex).map(nameOf).filter(Boolean):null;
       h='<p class="hint" style="margin:0">'+(fixed?'Se divide entre '+esc(fixed.join(', '))+' (los que estaban cuando se cargó). Para sumar o sacar a alguien, elegí "Algunos".'
         :'Se divide entre todas las personas del viaje'+(ppl.length?' ('+ppl.map(function(p){return esc(p.name);}).join(', ')+')':'')+'. Si después se suma alguien, te vamos a preguntar si entra en este gasto.')+'</p>';
@@ -240,7 +259,7 @@ function openItem(k,id,pre){
       h='<div class="rates">'+ppl.map(function(p){return '<label class="rate"><span style="min-width:90px">'+dot(p.id)+esc(p.name)+'</span><input type="number" step="any" min="0" inputmode="decimal" name="sh_'+esc(p.id)+'" value="'+esc(st.amt[p.id]||'')+'" placeholder="0"></label>';}).join('')+'</div>'
        +'<p class="hint" style="margin:8px 0 0">Al escribir el monto de alguien, lo que falta se reparte en partes iguales entre los que siguen. <span id="shsum"></span></p>';
     }
-    box.innerHTML=h;
+    box.innerHTML=(mode!=='guests'?groupChipsHtml():'')+h;
     if(mode==='amounts'&&lastEdited<0)spread(-1);
     updSum();
   }
@@ -292,12 +311,14 @@ function openItem(k,id,pre){
     showFld(el('cuotas'),credit);showFld(el('payDate'),credit);
   }
   if(el('amount')){drawSplit();syncPay();}
+  if(k==='transports'){var sm=f.querySelector('[name=same]');if(sm)sm.checked=vals.same==='1';syncTType();}
 
   f.addEventListener('submit',function(e){
     e.preventDefault();
     var d=readForm(),fm=$('#formmsg',panel);
     var req=sp.fields.filter(function(x){return x.req&&!d[x.k]})[0];
     if(req){var r=$('#f_'+req.k,panel);if(r)r.focus();return;}
+    if(k==='transports'&&d.dep&&d.arr&&d.arr<d.dep){fm.textContent=d.type==='auto'?'La devolución es antes del retiro. Revisá las fechas.':'La llegada es antes de la salida. Revisá las fechas.';return;}
     var prob='amount' in d?splitProblem(d):'';
     if(prob){fm.textContent=prob;return;}
     upsert(k,curId,normalizeCost(d,ex));
@@ -310,6 +331,13 @@ function openItem(k,id,pre){
   });
 
   panel.addEventListener('click',function(e){
+    var gb=e.target.closest('[data-grp]');
+    if(gb){   /* acceso rápido: tilda justo a los de ese alojamiento o auto */
+      var gids=groupIds(gb.getAttribute('data-grp'));
+      el('split').value='some';drawSplit();
+      Array.prototype.forEach.call(box.querySelectorAll('[name^=sw_]'),function(c){c.checked=gids.indexOf(c.name.slice(3))>=0;});
+      $('#formmsg',panel).textContent='';return;
+    }
     var ch=e.target.closest('[data-claimhere]');
     if(ch){claimPerson(ch.getAttribute('data-claimhere'));ch.textContent='Vinculando…';ch.disabled=true;return;}
     var rm=e.target.closest('[data-rmatt]');
@@ -357,6 +385,8 @@ function openItem(k,id,pre){
       return;
     }
     if(e.target.name==='split'){drawSplit();$('#formmsg',panel).textContent='';return;}
+    if(e.target.name==='type'||e.target.name==='same'){syncTType();return;}
+    if(String(e.target.name).indexOf('g_')===0&&el('split').value==='guests'){drawSplit();return;}
     if(e.target.name==='methodId'){syncPay();return;}
     if(e.target.name==='paidBy'){
       var sel=e.target;
@@ -442,11 +472,13 @@ function unlinkPerson(oldId){
     if(Array.isArray(x.shares)&&x.shares.some(function(s){return s.p===oldId;}))ch.shares=x.shares.map(function(s){return Object.assign({},s,{p:rep(s.p)});});
     if(Object.keys(ch).length)sysUpdate(k,x.id,ch);
   });});
+  S.lodging.slice().forEach(function(x){if(idsOf(x.guests).indexOf(oldId)>=0)sysUpdate('lodging',x.id,{guests:idsOf(x.guests).map(rep).join(',')});});
+  S.vehicles.slice().forEach(function(x){var ch={};if(idsOf(x.riders).indexOf(oldId)>=0)ch.riders=idsOf(x.riders).map(rep).join(',');if(x.owner===oldId)ch.owner=nid;if(Object.keys(ch).length)sysUpdate('vehicles',x.id,ch);});
   S.payments.slice().forEach(function(x){var ch={};if(x.from===oldId)ch.from=nid;if(x.to===oldId)ch.to=nid;if(Object.keys(ch).length)sysUpdate('payments',x.id,ch);});
   savePerson(oldId,{});remove('people',oldId);
   return nid;
 }
-function peopleUsed(id){if(live('payments').some(function(x){return x.from===id||x.to===id;}))return true;return costs().some(function(c){return c.paidBy===id||c.split===id||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
+function peopleUsed(id){if(live('payments').some(function(x){return x.from===id||x.to===id;}))return true;return costs().some(function(c){return c.paidBy===id||c.split===id||(c.split==='guests'&&idsOf(c.guests).indexOf(id)>=0)||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
 /* Los p1/p2 de viajes viejos pueden no estar todavía en `people`: se crean con su mismo id. */
 function savePerson(id,data){
   if(S.people.some(function(x){return x.id===id}))return upsert('people',id,data);

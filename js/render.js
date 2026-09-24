@@ -43,6 +43,7 @@ function openProfile(){
   var h='<div class="prof"><span class="avatar lg">'+initialOf(ME.name)+'</span><div><b>'+esc(ME.name||'Tu cuenta')+'</b><small>'+esc(ME.email||'')+'</small></div></div>';
   if(!homeMode())h+='<section class="psec"><div class="bar"><h3>Mis viajes</h3><button type="button" class="ghost sm" data-act="newtrip">+ Nuevo</button></div><div id="tripsl">'+tripsListHtml()+'</div></section>';
   h+=mapSectionHtml();
+  h+=myVehiclesHtml();
   h+='<section class="psec"><div class="bar"><h3>Formas de pago</h3><button type="button" class="ghost sm" data-act="addmethod">+ Agregar</button></div>'
    +(METHODS.length?METHODS.map(function(m){var ty=mtype(m);return '<div class="exp" role="button" tabindex="0" data-act="editmethod" data-id="'+esc(m.id)+'" style="grid-template-columns:34px 1fr"><span class="ec" aria-hidden="true">'+ty[0]+'</span><div class="et"><b>'+esc(methodLabel(m))+'</b><small><span>'+esc(ty[1])+'</span>'+(m.alias&&m.share?'<span>Alias visible: '+esc(m.alias)+'</span>':'')+'</small></div></div>';}).join('')
      :'<p class="nada">Todavía no cargaste ninguna. Sirven para elegir con qué pagaste cada gasto y para que te paguen a tu alias.</p>')

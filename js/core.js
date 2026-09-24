@@ -28,14 +28,14 @@ var ID_RE=/^[a-z0-9]{1,24}$/i;
 var curCode=function(c,def){c=String(c||'').trim().toUpperCase();return /^[A-Z]{3}$/.test(c)?c:(def||'ARS');};
 /* u siempre crece para cada ítem, aunque el reloj del celular esté atrasado. */
 var nextU=function(prev){return Math.max(Date.now(),(+prev||0)+1);};
-var ITEM_KEYS=['transports','lodging','expenses','plans','packing','people','payments'];
+var ITEM_KEYS=['transports','lodging','expenses','plans','packing','people','payments','vehicles'];
 /* En la nube la mochila vive en su propia colección (trips/{code}/packing), privada por reglas. */
 var CLOUD_KEYS=ITEM_KEYS.filter(function(k){return k!=='packing'});
 var cloudMode=function(){return !!(FIREBASE_CONFIG.apiKey&&CODE&&!LOCAL_ONLY)};
 /* Sin viaje abierto (celular nuevo, o salió de un viaje): pantalla de inicio con "Mis viajes". */
 var homeMode=function(){return !!(FIREBASE_CONFIG.apiKey&&!CODE&&!LOCAL_ONLY)};
 
-var TYPES={vuelo:['✈️','Vuelo'],bus:['🚌','Micro / bus'],tren:['🚆','Tren'],barco:['⛴️','Barco'],auto:['🚗','Auto alquilado'],traslado:['🚕','Traslado'],otro:['🧭','Otro']};
+var TYPES={vuelo:['✈️','Vuelo'],bus:['🚌','Micro / bus'],tren:['🚆','Tren'],barco:['⛴️','Barco'],auto:['🚙','Alquiler de auto'],traslado:['🚕','Traslado'],otro:['🧭','Otro']};
 var CATS={'Comida':'🍽️','Café y bebidas':'☕','Supermercado':'🛒','Transporte local':'🚇','Peajes y nafta':'⛽','Actividades':'🎟️','Entradas y tours':'🎫','Compras':'🛍️','Souvenirs':'🎁','Salud':'💊','Conectividad / SIM':'📶','Propinas':'🪙','Otros':'📌'};
 /* Categorías del viaje = las de arriba + las personalizadas que se crean en Ajustes del viaje
    (S.trip.cats = [{name,icon}]). "Otros" siempre queda al final. */
@@ -45,9 +45,9 @@ function catIcon(n){if(!n)return '📌';var o=catAll();if(o[n])return o[n];if(n=
 var ITYPES={paseo:['🚶','Paseo'],comida:['🍽️','Comida'],excursion:['🗺️','Excursión'],tramite:['📄','Trámite'],descanso:['🛌','Descanso'],otro:['📌','Otro']};
 
 /* ---------- Estado ---------- */
-function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[],people:[],payments:[]};}
+function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[],people:[],payments:[],vehicles:[]};}
 var arr=function(a){return Array.isArray(a)?a.filter(function(x){return x&&typeof x==='object'&&ID_RE.test(x.id||'')}):[]};
-function fix(o){var b=blank();o=o||{};var t=Object.assign(b.trip,o.trip||{});t.rates=Object.assign({},(o.trip&&o.trip.rates)||{});return {v:1,trip:t,transports:arr(o.transports),lodging:arr(o.lodging),expenses:arr(o.expenses),plans:arr(o.plans),packing:arr(o.packing),people:arr(o.people),payments:arr(o.payments)};}
+function fix(o){var b=blank();o=o||{};var t=Object.assign(b.trip,o.trip||{});t.rates=Object.assign({},(o.trip&&o.trip.rates)||{});return {v:1,trip:t,transports:arr(o.transports),lodging:arr(o.lodging),expenses:arr(o.expenses),plans:arr(o.plans),packing:arr(o.packing),people:arr(o.people),payments:arr(o.payments),vehicles:arr(o.vehicles)};}
 var S=blank(),PREV_CODE=LOCAL_ONLY?'':CODE;   /* PREV_CODE: el viaje en la nube que estaba abierto antes */
 try{
   var qp=(new URLSearchParams(location.search).get('t')||'').toLowerCase();
