@@ -12,6 +12,7 @@ function splitGroups(){
   var me=myPersonId(),g=[];
   live('lodging').forEach(function(l){var ids=livingIds(l.guests);if(ids.length)g.push({key:'l'+l.id,ic:'🏠',name:l.name||'Alojamiento',ids:ids,mine:ids.indexOf(me)>=0});});
   live('vehicles').forEach(function(v){var ids=livingIds(v.riders);if(ids.length)g.push({key:'v'+v.id,ic:'🚗',name:vehName(v),ids:ids,mine:ids.indexOf(me)>=0});});
+  rentals().forEach(function(t){var ids=livingIds(t.riders);if(ids.length)g.push({key:'t'+t.id,ic:'🚙',name:rentalName(t),ids:ids,mine:ids.indexOf(me)>=0});});
   return g.sort(function(a,b){return (b.mine-a.mine);});
 }
 function groupChipsHtml(){
@@ -40,24 +41,34 @@ function peopleChecksHtml(prefix,sel,title){
 function takeChecks(d,prefix){var o=[];Object.keys(d).forEach(function(k){if(k.indexOf(prefix+'_')===0){o.push(k.slice(prefix.length+1));delete d[k];}});return o.join(',');}
 
 /* ---------- Autos ---------- */
+function rentals(){return live('transports').filter(function(t){return t.type==='auto';});}
+function rentalName(t){return 'Alquiler'+(t.company?' '+t.company:'')+(t.from?' ('+t.from+')':'');}
 function vehName(v){return v.name||(v.detail?v.detail:'Auto')+(v.owner&&nameOf(v.owner)?' de '+nameOf(v.owner):'');}
 function vehiclesHtml(){
-  var L=live('vehicles'),me=myPersonId();
+  var L=live('vehicles'),R=rentals(),me=myPersonId();
   var h='<section class="vehs"><div class="bar" style="margin-bottom:8px"><h3>🚗 Autos del viaje</h3><button type="button" class="ghost sm" data-act="vehadd">+ Sumar un auto</button></div>';
-  if(!L.length)return h+'<p class="nada" style="padding:0 0 6px">Si van en auto, sumalo acá y cada uno marca en cuál va. Después, al cargar la nafta o los peajes, lo repartís entre los de ese auto con un toque.</p></section>';
+  if(!L.length&&!R.length)return h+'<p class="nada" style="padding:0 0 6px">Si van en auto, sumalo acá y cada uno marca en cuál va. Después, al cargar la nafta o los peajes, lo repartís entre los de ese auto con un toque.</p></section>';
   return h+L.map(function(v){
     var ids=livingIds(v.riders),seats=parseInt(v.seats,10)||0,inIt=ids.indexOf(me)>=0,full=seats&&ids.length>=seats;
     return '<div class="stay veh" role="button" tabindex="0" data-act="vehedit" data-id="'+v.id+'"><div class="nm">'+esc(vehName(v))+'</div>'
      +'<div class="sub" style="margin:2px 0 0">'+esc([v.detail,v.plate?'Patente '+v.plate:'',v.owner&&nameOf(v.owner)?'De '+nameOf(v.owner):''].filter(Boolean).join(' · '))+'</div>'
      +'<div class="guests"><span>👥 '+(ids.length?esc(ids.map(nameOf).join(', ')):'Nadie todavía')+(seats?' <b>· '+ids.length+'/'+seats+' lugares</b>':'')+'</span>'
      +(me?'<button type="button" class="ghost sm" data-act="ride" data-id="'+v.id+'"'+(!inIt&&full?' disabled':'')+'>'+(inIt?'Me bajo':full?'Lleno':'Me subo')+'</button>':'')+'</div></div>';
+  }).join('')+R.map(function(t){
+    var ids=livingIds(t.riders),seats=parseInt(t.seats,10)||0,inIt=ids.indexOf(me)>=0,full=seats&&ids.length>=seats;
+    var f=t.dep?fShort(t.dep.slice(0,10))+(t.arr?' al '+fShort(t.arr.slice(0,10)):''):'';
+    return '<div class="stay veh rent" role="button" tabindex="0" data-act="edit" data-k="transports" data-id="'+t.id+'"><div class="nm">🚙 '+esc(rentalName(t))+'</div>'
+     +'<div class="sub" style="margin:2px 0 0">'+esc(['Alquilado',f,t.split==='riders'?'el costo se divide entre los que van':''].filter(Boolean).join(' · '))+'</div>'
+     +'<div class="guests"><span>👥 '+(ids.length?esc(ids.map(nameOf).join(', ')):'Nadie todavía')+(seats?' <b>· '+ids.length+'/'+seats+' lugares</b>':'')+'</span>'
+     +(me?'<button type="button" class="ghost sm" data-act="ride" data-k="transports" data-id="'+t.id+'"'+(!inIt&&full?' disabled':'')+'>'+(inIt?'Me bajo':full?'Lleno':'Me subo')+'</button>':'')+'</div></div>';
   }).join('')+'</section>';
 }
-function toggleRide(vid){
-  var me=myPersonId(),v=S.vehicles.find(function(x){return x.id===vid;});if(!me||!v)return;
+function toggleRide(vid,k){
+  k=k==='transports'?'transports':'vehicles';
+  var me=myPersonId(),v=S[k].find(function(x){return x.id===vid;});if(!me||!v)return;
   var ids=idsOf(v.riders),i=ids.indexOf(me),seats=parseInt(v.seats,10)||0;
   if(i>=0)ids.splice(i,1);else{if(seats&&livingIds(v.riders).length>=seats)return;ids.push(me);}
-  upsert('vehicles',vid,{riders:ids.join(',')});render();
+  upsert(k,vid,{riders:ids.join(',')});render();
 }
 /* Sumar un auto al viaje: uno de "Mis vehículos" o cargado a mano. */
 function openVehAdd(){

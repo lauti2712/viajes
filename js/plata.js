@@ -27,7 +27,7 @@ function itemCost(src,x,cur0){
   else if(src==='lodging'){title=x.name||'Alojamiento';date=x.in||'';cat='Alojamiento';}
   else if(src==='expenses'){title=x.desc||'Gasto';date=x.date||'';cat=x.cat||'Otros';}
   else return null;
-  return {id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:curCode(x.cur,cur0||base()),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',guests:src==='lodging'?(x.guests||''):'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||''};
+  return {id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:curCode(x.cur,cur0||base()),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',guests:src==='lodging'?(x.guests||''):'',riders:src==='transports'?(x.riders||''):'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||''};
 }
 function costs(){
   var o=[];
@@ -47,6 +47,7 @@ function shareMap(c,b){
     if(tot>0){sh.forEach(function(x){out[x.p]=(out[x.p]||0)+b*parseFloat(x.a)/tot;});return out;}
   }
   /* 'guests': un alojamiento repartido entre los que se quedan ahí (si no marcó nadie, entre todos). */
+  if(sp==='riders'){var rs=String(c.riders||'').split(',').filter(function(id){return ids.indexOf(id)>=0;});var rw=rs.length?rs:ids;rw.forEach(function(id){out[id]=b/rw.length;});return out;}
   if(sp==='guests'){var gs=String(c.guests||'').split(',').filter(function(id){return ids.indexOf(id)>=0;});var gw=gs.length?gs:ids;gw.forEach(function(id){out[id]=b/gw.length;});return out;}
   var who=(sp==='some'||(sp==='equal'&&c.splitWith))?splitIds(c).filter(function(id){return ids.indexOf(id)>=0;}):(sp!=='equal'&&sp!=='amounts'&&ids.indexOf(sp)>=0?[sp]:ids);
   if(!who.length)who=ids;
@@ -60,6 +61,7 @@ function splitLabel(x){
     return ids.length&&all.some(function(id){return ids.indexOf(id)<0;})?'Entre '+ids.map(nameOf).filter(Boolean).join(', '):'';
   }
   if(sp==='amounts')return 'Por montos';
+  if(sp==='riders'){var rr=String(x.riders||'').split(',').filter(Boolean).map(nameOf).filter(Boolean);return rr.length?'Entre los que van en el auto: '+rr.join(', '):'Entre todos (nadie se subió todavía)';}
   if(sp==='guests'){var g=String(x.guests||'').split(',').filter(Boolean).map(nameOf).filter(Boolean);return g.length?'Entre los que se quedan: '+g.join(', '):'Entre todos (nadie marcó que se queda)';}
   if(sp==='some')return 'Entre '+splitIds(x).map(nameOf).filter(Boolean).join(', ');
   return 'Solo '+nameOf(sp);

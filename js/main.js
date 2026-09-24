@@ -25,7 +25,7 @@ document.addEventListener('click',function(e){
   else if(a==='mytrips')openTrips();
   else if(a==='profile')openProfile();
   else if(a==='lodgejoin')toggleGuest(t.dataset.id);
-  else if(a==='ride')toggleRide(t.dataset.id);
+  else if(a==='ride')toggleRide(t.dataset.id,t.dataset.k);
   else if(a==='vehadd')openVehAdd();
   else if(a==='vehfrom')addVehFromProfile(t.dataset.vid);
   else if(a==='vehedit')openVehicle(t.dataset.id);

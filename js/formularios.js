@@ -105,10 +105,12 @@ var SPECS={
     {k:'dep',l:'Sale',t:'datetime-local'},
     {k:'arr',l:'Llega',t:'datetime-local'},
     {k:'_same',t:'html',html:'<label class="fld pksug" id="sameWrap" style="flex-direction:row;white-space:normal" hidden><input type="checkbox" name="same"> Se devuelve en el mismo lugar donde se retira</label>'},
+    {k:'seats',l:'Asientos',t:'number',half:true,ph:'5'},
+    {k:'_riders',t:'html',html:''},   /* se completa en openItem: quiénes van en el auto alquilado */
     {k:'company',l:'Empresa',t:'text',half:true,ph:'Aerolínea, bus…'},
     {k:'ref',l:'Código de reserva',t:'text',half:true},
     {k:'notes',l:'Notas',t:'textarea',ph:'Terminal, asiento, equipaje, hora de check-in…'}
-  ].concat(costF())}},
+  ].concat(costF().map(function(f){return f.k==='split'?Object.assign({},f,{opts:[['riders','Los que van en este auto']].concat(f.opts)}):f;}))}},
   lodging:function(){return {title:['Nuevo alojamiento','Editar alojamiento'],fields:[
     {k:'name',l:'Nombre',t:'text',req:true,ph:'Hotel, depto, hostel…'},
     {k:'airbnb',l:'Link de Airbnb (opcional)',t:'text',ph:'https://www.airbnb.com.ar/rooms/…'},
@@ -191,11 +193,12 @@ function openItem(k,id,pre){
   var sp=SPECS[k](),ex=id?S[k].find(function(x){return x.id===id}):null;
   var vals=Object.assign({},ex||Object.assign({},DEFAULTS[k](),pre||{}));
   /* Gastos viejos "solo de X": se muestran como "algunos" con esa sola persona. */
-  if(vals.split&&['equal','some','amounts','guests'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
+  if(vals.split&&['equal','some','amounts','guests','riders'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
   if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="hint" id="tkmsg" style="margin:0"></span></div>':'';
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');});
+  if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes van en este auto');});
   var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="msg err" id="formmsg" role="status" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
    +'<hr>'+attsBlock(ex)+'<hr>'+linksBlock(ex);
   var panel=openSheet(sp.title[ex?1:0],body);
@@ -204,7 +207,11 @@ function openItem(k,id,pre){
   function showFld(input,on){if(!input)return;var w=input.closest('.fld');if(w)w.hidden=!on;input.disabled=!on;}
 
   function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging')d.guests=takeChecks(d,'g');
-    if(k==='transports'){if(d.type==='auto'&&d.same){d.to=d.from;d.same='1';}else d.same='';}
+    if(k==='transports'){
+      var rd=takeChecks(d,'rd');
+      if(d.type==='auto'){d.riders=rd;d.seats=String(parseInt(d.seats,10)||'');if(d.same){d.to=d.from;d.same='1';}else d.same='';}
+      else{d.riders='';d.seats='';d.same='';if(d.split==='riders')d.split='equal';}   /* "los del auto" solo existe en alquileres */
+    }
     return d;}
   /* Alquiler de auto: los mismos campos del transporte, con nombres de retiro y devolución. */
   var TLBL={from:['Origen','Lugar de retiro'],to:['Destino','Lugar de devolución'],dep:['Sale','Retiro (fecha y hora)'],arr:['Llega','Devolución (fecha y hora)'],company:['Empresa','Empresa de alquiler']};
@@ -214,6 +221,9 @@ function openItem(k,id,pre){
     Object.keys(TLBL).forEach(function(n){var i=el(n);if(i)i.closest('.fld').querySelector('span').textContent=TLBL[n][car?1:0];});
     el('from').placeholder=car?'Ej: Aeropuerto de Iguazú':'Ej: Rosario';el('to').placeholder=car?'Ej: Centro de Puerto Iguazú':'Ej: Bariloche';el('company').placeholder=car?'Localiza, Hertz…':'Aerolínea, bus…';
     $('#sameWrap',panel).hidden=!car;
+    showFld(el('seats'),car);var rb=$('#rdBox',panel);if(rb)rb.hidden=!car;
+    var so=el('split').querySelector('option[value=riders]');if(so)so.hidden=!car;
+    if(!car&&el('split').value==='riders'){el('split').value='equal';drawSplit();}
     var tw=el('to').closest('.fld');tw.hidden=same;el('to').required=!same;
   }
   function ensureId(){
@@ -241,7 +251,11 @@ function openItem(k,id,pre){
   function drawSplit(){
     if(!box)return;
     var mode=el('split').value,ppl=allPeople(),st=splitState(),h='';
-    if(mode==='guests'){
+    if(mode==='riders'){
+      var rn=Array.prototype.filter.call(f.querySelectorAll('[name^=rd_]'),function(c){return c.checked;}).map(function(c){return nameOf(c.name.slice(3));});
+      h='<p class="hint" style="margin:0">'+(rn.length?'Se divide entre los que van en el auto: '+esc(rn.join(', '))+'.':'Todavía nadie se subió: se divide entre todos.')+' Si alguien se sube o se baja, se actualiza solo.</p>';
+    }
+    else if(mode==='guests'){
       var gn=Array.prototype.filter.call(f.querySelectorAll('[name^=g_]'),function(c){return c.checked;}).map(function(c){return nameOf(c.name.slice(2));});
       h='<p class="hint" style="margin:0">'+(gn.length?'Se divide entre los que se quedan acá: '+esc(gn.join(', '))+'.':'Todavía no marcaste quiénes se quedan: se divide entre todos.')+' Si alguien se suma o se va del alojamiento, se actualiza solo.</p>';
     }
@@ -259,7 +273,7 @@ function openItem(k,id,pre){
       h='<div class="rates">'+ppl.map(function(p){return '<label class="rate"><span style="min-width:90px">'+dot(p.id)+esc(p.name)+'</span><input type="number" step="any" min="0" inputmode="decimal" name="sh_'+esc(p.id)+'" value="'+esc(st.amt[p.id]||'')+'" placeholder="0"></label>';}).join('')+'</div>'
        +'<p class="hint" style="margin:8px 0 0">Al escribir el monto de alguien, lo que falta se reparte en partes iguales entre los que siguen. <span id="shsum"></span></p>';
     }
-    box.innerHTML=(mode!=='guests'?groupChipsHtml():'')+h;
+    box.innerHTML=(mode!=='guests'&&mode!=='riders'?groupChipsHtml():'')+h;
     if(mode==='amounts'&&lastEdited<0)spread(-1);
     updSum();
   }
@@ -385,7 +399,12 @@ function openItem(k,id,pre){
       return;
     }
     if(e.target.name==='split'){drawSplit();$('#formmsg',panel).textContent='';return;}
-    if(e.target.name==='type'||e.target.name==='same'){syncTType();return;}
+    if(e.target.name==='type'||e.target.name==='same'){
+      /* al elegir "Alquiler de auto", el costo pasa a repartirse entre los que van en el auto */
+      if(e.target.name==='type'&&e.target.value==='auto'&&el('split').value==='equal'&&!ex){el('split').value='riders';var me0=myPersonId(),c0=me0&&f.querySelector('[name=rd_'+me0+']');if(c0)c0.checked=true;drawSplit();}
+      syncTType();return;
+    }
+    if(String(e.target.name).indexOf('rd_')===0&&el('split').value==='riders'){drawSplit();return;}
     if(String(e.target.name).indexOf('g_')===0&&el('split').value==='guests'){drawSplit();return;}
     if(e.target.name==='methodId'){syncPay();return;}
     if(e.target.name==='paidBy'){
@@ -473,12 +492,13 @@ function unlinkPerson(oldId){
     if(Object.keys(ch).length)sysUpdate(k,x.id,ch);
   });});
   S.lodging.slice().forEach(function(x){if(idsOf(x.guests).indexOf(oldId)>=0)sysUpdate('lodging',x.id,{guests:idsOf(x.guests).map(rep).join(',')});});
+  S.transports.slice().forEach(function(x){if(idsOf(x.riders).indexOf(oldId)>=0)sysUpdate('transports',x.id,{riders:idsOf(x.riders).map(rep).join(',')});});
   S.vehicles.slice().forEach(function(x){var ch={};if(idsOf(x.riders).indexOf(oldId)>=0)ch.riders=idsOf(x.riders).map(rep).join(',');if(x.owner===oldId)ch.owner=nid;if(Object.keys(ch).length)sysUpdate('vehicles',x.id,ch);});
   S.payments.slice().forEach(function(x){var ch={};if(x.from===oldId)ch.from=nid;if(x.to===oldId)ch.to=nid;if(Object.keys(ch).length)sysUpdate('payments',x.id,ch);});
   savePerson(oldId,{});remove('people',oldId);
   return nid;
 }
-function peopleUsed(id){if(live('payments').some(function(x){return x.from===id||x.to===id;}))return true;return costs().some(function(c){return c.paidBy===id||c.split===id||(c.split==='guests'&&idsOf(c.guests).indexOf(id)>=0)||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
+function peopleUsed(id){if(live('payments').some(function(x){return x.from===id||x.to===id;}))return true;return costs().some(function(c){return c.paidBy===id||c.split===id||(c.split==='guests'&&idsOf(c.guests).indexOf(id)>=0)||(c.split==='riders'&&idsOf(c.riders).indexOf(id)>=0)||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
 /* Los p1/p2 de viajes viejos pueden no estar todavía en `people`: se crean con su mismo id. */
 function savePerson(id,data){
   if(S.people.some(function(x){return x.id===id}))return upsert('people',id,data);
