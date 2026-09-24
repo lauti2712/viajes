@@ -74,6 +74,6 @@ function checkNewAvisos(){
   list.forEach(function(a,i){
     if(NOTIFIED[keys[i]])return;NOTIFIED[keys[i]]=1;
     if(document.visibilityState!=='hidden'||!('Notification' in window)||Notification.permission!=='granted')return;
-    try{new Notification(S.trip.name||'Nuestro viaje',{body:a.txt,tag:keys[i]});}catch(e){}
+    showSysNotification(S.trip.name||'Nuestro viaje',a.txt,keys[i]);
   });
 }

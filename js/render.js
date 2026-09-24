@@ -6,6 +6,7 @@ function renderHead(){
   if(homeMode()){$('#title').textContent='Mis viajes';$('#when').innerHTML='';$('#who2').innerHTML=syncChip();document.title='Mis viajes';var l0=$('#logoutBtn');if(l0){l0.hidden=!(ME&&AUTH==='in');if(ME)l0.textContent='Salir'+(ME.name?' ('+ME.name.split(' ')[0]+')':'');}var mt0=$('#tripsBtn');if(mt0)mt0.hidden=true;return;}
   $('#title').textContent=S.trip.name||'Nuestro viaje';
   var tb=$('#themeBtn');if(tb)tb.textContent=themeLabel();
+  if(typeof syncInstallBtn==='function')syncInstallBtn();
   var mt=$('#tripsBtn');if(mt)mt.hidden=!(cloudMode()&&AUTH==='in');
   var bb=$('#bellBtn');if(bb){var n=cloudMode()&&AUTH==='in'?avisosCount():0;bb.hidden=!(cloudMode()&&AUTH==='in');bb.innerHTML='🔔'+(n?' <b class="badge">'+n+'</b>':'');bb.setAttribute('aria-label',n?n+' avisos nuevos':'Avisos');}
   var lo=$('#logoutBtn');if(lo){lo.hidden=!(ME&&AUTH==='in');if(ME)lo.textContent='Salir'+(ME.name?' ('+ME.name.split(' ')[0]+')':'');}

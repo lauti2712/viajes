@@ -41,6 +41,7 @@ document.addEventListener('click',function(e){
   else if(a==='addmethod')openMethod(null);
   else if(a==='editmethod')openMethod(t.dataset.id);
   else if(a==='logout')logout();
+  else if(a==='install')installApp();
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&!$('#sheet').hidden){closeSheet();return;}

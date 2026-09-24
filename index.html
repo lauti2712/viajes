@@ -4,10 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nuestro viaje</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1E5AA8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Viajes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20260924c">
+<link rel="stylesheet" href="css/app.css?v=20260924d">
 <script>try{var __t=localStorage.getItem('viaje-de-a-dos:theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 </head>
 <body>
@@ -22,6 +30,7 @@
     <button class="ghost" data-act="sync">Compartir datos</button>
     <button class="ghost" data-act="avisos" id="bellBtn" hidden aria-label="Avisos">🔔</button>
     <button class="ghost" data-act="mytrips" id="tripsBtn" hidden>🧳 Mis viajes</button>
+    <button class="ghost" data-act="install" id="installBtn" hidden>📲 Instalar app</button>
     <button class="ghost" data-act="theme" id="themeBtn"></button>
     <button class="ghost" data-act="logout" id="logoutBtn" hidden></button>
   </div>
@@ -46,18 +55,19 @@
 <datalist id="methods"><option value="Efectivo"><option value="Tarjeta de crédito"><option value="Tarjeta de débito"><option value="Transferencia"><option value="Mercado Pago"><option value="Millas / puntos"></datalist>
 
 <!-- Al publicar un cambio, subí el ?v= (css y js) para que nadie quede con archivos viejos en caché. -->
-<script src="js/config.js?v=20260924c"></script>
-<script src="js/core.js?v=20260924c"></script>
-<script src="js/plata.js?v=20260924c"></script>
-<script src="js/vistas.js?v=20260924c"></script>
-<script src="js/mispagos.js?v=20260924c"></script>
-<script src="js/render.js?v=20260924c"></script>
-<script src="js/avisos.js?v=20260924c"></script>
-<script src="js/final.js?v=20260924c"></script>
-<script src="js/ticket.js?v=20260924c"></script>
-<script src="js/formularios.js?v=20260924c"></script>
-<script src="js/compartir.js?v=20260924c"></script>
-<script src="js/nube.js?v=20260924c"></script>
-<script src="js/main.js?v=20260924c"></script>
+<script src="js/config.js?v=20260924d"></script>
+<script src="js/core.js?v=20260924d"></script>
+<script src="js/plata.js?v=20260924d"></script>
+<script src="js/vistas.js?v=20260924d"></script>
+<script src="js/mispagos.js?v=20260924d"></script>
+<script src="js/render.js?v=20260924d"></script>
+<script src="js/avisos.js?v=20260924d"></script>
+<script src="js/final.js?v=20260924d"></script>
+<script src="js/ticket.js?v=20260924d"></script>
+<script src="js/formularios.js?v=20260924d"></script>
+<script src="js/compartir.js?v=20260924d"></script>
+<script src="js/nube.js?v=20260924d"></script>
+<script src="js/pwa.js?v=20260924d"></script>
+<script src="js/main.js?v=20260924d"></script>
 </body>
 </html>

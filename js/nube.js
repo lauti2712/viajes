@@ -2,7 +2,7 @@
 'use strict';
 /* ---------- Nube (Firestore + Auth) ---------- */
 var SYNC={ok:['var(--mint)','Sincronizado'],saving:['var(--sun)','Guardando…'],connecting:['var(--sun)','Conectando…'],offline:['var(--rose)','Sin conexión'],err:['var(--rose)','Error de conexión'],denied:['var(--rose)','Sin permiso: revisá las reglas de Firestore'],local:['var(--muted)','Solo en este dispositivo'],none:['var(--rose)','Sin conectar'],login:['var(--muted)','Falta iniciar sesión']};
-function syncChip(){var x=SYNC[syncState];return x?'<span class="chip" role="status"><i class="dot" style="background:'+x[0]+'"></i>'+x[1]+'</span>':'';}
+function syncChip(){var x=SYNC[syncState==='connecting'&&navigator.onLine===false?'offline':syncState];return x?'<span class="chip" role="status"><i class="dot" style="background:'+x[0]+'"></i>'+x[1]+'</span>':'';}
 function setSync(st){syncState=st;renderHead();}
 var clean=function(o){return JSON.parse(JSON.stringify(o))};
 function fbErr(e){if(e&&e.code==='permission-denied')setSync('denied');}
