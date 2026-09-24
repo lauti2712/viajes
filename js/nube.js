@@ -137,7 +137,7 @@ async function startCloud(){
   var listening=false;
   FB.au.onAuthStateChanged(FB.auth,function(u){
     if(u){
-      ME={uid:u.uid,name:u.displayName||''};AUTH='in';loginMsg='';
+      ME={uid:u.uid,name:u.displayName||'',email:u.email||''};AUTH='in';loginMsg='';
       if(!listening){listening=true;listenTrips();listenMeta();if(CODE)listen();}
       render();
     }else{

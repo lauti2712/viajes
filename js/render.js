@@ -2,15 +2,27 @@
 'use strict';
 var VIEWS={resumen:vResumen,transportes:vTransportes,alojamiento:vAlojamiento,gastos:vGastos,itinerario:vItinerario,mochila:vMochila,pagos:vPagos};
 
+/* Íconos del encabezado (trazo, toman el color del texto). */
+var ICON={
+  bell:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+  sun:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
+  moon:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
+  auto:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor"/></svg>',
+  user:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'
+};
+function initialOf(n){n=String(n||'').trim();return n?esc(n.charAt(0).toUpperCase()):'';}
+/* El estado de sincronización solo se muestra si hay algo que avisar. */
+var SYNC_SHOW=['offline','err','denied','local'];
 function renderHead(){
-  if(homeMode()){$('#title').textContent='Mis viajes';$('#when').innerHTML='';$('#who2').innerHTML=syncChip();document.title='Mis viajes';var l0=$('#logoutBtn');if(l0){l0.hidden=!(ME&&AUTH==='in');if(ME)l0.textContent='Salir'+(ME.name?' ('+ME.name.split(' ')[0]+')':'');}var mt0=$('#tripsBtn');if(mt0)mt0.hidden=true;return;}
+  var logged=!!(ME&&AUTH==='in'),home=homeMode(),t=getTheme();
+  var tb=$('#themeBtn');tb.innerHTML=ICON[t==='light'?'sun':t==='dark'?'moon':'auto'];tb.setAttribute('aria-label','Tema: '+themeLabel().replace(/^\S+\s/,''));tb.title=tb.getAttribute('aria-label');
+  var sb=$('#setBtn');sb.innerHTML=ICON.gear;sb.hidden=home||gated();
+  var bb=$('#bellBtn'),n=cloudMode()&&logged?avisosCount():0;bb.hidden=!(cloudMode()&&logged);bb.innerHTML=ICON.bell+(n?'<b class="badge">'+n+'</b>':'');bb.setAttribute('aria-label',n?n+' avisos nuevos':'Avisos');
+  var pb=$('#profileBtn');pb.hidden=!((cloudMode()||home)&&logged);pb.innerHTML=logged&&ME.name?'<span class="avatar">'+initialOf(ME.name)+'</span>':ICON.user;
+  $('#who2').innerHTML=SYNC_SHOW.indexOf(syncState==='connecting'&&navigator.onLine===false?'offline':syncState)>=0?syncChip():'';
+  if(home){$('#title').textContent='Mis viajes';$('#when').innerHTML='';document.title='Mis viajes';return;}
   $('#title').textContent=S.trip.name||'Nuestro viaje';
-  var tb=$('#themeBtn');if(tb)tb.textContent=themeLabel();
-  if(typeof syncInstallBtn==='function')syncInstallBtn();
-  var mt=$('#tripsBtn');if(mt)mt.hidden=!(cloudMode()&&AUTH==='in');
-  var bb=$('#bellBtn');if(bb){var n=cloudMode()&&AUTH==='in'?avisosCount():0;bb.hidden=!(cloudMode()&&AUTH==='in');bb.innerHTML='🔔'+(n?' <b class="badge">'+n+'</b>':'');bb.setAttribute('aria-label',n?n+' avisos nuevos':'Avisos');}
-  var lo=$('#logoutBtn');if(lo){lo.hidden=!(ME&&AUTH==='in');if(ME)lo.textContent='Salir'+(ME.name?' ('+ME.name.split(' ')[0]+')':'');}
-  $('#who2').innerHTML=(gated()?[]:allPeople()).map(function(p){return '<span class="chip">'+dot(p.id)+esc(p.name)+'</span>';}).join('')+syncChip();
   var s=pd(S.trip.start),e=pd(S.trip.end),w='';
   if(!s){w='<span>Sin fechas todavía</span>';}
   else{
@@ -19,10 +31,24 @@ function renderHead(){
     else if(e&&dayDiff(pd(today()),e)>=0)st='Día '+(1-d)+' de '+(dayDiff(s,e)+1);
     else if(e)st='Viaje terminado';
     else st='Ya empezó';
-    w='<span class="cal" aria-hidden="true">📅</span><span>'+esc(fShort(S.trip.start))+(e?' al '+esc(fShort(S.trip.end)):'')+'</span><b>'+st+'</b>';
+    w='<span>'+esc(fShort(S.trip.start))+(e?' al '+esc(fShort(S.trip.end)):'')+'</span><span class="sep" aria-hidden="true">·</span><b>'+st+'</b>';
   }
   $('#when').innerHTML=w;
   document.title=(S.trip.name||'Nuestro viaje');
+}
+/* Perfil: la cuenta, sus viajes, sus formas de pago, instalar la app y salir. */
+function openProfile(){
+  if(!ME)return;
+  var h='<div class="prof"><span class="avatar lg">'+initialOf(ME.name)+'</span><div><b>'+esc(ME.name||'Tu cuenta')+'</b><small>'+esc(ME.email||'')+'</small></div></div>';
+  if(!homeMode())h+='<section class="psec"><div class="bar"><h3>Mis viajes</h3><button type="button" class="ghost sm" data-act="newtrip">+ Nuevo</button></div><div id="tripsl">'+tripsListHtml()+'</div></section>';
+  h+='<section class="psec"><div class="bar"><h3>Formas de pago</h3><button type="button" class="ghost sm" data-act="addmethod">+ Agregar</button></div>'
+   +(METHODS.length?METHODS.map(function(m){var ty=mtype(m);return '<div class="exp" role="button" tabindex="0" data-act="editmethod" data-id="'+esc(m.id)+'" style="grid-template-columns:34px 1fr"><span class="ec" aria-hidden="true">'+ty[0]+'</span><div class="et"><b>'+esc(methodLabel(m))+'</b><small><span>'+esc(ty[1])+'</span>'+(m.alias&&m.share?'<span>Alias visible: '+esc(m.alias)+'</span>':'')+'</small></div></div>';}).join('')
+     :'<p class="nada">Todavía no cargaste ninguna. Sirven para elegir con qué pagaste cada gasto y para que te paguen a tu alias.</p>')
+   +(cloudMode()?'<div class="row" style="margin-top:10px"><button type="button" class="ghost" data-act="gopagos">💳 Ver mis pagos y resúmenes de tarjeta</button></div>':'')+'</section>';
+  if(typeof isStandalone==='function'&&!isStandalone()&&(installEvt||isIOS()))h+='<section class="psec"><button type="button" class="ghost" data-act="install">📲 Instalar la app en este dispositivo</button></section>';
+  h+='<section class="psec"><button type="button" class="danger" data-act="logout">Salir de la cuenta</button></section>';
+  var panel=openSheet('Mi perfil',h);
+  formRefresh=function(){var w=$('#tripsl',panel);if(w)w.innerHTML=tripsListHtml();};
 }
 /* Con nube hay que iniciar sesión con Google antes de ver el viaje. Si Firebase ni siquiera cargó
    (sin señal), AUTH queda 'offline' y se muestra lo guardado en el dispositivo. */
@@ -53,8 +79,7 @@ function render(){
   if(g){$('#main').innerHTML=vGate();return;}
   if(homeMode()){$('#main').innerHTML=vHome();return;}
   var canPay=cloudMode()&&AUTH==='in';
-  $('#tabPagos').hidden=!canPay;
-  if(tab==='pagos'&&!canPay)tab='itinerario';
+  if(tab==='pagos'&&!canPay)tab='itinerario';   /* Mis pagos se abre desde el perfil */
   $('#main').innerHTML=whoBanner()+VIEWS[tab]();
   Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }

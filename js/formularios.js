@@ -513,8 +513,10 @@ function openSettings(){
       {k:'budget',l:'Presupuesto total del viaje (opcional)',t:'number',half:true,ph:'0'},
       {k:'info',l:'Info útil (seguro de viaje, contacto de emergencia, dirección del alojamiento…)',t:'textarea',ph:'Lo que quieran tener a mano aunque no haya señal'}
     ],
+    intro:shareBlockHtml(),
     extra:'<hr>'+pplBlock(),
-    onReady:bindPeople,
+    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);},
+    validate:function(d){return d.start&&d.end&&d.end<d.start?'La fecha "Hasta" es anterior a "Desde". Revisá las fechas del viaje.':'';},
     onSave:function(d){
       var nb=curCode(d.base,'ARS'),newBase=nb!==base();
       if(newBase)S.trip.rates={};

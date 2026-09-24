@@ -15,25 +15,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20260924d">
+<link rel="stylesheet" href="css/app.css?v=20260924e">
 <script>try{var __t=localStorage.getItem('viaje-de-a-dos:theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 </head>
 <body>
 <header class="top">
+  <div class="topbar">
+    <h1 id="title" class="ttl">Nuestro viaje</h1>
+    <div class="icons">
+      <button class="ib" data-act="avisos" id="bellBtn" hidden aria-label="Avisos" title="Avisos"></button>
+      <button class="ib" data-act="settings" id="setBtn" aria-label="Ajustes del viaje" title="Ajustes del viaje"></button>
+      <button class="ib" data-act="theme" id="themeBtn" aria-label="Tema" title="Tema"></button>
+      <button class="ib" data-act="profile" id="profileBtn" hidden aria-label="Mi perfil" title="Mi perfil"></button>
+    </div>
+  </div>
+  <p class="when" id="when"></p>
   <div class="who2" id="who2"></div>
-  <div class="titlerow">
-    <h1 id="title">Nuestro viaje</h1>
-    <p class="when" id="when"></p>
-  </div>
-  <div class="hb">
-    <button class="ghost" data-act="settings">Ajustes del viaje</button>
-    <button class="ghost" data-act="sync">Compartir datos</button>
-    <button class="ghost" data-act="avisos" id="bellBtn" hidden aria-label="Avisos">🔔</button>
-    <button class="ghost" data-act="mytrips" id="tripsBtn" hidden>🧳 Mis viajes</button>
-    <button class="ghost" data-act="install" id="installBtn" hidden>📲 Instalar app</button>
-    <button class="ghost" data-act="theme" id="themeBtn"></button>
-    <button class="ghost" data-act="logout" id="logoutBtn" hidden></button>
-  </div>
 </header>
 <nav class="tabs" aria-label="Secciones">
   <div class="in" id="tabs">
@@ -42,7 +39,6 @@
     <button class="tab" data-tab="transportes">Transportes</button>
     <button class="tab" data-tab="alojamiento">Alojamiento</button>
     <button class="tab" data-tab="mochila">Mochila</button>
-    <button class="tab" data-tab="pagos" id="tabPagos" hidden>Mis pagos</button>
     <button class="tab" data-tab="resumen">Resumen</button>
   </div>
 </nav>
@@ -55,19 +51,19 @@
 <datalist id="methods"><option value="Efectivo"><option value="Tarjeta de crédito"><option value="Tarjeta de débito"><option value="Transferencia"><option value="Mercado Pago"><option value="Millas / puntos"></datalist>
 
 <!-- Al publicar un cambio, subí el ?v= (css y js) para que nadie quede con archivos viejos en caché. -->
-<script src="js/config.js?v=20260924d"></script>
-<script src="js/core.js?v=20260924d"></script>
-<script src="js/plata.js?v=20260924d"></script>
-<script src="js/vistas.js?v=20260924d"></script>
-<script src="js/mispagos.js?v=20260924d"></script>
-<script src="js/render.js?v=20260924d"></script>
-<script src="js/avisos.js?v=20260924d"></script>
-<script src="js/final.js?v=20260924d"></script>
-<script src="js/ticket.js?v=20260924d"></script>
-<script src="js/formularios.js?v=20260924d"></script>
-<script src="js/compartir.js?v=20260924d"></script>
-<script src="js/nube.js?v=20260924d"></script>
-<script src="js/pwa.js?v=20260924d"></script>
-<script src="js/main.js?v=20260924d"></script>
+<script src="js/config.js?v=20260924e"></script>
+<script src="js/core.js?v=20260924e"></script>
+<script src="js/plata.js?v=20260924e"></script>
+<script src="js/vistas.js?v=20260924e"></script>
+<script src="js/mispagos.js?v=20260924e"></script>
+<script src="js/render.js?v=20260924e"></script>
+<script src="js/avisos.js?v=20260924e"></script>
+<script src="js/final.js?v=20260924e"></script>
+<script src="js/ticket.js?v=20260924e"></script>
+<script src="js/formularios.js?v=20260924e"></script>
+<script src="js/compartir.js?v=20260924e"></script>
+<script src="js/nube.js?v=20260924e"></script>
+<script src="js/pwa.js?v=20260924e"></script>
+<script src="js/main.js?v=20260924e"></script>
 </body>
 </html>

@@ -14,7 +14,7 @@ function themeLabel(){var t=getTheme();return t==='light'?'☀️ Claro':(t==='d
 function setTheme(t){
   try{if(t)localStorage.setItem(THEME_KEY,t);else localStorage.removeItem(THEME_KEY);}catch(e){}
   if(t)document.documentElement.setAttribute('data-theme',t);else document.documentElement.removeAttribute('data-theme');
-  var b=$('#themeBtn');if(b)b.textContent=themeLabel();
+  if(typeof renderHead==='function')renderHead();
 }
 function cycleTheme(){var t=getTheme();setTheme(t===''?'light':(t==='light'?'dark':''));}
 

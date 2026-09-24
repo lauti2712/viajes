@@ -17,13 +17,13 @@ document.addEventListener('click',function(e){
   if(a==='add')openItem(t.dataset.k,null,t.dataset.date?{date:t.dataset.date}:null);
   else if(a==='edit')openItem(t.dataset.k,t.dataset.id);
   else if(a==='settings')openSettings();
-  else if(a==='sync')openSync();
   else if(a==='theme')cycleTheme();
   else if(a==='fetchrates')fetchRates((t.dataset.codes||'USD,BRL').split(','));
   else if(a==='fetchusd')fetchBlueUsd(t.dataset.type);
   else if(a==='settle')openPayment(null,{from:t.dataset.from,to:t.dataset.to,amount:Math.round(parseFloat(t.dataset.amt)*100)/100,method:'Transferencia'});
   else if(a==='editpay')openPayment(t.dataset.id);
   else if(a==='mytrips')openTrips();
+  else if(a==='profile')openProfile();
   else if(a==='final')openFinal();
   else if(a==='avisos')openAvisos();
   else if(a==='gopagos'){tab='pagos';closeSheet();}
