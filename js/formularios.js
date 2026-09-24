@@ -192,7 +192,8 @@ function openItem(k,id,pre){
   if(vals.split&&['equal','some','amounts'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
   if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
   var curId=id||null;
-  var body='<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="msg err" id="formmsg" role="status" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
+  var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="hint" id="tkmsg" style="margin:0"></span></div>':'';
+  var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="msg err" id="formmsg" role="status" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
    +'<hr>'+attsBlock(ex)+'<hr>'+linksBlock(ex);
   var panel=openSheet(sp.title[ex?1:0],body);
   var f=$('#sf',panel);
@@ -332,6 +333,22 @@ function openItem(k,id,pre){
   });
 
   panel.addEventListener('change',function(e){
+    var tf=e.target.closest('[data-ticket]');
+    if(tf&&tf.files&&tf.files[0]){
+      var file=tf.files[0],tm=$('#tkmsg',panel),say=function(t,err){tm.textContent=t;tm.className='hint'+(err?' warn':'');};
+      tf.value='';
+      readTicket(file,say).then(function(r){
+        var got=[];
+        if(r.amount!=null){el('amount').value=r.amount;el('amount').dispatchEvent(new Event('input',{bubbles:true}));got.push('total '+money(r.amount,el('cur').value||base()));}
+        if(r.date&&el('date')){el('date').value=r.date;got.push('fecha '+fShort(r.date));}
+        if(r.merchant&&el('desc')&&!el('desc').value.trim()){el('desc').value=r.merchant;got.push('«'+r.merchant+'»');}
+        say(got.length?'Encontré '+got.join(', ')+'. Revisalo antes de guardar.':'No pude leer los datos: completalos a mano. La foto igual queda adjunta.',!got.length);
+        /* La foto queda adjunta al gasto (achicada). */
+        var f2=new File([r.blob],'ticket-'+(r.date||today())+'.jpg',{type:'image/jpeg'}),msg=$('[data-attmsg]',panel);
+        uploadFiles(k,ensureId(),[f2],function(){redraw();},function(t,err){if(msg){msg.textContent=t;msg.className='msg'+(err?' err':'');}});
+      }).catch(function(err){say((err&&err.message)||'No se pudo leer el ticket.',true);});
+      return;
+    }
     var fi=e.target.closest('[data-file]');
     if(fi&&fi.files&&fi.files.length){
       var id2=ensureId(),msg=$('[data-attmsg]',panel),files=fi.files;
