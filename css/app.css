@@ -305,3 +305,24 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .strow .x{border:0;background:transparent;color:var(--muted);font-size:15px;padding:8px 6px}
 .updbar{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));background:var(--sun);color:var(--on-sun);font-weight:700;font-size:14px;padding:10px 16px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:calc(100% - 32px);text-align:center}
 @media (prefers-reduced-motion:reduce){#sheet .panel{animation:none}}
+
+/* Ciudad, clima y mapa */
+.cityPick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.cityPick b{flex:1;min-width:0}
+.cityList{display:grid;gap:4px;margin-top:6px}
+.cityList:empty{display:none}
+.cityOpt{text-align:left;border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:8px 10px}
+.cityOpt small{color:var(--muted)}
+.cityOpt:hover{border-color:var(--muted)}
+.wx{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.wxbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin:0 0 16px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.tripmap.dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9)}
+.tripmap{height:260px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--paper)}
+.mpin{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--sea);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);color:#fff;font:800 12px var(--body)}
+.mpin.here{background:var(--sun)}
+.mpop{font-family:var(--body);min-width:170px}
+.mpop>b{display:block;margin-bottom:4px}
+.mpt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid #e5e5e5}
+.mpt small{display:block;color:#666}
+.mpt em{font-size:12px;font-style:normal;font-weight:700;color:#8a6d00}
+.leaflet-popup-content .ghost{color:#16223A;border-color:#ccc}

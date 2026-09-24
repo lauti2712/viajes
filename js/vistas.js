@@ -168,7 +168,8 @@ function autoRow(ic,time,title,sub){return '<div class="pl auto"><span class="t"
 function planRow(p){var ty=ITYPES[p.type]||ITYPES.otro;return '<div class="pl" role="button" tabindex="0" data-act="edit" data-k="plans" data-id="'+p.id+'"><span class="t">'+esc(p.time||'')+'</span><div><b>'+ty[0]+' '+esc(p.title||'Plan')+attLinkChips(p)+'</b>'+(p.place?'<small>'+esc(p.place)+'</small>':'')+(p.notes?'<small>'+esc(p.notes)+'</small>':'')+'</div></div>';}
 function vItinerario(){
   var days=daysList(),t=today(),s=pd(S.trip.start);
-  var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>';
+  loadWeather();
+  var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>'+wxSummary();
   if(!days.length)return h+empty('Todavía no hay días armados','Poné las fechas del viaje en Ajustes, o agregá un plan con su fecha. Los transportes y el alojamiento aparecen solos en su día.');
   return h+days.map(function(d){
     var items=[];
@@ -184,7 +185,7 @@ function vItinerario(){
     });
     items.sort(function(a,b){return a.k.localeCompare(b.k)});
     var dn=s?dayDiff(s,pd(d))+1:0;
-    return '<section class="iday"><div class="ih"><h3>'+esc(fLong(d))+'</h3>'+(dn>=1?'<span class="dn">Día '+dn+'</span>':'')+(d===t?'<span class="hoy">Hoy</span>':'')+'<span class="sp"></span><button class="ghost" data-act="add" data-k="plans" data-date="'+esc(d)+'">+ Plan</button></div>'+(items.length?items.map(function(i){return i.h}).join(''):'<div class="nada">Nada planeado todavía.</div>')+'</section>';
+    return '<section class="iday"><div class="ih"><h3>'+esc(fLong(d))+'</h3>'+(dn>=1?'<span class="dn">Día '+dn+'</span>':'')+(d===t?'<span class="hoy">Hoy</span>':'')+wxChip(d)+'<span class="sp"></span><button class="ghost" data-act="add" data-k="plans" data-date="'+esc(d)+'">+ Plan</button></div>'+(items.length?items.map(function(i){return i.h}).join(''):'<div class="nada">Nada planeado todavía.</div>')+'</section>';
   }).join('');
 }
 

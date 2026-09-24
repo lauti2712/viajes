@@ -33,6 +33,7 @@ function renderHead(){
     else st='Ya empezó';
     w='<span>'+esc(fShort(S.trip.start))+(e?' al '+esc(fShort(S.trip.end)):'')+'</span><span class="sep" aria-hidden="true">·</span><b>'+st+'</b>';
   }
+  var cy=cleanCity(S.trip.city);if(cy)w='<span>📍 '+esc(cy.name)+'</span><span class="sep" aria-hidden="true">·</span>'+w;
   $('#when').innerHTML=w;
   document.title=(S.trip.name||'Nuestro viaje');
 }
@@ -41,6 +42,7 @@ function openProfile(){
   if(!ME)return;
   var h='<div class="prof"><span class="avatar lg">'+initialOf(ME.name)+'</span><div><b>'+esc(ME.name||'Tu cuenta')+'</b><small>'+esc(ME.email||'')+'</small></div></div>';
   if(!homeMode())h+='<section class="psec"><div class="bar"><h3>Mis viajes</h3><button type="button" class="ghost sm" data-act="newtrip">+ Nuevo</button></div><div id="tripsl">'+tripsListHtml()+'</div></section>';
+  h+=mapSectionHtml();
   h+='<section class="psec"><div class="bar"><h3>Formas de pago</h3><button type="button" class="ghost sm" data-act="addmethod">+ Agregar</button></div>'
    +(METHODS.length?METHODS.map(function(m){var ty=mtype(m);return '<div class="exp" role="button" tabindex="0" data-act="editmethod" data-id="'+esc(m.id)+'" style="grid-template-columns:34px 1fr"><span class="ec" aria-hidden="true">'+ty[0]+'</span><div class="et"><b>'+esc(methodLabel(m))+'</b><small><span>'+esc(ty[1])+'</span>'+(m.alias&&m.share?'<span>Alias visible: '+esc(m.alias)+'</span>':'')+'</small></div></div>';}).join('')
      :'<p class="nada">Todavía no cargaste ninguna. Sirven para elegir con qué pagaste cada gasto y para que te paguen a tu alias.</p>')
@@ -48,6 +50,7 @@ function openProfile(){
   if(typeof isStandalone==='function'&&!isStandalone()&&(installEvt||isIOS()))h+='<section class="psec"><button type="button" class="ghost" data-act="install">📲 Instalar la app en este dispositivo</button></section>';
   h+='<section class="psec"><button type="button" class="danger" data-act="logout">Salir de la cuenta</button></section>';
   var panel=openSheet('Mi perfil',h);
+  drawTripMap(panel);
   formRefresh=function(){var w=$('#tripsl',panel);if(w)w.innerHTML=tripsListHtml();};
 }
 /* Con nube hay que iniciar sesión con Google antes de ver el viaje. Si Firebase ni siquiera cargó

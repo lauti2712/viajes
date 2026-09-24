@@ -8,10 +8,10 @@
 'use strict';
 const V = new URL(self.location).searchParams.get('v') || '0';
 const SHELL = 'viajes-shell-' + V, CDN = 'viajes-cdn-v1';
-const JS = ['config', 'core', 'plata', 'vistas', 'mispagos', 'render', 'avisos', 'final', 'ticket', 'formularios', 'compartir', 'nube', 'pwa', 'main'];   /* los mismos que index.html */
+const JS = ['config', 'core', 'plata', 'vistas', 'mispagos', 'render', 'avisos', 'final', 'ticket', 'lugares', 'clima', 'mapa', 'formularios', 'compartir', 'nube', 'pwa', 'main'];   /* los mismos que index.html */
 const FILES = ['./', 'manifest.webmanifest', 'css/app.css?v=' + V, 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png']
   .concat(JS.map(f => 'js/' + f + '.js?v=' + V));
-const CDN_HOSTS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net', 'tessdata.projectnaptha.com'];
+const CDN_HOSTS = ['cdnjs.cloudflare.com', 'www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net', 'tessdata.projectnaptha.com'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

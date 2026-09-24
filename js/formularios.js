@@ -506,6 +506,7 @@ function openSettings(){
   sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:t.name,start:t.start,end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
     fields:[
       {k:'name',l:'Nombre del viaje',t:'text',ph:'Ej: Bariloche 2026'},
+      {k:'_city',t:'html',html:cityFieldHtml(t.city)},
       {k:'start',l:'Desde',t:'date',half:true},
       {k:'end',l:'Hasta',t:'date',half:true},
       {k:'base',l:'Moneda para los totales',t:'text',list:'curs',half:true,ph:'ARS'},
@@ -515,13 +516,19 @@ function openSettings(){
     ],
     intro:shareBlockHtml(),
     extra:'<hr>'+pplBlock(),
-    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);},
-    validate:function(d){return d.start&&d.end&&d.end<d.start?'La fecha "Hasta" es anterior a "Desde". Revisá las fechas del viaje.':'';},
+    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);bindCityField(panel);},
+    validate:function(d){
+      if(d.start&&d.end&&d.end<d.start)return 'La fecha "Hasta" es anterior a "Desde". Revisá las fechas del viaje.';
+      var q=$('#cityQ');if(!d.cityJson&&q&&q.value.trim()&&!q.closest('[hidden]'))return 'Elegí la ciudad principal de la lista (o dejala vacía).';
+      return '';
+    },
     onSave:function(d){
       var nb=curCode(d.base,'ARS'),newBase=nb!==base();
       if(newBase)S.trip.rates={};
       var patch={name:d.name||'Nuestro viaje',start:d.start||'',end:d.end||'',base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true};
       if(first&&cloudMode()&&ME&&!S.trip.owner)patch.owner=ME.uid;   /* quien arma el viaje lo organiza */
+      var city=null;try{city=cleanCity(JSON.parse(d.cityJson||'null'));}catch(e){}
+      patch.city=city;
       Object.assign(S.trip,patch,{u:nextU(S.trip.u)});
       save();pushTrip(newBase||first?null:patch);   /* moneda nueva o viaje nuevo: el viaje entero */
       /* Quien arma un viaje nuevo en la nube queda como su primera persona, ya vinculada a su cuenta. */

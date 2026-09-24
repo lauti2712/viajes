@@ -172,10 +172,10 @@ function recordTrip(){
   if(!FB||AUTH!=='in'||!CODE)return;
   if(!tripsServer){recordPending=true;return;}   /* hay que saber si ya tenía "visto" antes de escribir */
   recordPending=false;
-  var t=S.trip,key=[t.name,t.start,t.end].join('|');
+  var t=S.trip,cy=cleanCity(t.city),key=[t.name,t.start,t.end,cy?cy.lat+','+cy.lng:''].join('|');
   if(key===lastTripRec)return;
   lastTripRec=key;
-  var prev=MYTRIPS.find(function(x){return x.code===CODE;}),data={code:CODE,name:t.name||'',start:t.start||'',end:t.end||'',lastOpen:Date.now()};
+  var prev=MYTRIPS.find(function(x){return x.code===CODE;}),data={code:CODE,name:t.name||'',start:t.start||'',end:t.end||'',city:cy,lastOpen:Date.now()};
   if(!prev||!prev.seen)data.seen=Date.now();   /* los avisos arrancan desde que se abre el viaje por primera vez */
   try{FB.fs.setDoc(FB.fs.doc(FB.db,'users',ME.uid,'trips',CODE),data,{merge:true}).catch(fbErr);}catch(e){}
 }
