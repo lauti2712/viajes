@@ -65,24 +65,21 @@ a.openlink:hover{text-decoration:underline}
   </div>
   </div>
 </div>
+<script src="js/config.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getFirestore, collection, getDocs, doc, getDoc, setDoc, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, connectAuthEmulator, signInWithCredential } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
-/* Misma configuración que index.html — es pública por diseño de Firebase. */
-var FIREBASE_CONFIG = {
-  apiKey: "AIzaSyARMDTJSRVhHLlGmK83zJn4fI2fM6R4meQ",
-  authDomain: "viajeiguazu-7104e.firebaseapp.com",
-  projectId: "viajeiguazu-7104e",
-  storageBucket: "viajeiguazu-7104e.firebasestorage.app",
-  messagingSenderId: "783661170294",
-  appId: "1:783661170294:web:192ffe6f0ea7d3bcdfa957"
-};
+/* FIREBASE_CONFIG y DEV vienen de js/config.js (compartido con index.html). */
 
 var app = initializeApp(FIREBASE_CONFIG);
 var db = getFirestore(app);
 var auth = getAuth(app);
+if(DEV){
+  connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});connectFirestoreEmulator(db,'127.0.0.1',8085);
+  window.__signIn=function(sub,email,name){return signInWithCredential(auth,GoogleAuthProvider.credential(JSON.stringify({sub:sub,email:email,email_verified:true,name:name})));};
+}
 
 var statusEl = document.getElementById('status');
 var tbl = document.getElementById('tbl');
