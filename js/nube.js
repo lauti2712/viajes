@@ -34,7 +34,7 @@ function applyItem(k,d,srv){
     var v=d[key];
     if(key==='attachments'||key==='links'||key==='shares'){it[key]=Array.isArray(v)?v.map(function(x){return Object.assign({},x)}):[];return;}
     if(v!==null&&typeof v==='object')return;
-    it[key]=(key==='amount'||key==='u'||key==='del'||key==='c'||key==='ct')?v:String(v);
+    it[key]=(key==='amount'||key==='u'||key==='del'||key==='c'||key==='ct'||key==='ra')?v:String(v);
   });
   if(!/^[a-z0-9]{1,24}$/i.test(it.id||''))return false;
   var i=S[k].findIndex(function(x){return x.id===it.id});
@@ -281,6 +281,7 @@ function listen(){
     if(mine!==myClaim||!claimsSeen){claimsSeen=true;myClaim=mine;subscribePacking();}
     if(!snap.metadata.hasPendingWrites)syncCobro();
     claimsLoaded=true;
+    if(!snap.metadata.fromCache)maybeAdoptOwner();
     render();if(formRefresh)formRefresh();
   },function(err){fbErr(err);});
 

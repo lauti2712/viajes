@@ -408,6 +408,44 @@ function askJoin(){
     closeSheet();
   });
 }
+/* Organizador: la cuenta que creó el viaje (trip.owner). En viajes anteriores a este dato, quien esté
+   vinculado a la primera persona de la lista (y queda anotado como organizador). */
+function isOrganizer(){
+  if(!cloudMode()||AUTH!=='in'||!ME)return false;
+  if(S.trip.owner)return S.trip.owner===ME.uid;
+  var first=allPeople()[0];
+  return !!(first&&CLAIMS[first.id]&&CLAIMS[first.id].uid===ME.uid);
+}
+function maybeAdoptOwner(){
+  if(S.trip.owner||!S.trip.setup||!isOrganizer())return;
+  S.trip.owner=ME.uid;S.trip.u=nextU(S.trip.u);save();pushTrip({owner:ME.uid});
+}
+/* Cambio "de sistema" sobre un ítem (no es una edición de la persona): ra marca que no genera aviso. */
+function sysUpdate(k,id,data){
+  var i=S[k].findIndex(function(x){return x.id===id;});if(i<0)return;
+  var u=nextU(S[k][i].u);S[k][i]=Object.assign({},S[k][i],data,{u:u,ra:u});save();pushItem(k,S[k][i]);
+}
+/* Desvincular: la persona se vuelve a crear con otro id y se le pasan gastos, repartos y pagos (el balance
+   no cambia). El vínculo viejo queda apuntando a una persona borrada, así que la cuenta que la había
+   tomado tiene que volver a elegir; y la mochila vieja queda con el id viejo, sellada: nadie que tome la
+   persona nueva puede leerla. */
+function unlinkPerson(oldId){
+  var old=allPeople().find(function(p){return p.id===oldId;});if(!old)return '';
+  freezeEqual();   /* los "todos por igual" viejos pasan a nombrar a cada uno, así se puede reemplazar el id */
+  var nid=upsert('people',null,{name:old.name,c:old.c<1e15?old.c:Date.now()});
+  var rep=function(id){return id===oldId?nid:id;};
+  ['transports','lodging','expenses'].forEach(function(k){S[k].slice().forEach(function(x){
+    var ch={};
+    if(x.paidBy===oldId)ch.paidBy=nid;
+    if(x.split===oldId)ch.split=nid;
+    if(splitIds(x).indexOf(oldId)>=0)ch.splitWith=splitIds(x).map(rep).join(',');
+    if(Array.isArray(x.shares)&&x.shares.some(function(s){return s.p===oldId;}))ch.shares=x.shares.map(function(s){return Object.assign({},s,{p:rep(s.p)});});
+    if(Object.keys(ch).length)sysUpdate(k,x.id,ch);
+  });});
+  S.payments.slice().forEach(function(x){var ch={};if(x.from===oldId)ch.from=nid;if(x.to===oldId)ch.to=nid;if(Object.keys(ch).length)sysUpdate('payments',x.id,ch);});
+  savePerson(oldId,{});remove('people',oldId);
+  return nid;
+}
 function peopleUsed(id){if(live('payments').some(function(x){return x.from===id||x.to===id;}))return true;return costs().some(function(c){return c.paidBy===id||c.split===id||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
 /* Los p1/p2 de viajes viejos pueden no estar todavía en `people`: se crean con su mismo id. */
 function savePerson(id,data){
@@ -416,12 +454,14 @@ function savePerson(id,data){
   return upsert('people',null,Object.assign({id:id,name:lp?lp.name:'',c:lp?lp.c:Date.now()},data));
 }
 function pplBlock(){
-  var ppl=allPeople();
-  return '<div class="sideSec" id="pplWrap"><h3>Personas del viaje</h3><p class="hint">Pueden ser una o varias. Para cambiar un nombre, tocalo y escribí.</p><div class="attlist">'
+  var ppl=allPeople(),org=isOrganizer();
+  return '<div class="sideSec" id="pplWrap"><h3>Personas del viaje</h3><p class="hint">Pueden ser una o varias. Para cambiar un nombre, tocalo y escribí.'
+   +(org?' Como organizás el viaje, podés desvincular a una persona si la eligió la cuenta equivocada.':'')+'</p><div class="attlist">'
    +(ppl.length?ppl.map(function(p){
       var cl=cloudMode()?CLAIMS[p.id]:null;
       return '<div class="pplrow">'+dot(p.id)+'<input type="text" data-pname="'+esc(p.id)+'" value="'+esc(p.name)+'" aria-label="Nombre" autocomplete="off">'
        +(cl?'<small title="Vinculada a una cuenta de Google">🔗 '+esc(cl.name||'cuenta')+'</small>':'')
+       +(cl&&org&&cl.uid!==ME.uid?'<button type="button" class="ghost" data-unlink="'+esc(p.id)+'" style="padding:3px 9px;font-size:12px;flex:none">Desvincular</button>':'')
        +'<button type="button" class="x" data-pdel="'+esc(p.id)+'" aria-label="Quitar a '+esc(p.name)+'">✕</button></div>';
     }).join(''):'<p class="nada">'+(cloudMode()&&ME?'Al guardar, quedás vos'+(ME.name?' ('+esc(ME.name)+')':'')+' como primera persona. Después podés sumar a los demás.':'Todavía no hay nadie.')+'</p>')
    +'</div><form class="pplform"><input type="text" data-pnew placeholder="Nombre" autocomplete="off" required><button type="submit" class="ghost">+ Agregar persona</button></form><p class="msg" data-pplmsg></p></div>';
@@ -435,6 +475,15 @@ function bindPeople(panel){
     if(nm!==nameOf(id)){savePerson(id,{name:nm});renderHead();}
   });
   panel.addEventListener('click',function(e){
+    var ub=e.target.closest('[data-unlink]');
+    if(ub){
+      var uid0=ub.getAttribute('data-unlink'),unm=nameOf(uid0),who=(CLAIMS[uid0]||{}).name||'otra cuenta';
+      if(!isOrganizer())return;
+      if(!ub.classList.contains('armed')){ub.classList.add('armed');ub.textContent='¿Seguro?';redraw('Si desvinculás a '+unm+', la cuenta «'+who+'» deja de ser '+unm+' y la persona queda libre para que la elija su cuenta. Sus gastos y pagos no cambian. Lo que había en su mochila queda guardado aparte y no lo ve nadie más. Tocá de nuevo para confirmar.');var again=$('[data-unlink="'+uid0+'"]',panel);if(again){again.classList.add('armed');again.textContent='¿Seguro?';}return;}
+      unlinkPerson(uid0);
+      redraw('Listo: '+unm+' quedó libre para que la elija su cuenta.');
+      return;
+    }
     var b=e.target.closest('[data-pdel]');if(!b)return;
     var id=b.getAttribute('data-pdel'),nm=nameOf(id);
     if(peopleUsed(id)){redraw('No se puede quitar a '+nm+': participa de gastos (pagó alguno o le toca una parte). Sacalo de esos gastos primero.',true);return;}
@@ -470,6 +519,7 @@ function openSettings(){
       var nb=curCode(d.base,'ARS'),newBase=nb!==base();
       if(newBase)S.trip.rates={};
       var patch={name:d.name||'Nuestro viaje',start:d.start||'',end:d.end||'',base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true};
+      if(first&&cloudMode()&&ME&&!S.trip.owner)patch.owner=ME.uid;   /* quien arma el viaje lo organiza */
       Object.assign(S.trip,patch,{u:nextU(S.trip.u)});
       save();pushTrip(newBase||first?null:patch);   /* moneda nueva o viaje nuevo: el viaje entero */
       /* Quien arma un viaje nuevo en la nube queda como su primera persona, ya vinculada a su cuenta. */

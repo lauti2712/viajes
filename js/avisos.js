@@ -15,7 +15,7 @@ function avisosList(){
   var t0=MYTRIPS.find(function(x){return x.code===CODE;});
   if(!t0||!t0.seen)return [];   /* primera vez: sin historial viejo */
   ['expenses','transports','lodging'].forEach(function(k){S[k].forEach(function(x){
-    if(!x.eb||x.eb===me||(x.u||0)<=seen)return;
+    if(!x.eb||x.eb===me||(x.u||0)<=seen||(x.ra&&x.ra===x.u))return;   /* ra: reasignación al desvincular, no avisa */
     var c=itemCost(k,Object.assign({},x,{del:false}));if(!c)return;
     var part=shareMap(c,c.amount)[me]||0;
     if(part<=0&&c.paidBy!==me)return;
@@ -23,7 +23,7 @@ function avisosList(){
     out.push({u:x.u,k:k,id:x.id,del:!!x.del,ic:x.del?'🗑️':'🧾',txt:nameOf(x.eb)+' '+verb+' «'+c.title+'»'+(part>0?' · te toca '+money(part,c.cur):c.paidBy===me?' · figura que lo pagaste vos':'')});
   });});
   S.payments.forEach(function(x){
-    if(!x.eb||x.eb===me||(x.u||0)<=seen||x.del||(x.from!==me&&x.to!==me))return;
+    if(!x.eb||x.eb===me||(x.u||0)<=seen||x.del||(x.ra&&x.ra===x.u)||(x.from!==me&&x.to!==me))return;
     var amt=money(parseFloat(x.amount)||0,x.cur);
     out.push({u:x.u,k:'payments',id:x.id,ic:'🤝',txt:x.to===me?nameOf(x.eb)+' registró que '+(x.from===x.eb?'te pagó':nameOf(x.from)+' te pagó')+' '+amt:nameOf(x.eb)+' registró que le pagaste '+amt+' a '+nameOf(x.to)});
   });
