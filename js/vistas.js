@@ -42,7 +42,7 @@ function vResumen(){
 
   if(!cs.length){h+='<section class="sec">'+empty('Acá va a aparecer el resumen de plata','Cargá transportes, alojamiento o gastos con su monto y vamos sumando el total, lo pagado y lo que falta.')+'</section>';return h;}
   var tot=sumBase(cs),pg=sumBase(cs.filter(function(c){return c.status==='pagado'})),pe=tot.t-pg.t;
-  h+='<section class="sec"><h2>Plata del viaje</h2><dl class="stats"><div><dt>Total</dt><dd>'+money(tot.t)+'</dd></div><div><dt>Ya pagado</dt><dd>'+money(pg.t)+'</dd></div><div><dt>Por pagar</dt><dd>'+money(pe)+'</dd></div></dl>'+(tot.miss.size?warnMiss(tot.miss):'')+'</section>';
+  h+='<section class="sec"><div class="bar"><h2>Plata del viaje</h2><button type="button" class="primary" data-act="final">📄 Resumen final</button></div><dl class="stats"><div><dt>Total</dt><dd>'+money(tot.t)+'</dd></div><div><dt>Ya pagado</dt><dd>'+money(pg.t)+'</dd></div><div><dt>Por pagar</dt><dd>'+money(pe)+'</dd></div></dl>'+(tot.miss.size?warnMiss(tot.miss):'')+'</section>';
   var bud=parseFloat(S.trip.budget)||0;
   if(bud>0){
     var bpct=Math.min(100,tot.t/bud*100),bover=tot.t>bud;

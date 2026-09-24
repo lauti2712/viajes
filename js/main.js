@@ -24,6 +24,7 @@ document.addEventListener('click',function(e){
   else if(a==='settle')openPayment(null,{from:t.dataset.from,to:t.dataset.to,amount:Math.round(parseFloat(t.dataset.amt)*100)/100,method:'Transferencia'});
   else if(a==='editpay')openPayment(t.dataset.id);
   else if(a==='mytrips')openTrips();
+  else if(a==='final')openFinal();
   else if(a==='avisos')openAvisos();
   else if(a==='gopagos'){tab='pagos';closeSheet();}
   else if(a==='gomochila'){tab='mochila';closeSheet();}

@@ -53,7 +53,10 @@ function shareMap(c,b){
 }
 function splitLabel(x){
   var sp=x.split||'equal';
-  if(sp==='equal')return '';
+  if(sp==='equal'){  /* "todos" guardado cuando eran menos que ahora: se nombra a quiénes */
+    var ids=splitIds(x),all=allPeople().map(function(p){return p.id;});
+    return ids.length&&all.some(function(id){return ids.indexOf(id)<0;})?'Entre '+ids.map(nameOf).filter(Boolean).join(', '):'';
+  }
   if(sp==='amounts')return 'Por montos';
   if(sp==='some')return 'Entre '+splitIds(x).map(nameOf).filter(Boolean).join(', ');
   return 'Solo '+nameOf(sp);

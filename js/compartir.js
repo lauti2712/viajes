@@ -16,7 +16,7 @@ function mergeIn(inc){
   save();pushAll();
 }
 /* ---------- Compartir / copia ---------- */
-function downloadFile(name,text){var a=document.createElement('a'),u=URL.createObjectURL(new Blob([text],{type:'application/json'}));a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},1000);}
+function downloadFile(name,text,type){var a=document.createElement('a'),u=URL.createObjectURL(new Blob([text],{type:type||'application/json'}));a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},1000);}
 function openSync(){
   var json=JSON.stringify(S),cloud='';
   if(!FIREBASE_CONFIG.apiKey)cloud='<p class="hint">La nube no está activada: falta pegar la configuración de Firebase en el archivo. Mientras tanto, los datos se guardan solo en este dispositivo.</p>';
