@@ -23,6 +23,8 @@ var ITEM_KEYS=['transports','lodging','expenses','plans','packing','people','pay
 /* En la nube la mochila vive en su propia colección (trips/{code}/packing), privada por reglas. */
 var CLOUD_KEYS=ITEM_KEYS.filter(function(k){return k!=='packing'});
 var cloudMode=function(){return !!(FIREBASE_CONFIG.apiKey&&CODE&&!LOCAL_ONLY)};
+/* Sin viaje abierto (celular nuevo, o salió de un viaje): pantalla de inicio con "Mis viajes". */
+var homeMode=function(){return !!(FIREBASE_CONFIG.apiKey&&!CODE&&!LOCAL_ONLY)};
 
 var TYPES={vuelo:['✈️','Vuelo'],bus:['🚌','Micro / bus'],tren:['🚆','Tren'],barco:['⛴️','Barco'],auto:['🚗','Auto alquilado'],traslado:['🚕','Traslado'],otro:['🧭','Otro']};
 var CATS={'Comida':'🍽️','Transporte local':'🚇','Actividades':'🎟️','Compras':'🛍️','Salud':'💊','Otros':'📌'};

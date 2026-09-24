@@ -125,7 +125,7 @@ async function startCloud(){
   FB.au.onAuthStateChanged(FB.auth,function(u){
     if(u){
       ME={uid:u.uid,name:u.displayName||''};AUTH='in';loginMsg='';
-      if(!listening){listening=true;listen();}
+      if(!listening){listening=true;listenTrips();if(CODE)listen();}
       render();
     }else{
       if(AUTH==='in'){if(!loggingOut)location.reload();return;}
@@ -135,6 +135,46 @@ async function startCloud(){
 }
 var RELOAD_KEY='viaje-de-a-dos:reloadToken',reloadPending='';
 function forceReload(tok){try{localStorage.setItem(RELOAD_KEY,tok);}catch(e){}location.replace(location.pathname+'?v='+encodeURIComponent(tok));}
+/* ---------- Mis viajes: users/{uid}/trips/{code}, se anota solo cada viaje que se abre ---------- */
+var MYTRIPS=[],tripsLoaded=false,lastTripRec='';
+function listenTrips(){
+  FB.fs.onSnapshot(FB.fs.collection(FB.db,'users',ME.uid,'trips'),function(snap){
+    MYTRIPS=snap.docs.map(function(x){return x.data()||{};}).filter(function(t){return /^[a-z0-9]{12,40}$/.test(t.code||'');})
+      .sort(function(a,b){return (b.lastOpen||0)-(a.lastOpen||0);});
+    tripsLoaded=true;
+    if(homeMode())setSync('');
+    render();if(formRefresh)formRefresh();
+  },function(err){fbErr(err);});
+}
+function recordTrip(){
+  if(!FB||AUTH!=='in'||!CODE)return;
+  var t=S.trip,key=[t.name,t.start,t.end].join('|');
+  if(key===lastTripRec)return;
+  lastTripRec=key;
+  try{FB.fs.setDoc(FB.fs.doc(FB.db,'users',ME.uid,'trips',CODE),{code:CODE,name:t.name||'',start:t.start||'',end:t.end||'',lastOpen:Date.now()},{merge:true}).catch(fbErr);}catch(e){}
+}
+function forgetTrip(code){
+  MYTRIPS=MYTRIPS.filter(function(t){return t.code!==code;});
+  try{FB.fs.deleteDoc(FB.fs.doc(FB.db,'users',ME.uid,'trips',code)).catch(fbErr);}catch(e){}
+}
+function tripsListHtml(){
+  if(!tripsLoaded)return '<p class="nada">Cargando…</p>';
+  if(!MYTRIPS.length)return empty('Todavía no tenés viajes','Armá uno nuevo o abrí el link que te pasaron: cada viaje que abras queda anotado acá.');
+  return MYTRIPS.map(function(t){
+    var fechas=t.start?fShort(t.start)+(t.end?' al '+fShort(t.end):''):'Sin fechas';
+    return '<div class="exp trow" role="button" tabindex="0" data-act="gotrip" data-code="'+esc(t.code)+'"><span class="ec" aria-hidden="true">🧳</span><div class="et"><b>'+esc(t.name||'Viaje sin nombre')+(t.code===CODE?'<span class="here">Estás acá</span>':'')+'</b><small><span>'+esc(fechas)+'</span>'+(t.lastOpen?'<span>Abierto '+esc(relTime(t.lastOpen))+'</span>':'')+'</small></div>'
+     +'<div class="ea"><button type="button" class="ghost" data-forget="'+esc(t.code)+'" style="padding:4px 9px;font-size:13px" aria-label="Quitar de mi lista">✕</button></div></div>';
+  }).join('');
+}
+function vHome(){
+  return '<div class="bar"><h2>Tus viajes</h2><button class="primary" data-act="newtrip">+ Viaje nuevo</button></div>'
+   +tripsListHtml()
+   +'<section class="sec"><h2>¿Te pasaron un link?</h2><form class="pplform" id="joinform"><input type="text" id="joinc" placeholder="Pegá el link o el código" autocomplete="off" required><button type="submit" class="ghost">Abrir</button></form><p class="msg err" id="joinmsg"></p></section>';
+}
+function openTrips(){
+  var panel=openSheet('Mis viajes','<div class="row" style="margin-bottom:12px"><button type="button" class="primary" data-act="newtrip">+ Viaje nuevo</button></div><div id="tripsl">'+tripsListHtml()+'</div><p class="hint" style="margin-top:12px">El ✕ solo lo saca de tu lista; el viaje sigue existiendo para los demás.</p>');
+  formRefresh=function(){var w=$('#tripsl',panel);if(w)w.innerHTML=tripsListHtml();};
+}
 function login(){
   loginMsg='';
   if(!FB){loginMsg='Todavía se está conectando. Probá de nuevo en un segundo.';render();return;}
@@ -173,6 +213,7 @@ function listen(){
       if(S.trip.setup)pushTrip();else if($('#sheet').hidden)openSettings();
     }
     if(!snap.metadata.fromCache&&!tripReady){tripReady=true;maybeMigratePeople();}
+    if(!snap.metadata.fromCache&&snap.exists())recordTrip();
   },function(err){fbErr(err);if(!err||err.code!=='permission-denied')setSync('err');});
 
   fs.onSnapshot(fs.collection(db,'trips',CODE,'items'),{includeMetadataChanges:true},function(snap){
@@ -233,7 +274,8 @@ function listen(){
 }
 function parseCode(v){v=String(v||'').trim();try{var t=new URL(v).searchParams.get('t');if(t)v=t;}catch(e){}v=v.toLowerCase();return /^[a-z0-9]{12,40}$/.test(v)?v:'';}
 function genCode(){var a='abcdefghjkmnpqrstuvwxyz23456789',b=new Uint8Array(20),c='';window.crypto.getRandomValues(b);for(var i=0;i<20;i++)c+=a[b[i]%a.length];return c;}
-function connectTo(code){try{localStorage.setItem(CODE_KEY,code);localStorage.removeItem(MODE_KEY);}catch(e){}location.href=location.pathname;}
+/* keep: conservar los datos locales (pasar un viaje "solo en este dispositivo" a la nube). */
+function connectTo(code,keep){try{if(!keep&&code!==CODE)localStorage.removeItem(LS);localStorage.setItem(CODE_KEY,code);localStorage.removeItem(MODE_KEY);}catch(e){}location.href=location.pathname;}
 function openConnect(){
   var panel=openSheet('Conectar el viaje',
    '<p class="hint">Para que todos vean lo mismo en tiempo real, el viaje se guarda en la nube con un código secreto. Cada uno entra con su cuenta de Google.</p><div class="stack">'
@@ -241,7 +283,7 @@ function openConnect(){
    +'<label class="fld"><span>¿Te pasaron un link o un código?</span><input class="box" id="joinc" placeholder="Pegá el link o el código" autocomplete="off"></label>'
    +'<button type="button" class="ghost" id="join">Unirme a ese viaje</button><p class="msg err" id="msg" role="status"></p><hr>'
    +'<button type="button" class="ghost" id="localonly">Usar solo en este dispositivo</button></div>');
-  $('#newtrip',panel).addEventListener('click',function(){connectTo(genCode())});
+  $('#newtrip',panel).addEventListener('click',function(){connectTo(genCode(),true)});
   $('#join',panel).addEventListener('click',function(){var c=parseCode($('#joinc',panel).value);if(!c){$('#msg',panel).textContent='Ese código no es válido. Pegá el link completo tal cual te lo pasaron.';return;}connectTo(c);});
   $('#localonly',panel).addEventListener('click',function(){try{localStorage.setItem(MODE_KEY,'local');}catch(e){}location.href=location.pathname;});
 }

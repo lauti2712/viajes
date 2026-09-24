@@ -8,6 +8,8 @@ document.addEventListener('click',function(e){
     e.stopPropagation();return;}
   var pd=e.target.closest&&e.target.closest('[data-pkdel]');
   if(pd){remove('packing',pd.getAttribute('data-pkdel'));render();return;}
+  var fg=e.target.closest&&e.target.closest('[data-forget]');
+  if(fg){e.stopPropagation();if(!fg.classList.contains('armed')){fg.classList.add('armed');fg.textContent='¿Quitar?';return;}forgetTrip(fg.getAttribute('data-forget'));render();if(formRefresh)formRefresh();return;}
   var t=e.target.closest('[data-tab],[data-act],[data-close]');if(!t)return;
   if(t.hasAttribute('data-close')){closeSheet();return;}
   if(t.dataset.tab){tab=t.dataset.tab;render();window.scrollTo(0,0);return;}
@@ -21,6 +23,10 @@ document.addEventListener('click',function(e){
   else if(a==='fetchusd')fetchBlueUsd(t.dataset.type);
   else if(a==='settle')openPayment(null,{from:t.dataset.from,to:t.dataset.to,amount:Math.round(parseFloat(t.dataset.amt)*100)/100,method:'Transferencia'});
   else if(a==='editpay')openPayment(t.dataset.id);
+  else if(a==='mytrips')openTrips();
+  else if(a==='newtrip')connectTo(genCode());
+  else if(a==='gotrip'){if(t.dataset.code===CODE)closeSheet();else connectTo(t.dataset.code);}
+  else if(a==='golocal'){try{localStorage.setItem(MODE_KEY,'local');}catch(e){}location.href=location.pathname;}
   else if(a==='wholater'){whoLater=true;render();}
   else if(a==='gwho'){gastosWho=t.dataset.who||'';render();}
   else if(a==='whoami'){if(cloudMode())claimPerson(t.dataset.who);else setWhoAmI(t.dataset.who);render();}
@@ -41,6 +47,12 @@ document.addEventListener('change',function(e){
   if(pc){upsert('packing',pc.getAttribute('data-pkcheck'),{checked:pc.checked?'1':''});render();}
 });
 document.addEventListener('submit',function(e){
+  if(e.target.id==='joinform'){
+    e.preventDefault();
+    var c=parseCode($('#joinc').value);
+    if(!c){$('#joinmsg').textContent='Ese link o código no es válido. Pegalo completo, tal cual te lo pasaron.';return;}
+    connectTo(c);return;
+  }
   var pform=e.target.closest&&e.target.closest('.addperson');
   if(pform){
     e.preventDefault();
@@ -75,5 +87,4 @@ if(!cloudMode())migratePeople();
 render();
 if(!FIREBASE_CONFIG.apiKey){if(!S.trip.setup)openSettings();}
 else if(LOCAL_ONLY){syncState='local';renderHead();if(!S.trip.setup)openSettings();}
-else if(!CODE){syncState='none';renderHead();openConnect();}
-else startCloud();
+else startCloud();   /* con viaje abierto, o la pantalla de inicio con Mis viajes */
