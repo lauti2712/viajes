@@ -120,7 +120,7 @@ var SPECS={
   expenses:function(){return {title:['Anotar gasto','Editar gasto'],fields:[
     {k:'desc',l:'Qué fue',t:'text',req:true,ph:'Almuerzo, taxi, entradas…'},
     {k:'date',l:'Fecha',t:'date',half:true},
-    {k:'cat',l:'Categoría',t:'select',half:true,opts:Object.keys(CATS).map(function(k){return [k,CATS[k]+' '+k]})}
+    {k:'cat',l:'Categoría',t:'select',half:true,opts:Object.keys(catAll()).map(function(k){return [k,catAll()[k]+' '+k]})}
   ].concat(costF())}},
   plans:function(){return {title:['Nuevo plan','Editar plan'],fields:[
     {k:'title',l:'Qué van a hacer',t:'text',req:true,ph:'Ej: Cena en el puerto'},
@@ -501,8 +501,26 @@ function bindPeople(panel){
     redraw();var n=$('[data-pnew]',panel);if(n)n.focus();
   });
 }
+/* Categorías propias del viaje (S.trip.cats = [{name,icon}]), además de las fijas de CATS. Se editan en
+   Ajustes y se guardan con "Guardar". */
+function catsBlockHtml(list){
+  return '<div class="sideSec" id="catsWrap"><h3>Categorías de gastos propias</h3><p class="hint" style="margin:0 0 8px">Además de las de siempre, podés sumar las que use este viaje (por ejemplo "Nafta del auto" o "Regalos").</p>'
+   +'<div class="row" style="gap:6px;margin-bottom:8px">'+(list.length?list.map(function(c,i){return '<span class="chip">'+esc(c.icon||'🏷️')+' '+esc(c.name)+'<button type="button" class="x" data-catdel="'+i+'" aria-label="Quitar '+esc(c.name)+'" style="border:0;background:none;color:var(--muted);padding:0 0 0 4px">✕</button></span>';}).join(''):'<span class="nada" style="padding:0">Ninguna todavía.</span>')+'</div>'
+   +'<div class="pplform" style="margin-top:0"><input type="text" id="catIcon" maxlength="4" placeholder="🏷️" aria-label="Emoji" style="flex:none;width:56px;text-align:center"><input type="text" id="catName" maxlength="30" placeholder="Nombre de la categoría" autocomplete="off"><button type="button" class="ghost" id="catAdd">+ Agregar</button></div><p class="msg err" id="catMsg" style="margin:4px 0 0"></p></div>';
+}
+function bindCats(panel,list){
+  function redraw(){var w=$('#catsWrap',panel);if(w)w.outerHTML=catsBlockHtml(list);}
+  panel.addEventListener('click',function(e){
+    var d=e.target.closest('[data-catdel]');if(d){list.splice(+d.getAttribute('data-catdel'),1);redraw();return;}
+    if(!e.target.closest('#catAdd'))return;
+    var nm=$('#catName',panel).value.trim().slice(0,30),ic=$('#catIcon',panel).value.replace(/[<>&"'`]/g,'').trim().slice(0,4)||'🏷️',msg=$('#catMsg',panel);
+    if(!nm){msg.textContent='Poné un nombre.';return;}
+    if(catAll()[nm]||list.some(function(c){return c.name.toLowerCase()===nm.toLowerCase();})){msg.textContent='Esa categoría ya existe.';return;}
+    list.push({name:nm,icon:ic});redraw();
+  });
+}
 function openSettings(){
-  var t=S.trip,first=!t.setup;
+  var t=S.trip,first=!t.setup,cats=tripCats().filter(function(c){return c&&c.name;}).map(function(c){return {name:String(c.name).slice(0,30),icon:String(c.icon||'🏷️').slice(0,4)};});
   sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:t.name,start:t.start,end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
     fields:[
       {k:'name',l:'Nombre del viaje',t:'text',ph:'Ej: Bariloche 2026'},
@@ -515,8 +533,8 @@ function openSettings(){
       {k:'info',l:'Info útil (seguro de viaje, contacto de emergencia, dirección del alojamiento…)',t:'textarea',ph:'Lo que quieran tener a mano aunque no haya señal'}
     ],
     intro:shareBlockHtml(),
-    extra:'<hr>'+pplBlock(),
-    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);bindCityField(panel);},
+    extra:'<hr>'+pplBlock()+'<hr>'+catsBlockHtml(cats),
+    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);bindCityField(panel);bindCats(panel,cats);},
     validate:function(d){
       if(d.start&&d.end&&d.end<d.start)return 'La fecha "Hasta" es anterior a "Desde". Revisá las fechas del viaje.';
       var q=$('#cityQ');if(!d.cityJson&&q&&q.value.trim()&&!q.closest('[hidden]'))return 'Elegí la ciudad principal de la lista (o dejala vacía).';
@@ -529,6 +547,7 @@ function openSettings(){
       if(first&&cloudMode()&&ME&&!S.trip.owner)patch.owner=ME.uid;   /* quien arma el viaje lo organiza */
       var city=null;try{city=cleanCity(JSON.parse(d.cityJson||'null'));}catch(e){}
       patch.city=city;
+      patch.cats=cats;
       Object.assign(S.trip,patch,{u:nextU(S.trip.u)});
       save();pushTrip(newBase||first?null:patch);   /* moneda nueva o viaje nuevo: el viaje entero */
       /* Quien arma un viaje nuevo en la nube queda como su primera persona, ya vinculada a su cuenta. */

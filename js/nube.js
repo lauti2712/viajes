@@ -138,7 +138,7 @@ async function startCloud(){
   FB.au.onAuthStateChanged(FB.auth,function(u){
     if(u){
       ME={uid:u.uid,name:u.displayName||'',email:u.email||''};AUTH='in';loginMsg='';
-      if(!listening){listening=true;listenTrips();listenMeta();if(CODE)listen();}
+      if(!listening){listening=true;listenTrips();listenMeta();listenPrefs();if(CODE)listen();}
       render();
     }else{
       if(AUTH==='in'){if(!loggingOut)location.reload();return;}
@@ -287,6 +287,12 @@ function listen(){
 
   window.addEventListener('offline',function(){setSync('offline')});
   window.addEventListener('online',function(){setSync('connecting')});
+}
+function listenPrefs(){
+  FB.fs.onSnapshot(FB.fs.doc(FB.db,'users',ME.uid,'prefs','app'),function(snap){
+    if(!snap.exists())return;var d=snap.data()||{};
+    if(typeof d.showWeather==='boolean'&&d.showWeather!==PREFS.showWeather){PREFS.showWeather=d.showWeather;try{localStorage.setItem('viaje-de-a-dos:prefs',JSON.stringify(PREFS));}catch(e){}render();}
+  },function(){});
 }
 /* Se escucha siempre (también en la pantalla de inicio), no solo dentro de un viaje. */
 function listenMeta(){

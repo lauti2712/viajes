@@ -57,7 +57,7 @@ function vResumen(){
   }
 
   var byCat={};cs.forEach(function(c){var b=toBase(c.amount,c.cur);if(b!=null)byCat[c.cat]=(byCat[c.cat]||0)+b;});
-  h+='<section class="sec"><h2>En qué se va</h2>'+bars(Object.keys(byCat).map(function(k){return {l:(CATS[k]?CATS[k]+' ':k==='Transporte'?'✈️ ':k==='Alojamiento'?'🛏️ ':'')+k,v:byCat[k]}}).sort(function(a,b){return b.v-a.v}))+'</section>';
+  h+='<section class="sec"><h2>En qué se va</h2>'+bars(Object.keys(byCat).map(function(k){return {l:catIcon(k)+' '+k,v:byCat[k]}}).sort(function(a,b){return b.v-a.v}))+'</section>';
 
   var byM={};cs.filter(function(c){return c.status==='pagado'}).forEach(function(c){var b=toBase(c.amount,c.cur);if(b!=null){var m=c.method||'Sin especificar';byM[m]=(byM[m]||0)+b;}});
   h+='<section class="sec"><h2>Cómo lo pagamos</h2>'+bars(Object.keys(byM).map(function(k){return {l:k,v:byM[k],c:'var(--mint)'}}).sort(function(a,b){return b.v-a.v}))+'</section>';
@@ -107,7 +107,7 @@ function costRow(k,item,desc,icon,catLabel,extra){
   var a=parseFloat(item.amount)||0,cur=curCode(item.cur,base()),b=toBase(a,cur);
   return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="'+k+'" data-id="'+item.id+'"><span class="ec" aria-hidden="true">'+icon+'</span><div class="et"><b>'+esc(desc)+'</b><small><span>'+esc(catLabel)+'</span>'+(item.paidBy?'<span class="who">'+dot(item.paidBy)+esc(pn(item.paidBy))+'</span>':'')+(item.method?'<span>'+esc(item.method)+'</span>':'')+attLinkChips(item)+(extra||'')+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(item.status==='pendiente'?'<span class="pill pend">Por pagar</span>':'')+'</div></div>';
 }
-function expRow(e,extra){return costRow('expenses',e,e.desc||'Gasto',CATS[e.cat]||'📌',e.cat||'Otros',extra);}
+function expRow(e,extra){return costRow('expenses',e,e.desc||'Gasto',catIcon(e.cat),e.cat||'Otros',extra);}
 /* Filtro "Ver gastos de": muestra solo lo que esa persona pagó o donde le toca una parte, y suma su parte. */
 var gastosWho='';
 function vGastos(){
@@ -168,8 +168,9 @@ function autoRow(ic,time,title,sub){return '<div class="pl auto"><span class="t"
 function planRow(p){var ty=ITYPES[p.type]||ITYPES.otro;return '<div class="pl" role="button" tabindex="0" data-act="edit" data-k="plans" data-id="'+p.id+'"><span class="t">'+esc(p.time||'')+'</span><div><b>'+ty[0]+' '+esc(p.title||'Plan')+attLinkChips(p)+'</b>'+(p.place?'<small>'+esc(p.place)+'</small>':'')+(p.notes?'<small>'+esc(p.notes)+'</small>':'')+'</div></div>';}
 function vItinerario(){
   var days=daysList(),t=today(),s=pd(S.trip.start);
-  loadWeather();
-  var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>'+wxSummary();
+  var wxOn=PREFS.showWeather!==false;
+  if(wxOn)loadWeather();
+  var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>'+(wxOn?wxSummary():'');
   if(!days.length)return h+empty('Todavía no hay días armados','Poné las fechas del viaje en Ajustes, o agregá un plan con su fecha. Los transportes y el alojamiento aparecen solos en su día.');
   return h+days.map(function(d){
     var items=[];
@@ -185,7 +186,7 @@ function vItinerario(){
     });
     items.sort(function(a,b){return a.k.localeCompare(b.k)});
     var dn=s?dayDiff(s,pd(d))+1:0;
-    return '<section class="iday"><div class="ih"><h3>'+esc(fLong(d))+'</h3>'+(dn>=1?'<span class="dn">Día '+dn+'</span>':'')+(d===t?'<span class="hoy">Hoy</span>':'')+wxChip(d)+'<span class="sp"></span><button class="ghost" data-act="add" data-k="plans" data-date="'+esc(d)+'">+ Plan</button></div>'+(items.length?items.map(function(i){return i.h}).join(''):'<div class="nada">Nada planeado todavía.</div>')+'</section>';
+    return '<section class="iday"><div class="ih"><h3>'+esc(fLong(d))+'</h3>'+(dn>=1?'<span class="dn">Día '+dn+'</span>':'')+(d===t?'<span class="hoy">Hoy</span>':'')+(wxOn?wxChip(d):'')+'<span class="sp"></span><button class="ghost" data-act="add" data-k="plans" data-date="'+esc(d)+'">+ Plan</button></div>'+(items.length?items.map(function(i){return i.h}).join(''):'<div class="nada">Nada planeado todavía.</div>')+'</section>';
   }).join('');
 }
 

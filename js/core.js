@@ -36,7 +36,12 @@ var cloudMode=function(){return !!(FIREBASE_CONFIG.apiKey&&CODE&&!LOCAL_ONLY)};
 var homeMode=function(){return !!(FIREBASE_CONFIG.apiKey&&!CODE&&!LOCAL_ONLY)};
 
 var TYPES={vuelo:['✈️','Vuelo'],bus:['🚌','Micro / bus'],tren:['🚆','Tren'],barco:['⛴️','Barco'],auto:['🚗','Auto alquilado'],traslado:['🚕','Traslado'],otro:['🧭','Otro']};
-var CATS={'Comida':'🍽️','Transporte local':'🚇','Actividades':'🎟️','Compras':'🛍️','Salud':'💊','Otros':'📌'};
+var CATS={'Comida':'🍽️','Café y bebidas':'☕','Supermercado':'🛒','Transporte local':'🚇','Peajes y nafta':'⛽','Actividades':'🎟️','Entradas y tours':'🎫','Compras':'🛍️','Souvenirs':'🎁','Salud':'💊','Conectividad / SIM':'📶','Propinas':'🪙','Otros':'📌'};
+/* Categorías del viaje = las de arriba + las personalizadas que se crean en Ajustes del viaje
+   (S.trip.cats = [{name,icon}]). "Otros" siempre queda al final. */
+function tripCats(){var c=(typeof S!=='undefined'&&S.trip&&S.trip.cats);return Array.isArray(c)?c:[];}
+function catAll(){var o={};Object.keys(CATS).forEach(function(k){if(k!=='Otros')o[k]=CATS[k];});tripCats().forEach(function(c){if(c&&c.name&&c.name!=='Otros'&&!o[c.name])o[String(c.name).slice(0,30)]=String(c.icon||'🏷️').replace(/[<>&"'`]/g,'').slice(0,4)||'🏷️';});   /* el ícono lo carga cualquiera del viaje: sin HTML */o['Otros']=CATS['Otros'];return o;}
+function catIcon(n){if(!n)return '📌';var o=catAll();if(o[n])return o[n];if(n==='Transporte')return '✈️';if(n==='Alojamiento')return '🛏️';return '📌';}
 var ITYPES={paseo:['🚶','Paseo'],comida:['🍽️','Comida'],excursion:['🗺️','Excursión'],tramite:['📄','Trámite'],descanso:['🛌','Descanso'],otro:['📌','Otro']};
 
 /* ---------- Estado ---------- */
@@ -70,4 +75,12 @@ var live=function(k){return S[k].filter(function(x){return !x.del})};
 /* eb = persona que hizo el último cambio, ct = cuándo se creó (para los avisos). */
 function upsert(k,id,data){var now=Date.now(),by=editorId(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:nextU(S[k][i].u),eb:by});}else{it=Object.assign({id:uid(),u:now,ct:now,eb:by},data);S[k].push(it);}save();pushItem(k,it);return it.id;}
 function remove(k,id){var x=S[k].find(function(y){return y.id===id});if(x){x.del=true;x.u=nextU(x.u);x.eb=editorId();save();pushItem(k,x);}}
+/* Preferencias de cada persona (users/{uid}/prefs/app en la nube; copia en el dispositivo). */
+var PREFS={showWeather:true};
+try{Object.assign(PREFS,JSON.parse(localStorage.getItem('viaje-de-a-dos:prefs')||'{}'));}catch(e){}
+function setPref(k,v){
+  PREFS[k]=v;try{localStorage.setItem('viaje-de-a-dos:prefs',JSON.stringify(PREFS));}catch(e){}
+  if(FB&&AUTH==='in'&&ME){var d={};d[k]=v;try{FB.fs.setDoc(FB.fs.doc(FB.db,'users',ME.uid,'prefs','app'),d,{merge:true}).catch(fbErr);}catch(e){}}
+  render();
+}
 function editorId(){try{return myPersonId()||'';}catch(e){return '';}}

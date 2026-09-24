@@ -24,6 +24,7 @@ document.addEventListener('click',function(e){
   else if(a==='editpay')openPayment(t.dataset.id);
   else if(a==='mytrips')openTrips();
   else if(a==='profile')openProfile();
+  else if(a==='wxoff')setPref('showWeather',false);
   else if(a==='final')openFinal();
   else if(a==='avisos')openAvisos();
   else if(a==='gopagos'){tab='pagos';closeSheet();}
@@ -50,6 +51,8 @@ document.addEventListener('keydown',function(e){
 document.addEventListener('change',function(e){
   var r=e.target.closest&&e.target.closest('[data-rate]');
   if(r){var rc=curCode(r.dataset.rate,''),rv=parseFloat(r.value)||0;if(!rc)return;S.trip.rates[rc]=rv;S.trip.u=nextU(S.trip.u);save();var rp={};rp[rc]=rv;pushTrip({rates:rp});render();return;}
+  var pf=e.target.closest&&e.target.closest('[data-pref]');
+  if(pf){setPref(pf.getAttribute('data-pref'),pf.checked);return;}
   var pc=e.target.closest&&e.target.closest('[data-pkcheck]');
   if(pc){upsert('packing',pc.getAttribute('data-pkcheck'),{checked:pc.checked?'1':''});render();}
 });

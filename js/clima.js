@@ -64,7 +64,7 @@ function wxChip(date){
 function wxSummary(){
   var r=wxRange();if(!r)return '';
   var ds=Object.keys(WX.days);
-  var head='<div class="wxbox"><b>'+flagOf(r.c.cc)+' '+esc(r.c.name)+'</b>';
+  var head='<div class="wxbox"><button type="button" class="ghost sm wxoff" data-act="wxoff" title="Podés volver a mostrarlo desde tu perfil">Ocultar</button><b>'+flagOf(r.c.cc)+' '+esc(r.c.name)+'</b>';
   if(WX.state==='loading')return head+' <span class="hint" style="margin:0">Buscando el clima…</span></div>';
   if(!ds.length)return head+'</div>';
   var mx=Math.round(ds.reduce(function(t,d){return t+WX.days[d].max;},0)/ds.length),mn=Math.round(ds.reduce(function(t,d){return t+WX.days[d].min;},0)/ds.length);

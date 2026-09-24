@@ -80,8 +80,10 @@ h1{font-family:var(--display);font-weight:800;font-size:clamp(22px,6vw,42px);lin
 .tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line);margin-top:8px}
 .tabs .in{max-width:780px;margin:0 auto;padding:8px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .tabs .in::-webkit-scrollbar{display:none}
-.tab{flex:none;border:0;background:transparent;padding:8px 14px;border-radius:999px;font-weight:600;color:var(--muted)}
+.tab{flex:none;display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;padding:8px 14px;border-radius:999px;font-weight:600;color:var(--muted)}
+.tab svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current="page"]{background:var(--ink);color:var(--paper)}
+@media (max-width:420px){.tab{padding:8px 12px;gap:6px}.tab svg{width:17px;height:17px}}
 main{max-width:780px;margin:0 auto;padding:18px 16px 90px}
 
 .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -326,3 +328,5 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .mpt small{display:block;color:#666}
 .mpt em{font-size:12px;font-style:normal;font-weight:700;color:#8a6d00}
 .leaflet-popup-content .ghost{color:#16223A;border-color:#ccc}
+
+.wxbox .wxoff{order:9;margin-left:auto;padding:2px 9px!important;font-size:12px!important}
