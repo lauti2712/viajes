@@ -1028,8 +1028,8 @@ function costF(){
     {k:'status',l:'Estado del pago',t:'select',half:true,opts:[['pendiente','Por pagar'],['pagado','Pagado']]},
     {k:'paidBy',l:'Quién pagó',t:'select',half:true,opts:buildPaidByOptions()}
   ];
-  /* Si el que pagó sos vos, elegís entre tus formas de pago (Mis pagos); si no, se escribe a mano. */
-  if(METHODS.length)f.push({k:'methodId',l:'Con qué pagaste',t:'select',opts:[['','Elegí…']].concat(METHODS.map(function(m){return [m.id,mtype(m)[0]+' '+methodLabel(m)];})).concat([['__other','Otro (escribir)']])});
+  /* Se elige entre las formas de pago de quien pagó (payerMethods); "Otro" deja escribirla a mano. */
+  if(cloudMode())f.push({k:'methodId',l:'Con qué pagó',t:'select',opts:[['','Elegí…']]});
   return f.concat([
     {k:'method',l:'Cómo se pagó',t:'text',list:'methods',ph:'Efectivo, Visa 3 cuotas, transferencia…'},
     {k:'cuotas',l:'Cuotas',t:'number',half:true,ph:'1'},
@@ -1037,6 +1037,14 @@ function costF(){
     {k:'split',l:'Para quién es',t:'select',opts:[['equal','Todos, a partes iguales'],['some','Algunos, a partes iguales'],['amounts','Por montos']]},
     {k:'_splitbox',t:'html',html:'<div class="fld" id="splitBox"></div>'}
   ]);
+}
+/* Formas de pago de una persona del viaje: las propias salen de Mis pagos; las de los demás, de lo
+   que cada uno publica en su vínculo (solo nombre y tipo). null = sin nube, se escribe a mano. */
+function payerMethods(pid){
+  if(!cloudMode()||!pid)return null;
+  if(pid===myPersonId())return METHODS.map(function(m){return {id:m.id,name:m.name||'',type:m.type,label:methodLabel(m)};});
+  var c=CLAIMS[pid];
+  return c&&c.methods?c.methods.map(function(m){return {id:m.id,name:m.n,type:m.t,label:m.n};}):[];
 }
 function buildPaidByOptions(){return [['','Sin definir']].concat(allPeople().map(function(p){return [p.id,p.name];})).concat([['__new__','+ Agregar otra persona…']]);}
 /* Pasa el formulario de costo a datos: montos, reparto y forma de pago. `ex` es el ítem que se edita. */
@@ -1053,11 +1061,11 @@ function normalizeCost(d,ex){
   d.shares=d.split==='amounts'?sh:[];
   if('methodId' in d){
     if(d.methodId==='__other')d.methodId='';
-    var m=METHODS.find(function(x){return x.id===d.methodId;});
-    if(m)d.method=m.name;
-    if(!m||m.type!=='credito')d.cuotas='';
-  }else if(ex&&ex.methodId&&METHODS.some(function(x){return x.id===ex.methodId;})){
-    d.methodId='';d.cuotas='';   /* dejó de pagarlo yo: sale de mis tarjetas */
+    var m=(payerMethods(d.paidBy)||[]).find(function(x){return x.id===d.methodId;});
+    if(m){d.method=m.name;if(m.type!=='credito')d.cuotas='';}
+    else if(!(ex&&d.methodId&&d.methodId===ex.methodId))d.cuotas='';
+  }else if(cloudMode()&&!d.paidBy){
+    d.methodId='';d.cuotas='';   /* sin quién pagó no hay forma de pago de nadie */
   }
   return d;
 }
@@ -1163,7 +1171,7 @@ function openItem(k,id,pre){
   var vals=Object.assign({},ex||Object.assign({},DEFAULTS[k](),pre||{}));
   /* Gastos viejos "solo de X": se muestran como "algunos" con esa sola persona. */
   if(vals.split&&['equal','some','amounts'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
-  if(!vals.methodId&&vals.method&&METHODS.length&&ex)vals.methodId='__other';
+  if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
   var curId=id||null;
   var body='<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="msg err" id="formmsg" role="status" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
    +'<hr>'+attsBlock(ex)+'<hr>'+linksBlock(ex);
@@ -1207,10 +1215,13 @@ function openItem(k,id,pre){
       var none=!Object.keys(st.sel).length;
       h='<div class="row">'+ppl.map(function(p){return '<label class="pksug"><input type="checkbox" name="sw_'+esc(p.id)+'"'+(st.sel[p.id]||none?' checked':'')+'>'+esc(p.name)+'</label>';}).join('')+'</div>';
     }else if(mode==='amounts'){
+      var had=Object.keys(st.amt).length;
+      lastEdited=had?ppl.length-1:-1;
       h='<div class="rates">'+ppl.map(function(p){return '<label class="rate"><span style="min-width:90px">'+dot(p.id)+esc(p.name)+'</span><input type="number" step="any" min="0" inputmode="decimal" name="sh_'+esc(p.id)+'" value="'+esc(st.amt[p.id]||'')+'" placeholder="0"></label>';}).join('')+'</div>'
-       +'<div class="row" style="margin-top:8px"><button type="button" class="ghost" id="shfill" style="padding:6px 12px;font-size:13px">Repartir lo que falta</button><span class="hint" id="shsum" style="margin:0"></span></div>';
+       +'<p class="hint" style="margin:8px 0 0">Al escribir el monto de alguien, lo que falta se reparte en partes iguales entre los que siguen. <span id="shsum"></span></p>';
     }
     box.innerHTML=h;
+    if(mode==='amounts'&&lastEdited<0)spread(-1);
     updSum();
   }
   function updSum(){
@@ -1220,22 +1231,38 @@ function openItem(k,id,pre){
     var rest=Math.round((amt-sum)*100)/100;
     out.textContent='Suman '+money(sum,cur)+' de '+money(amt,cur)+(rest>0?' · falta '+money(rest,cur):rest<0?' · sobran '+money(-rest,cur):' ✓');
   }
-  function fillRest(){
+  /* Por montos: lo que queda después de la persona `upto` (y las anteriores) se divide en partes
+     iguales entre las que siguen; la última absorbe los centavos. */
+  var lastEdited=-1;
+  function spread(upto){
     var amt=parseFloat(el('amount').value)||0,ins=Array.prototype.slice.call(box.querySelectorAll('[name^=sh_]'));
-    var sum=ins.reduce(function(t,c){return t+(parseFloat(c.value)||0);},0),empty=ins.filter(function(c){return !(parseFloat(c.value)>0);});
-    var rest=Math.round((amt-sum)*100)/100;
-    if(rest<=0||!empty.length)return;
-    var each=Math.floor(rest/empty.length*100)/100;
-    empty.forEach(function(c,i){c.value=i===empty.length-1?Math.round((rest-each*(empty.length-1))*100)/100:each;});
-    updSum();
+    var rest=ins.slice(0,upto+1).reduce(function(t,c){return t+(parseFloat(c.value)||0);},amt*0);
+    rest=Math.round((amt-rest)*100)/100;
+    var next=ins.slice(upto+1);if(!next.length)return;
+    if(rest<=0){next.forEach(function(c){c.value=0;});return;}
+    var each=Math.floor(rest/next.length*100)/100;
+    next.forEach(function(c,i){c.value=i===next.length-1?Math.round((rest-each*(next.length-1))*100)/100:each;});
   }
 
   /* --- Forma de pago --- */
+  var lastPayer=null;
+  function fillMethods(payer){
+    var ms=el('methodId'),list=payerMethods(payer)||[];
+    var cur=lastPayer===null?(vals.methodId||''):'';
+    var opts=[['','Elegí…']].concat(list.map(function(m){return [m.id,(MTYPES[m.type]||MTYPES.otro)[0]+' '+m.label];}));
+    if(cur&&cur!=='__other'&&!list.some(function(m){return m.id===cur;}))opts.push([cur,'💳 '+(vals.method||'Forma de pago')]);
+    opts.push(['__other','Otro (escribir)']);
+    ms.innerHTML=opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]===cur?' selected':'')+'>'+esc(o[1])+'</option>';}).join('');
+    var w=ms.closest('.fld'),hint=w.querySelector('.mhint');
+    if(!hint){hint=document.createElement('small');hint.className='mhint hint';hint.style.margin='0';w.appendChild(hint);}
+    hint.textContent=list.length?'':(payer===myPersonId()?'Todavía no cargaste tus formas de pago: agregalas en "Mis pagos".':nameOf(payer)+' todavía no cargó sus formas de pago en la app.');
+  }
   function syncPay(){
-    var pb=el('paidBy'),ms=el('methodId'),mine=!!(pb&&pb.value&&pb.value===myPersonId());
-    showFld(ms,!!ms&&mine);
-    var m=ms&&mine?METHODS.find(function(x){return x.id===ms.value;}):null;
-    showFld(el('method'),!ms||!mine||ms.value==='__other');
+    var pb=el('paidBy'),ms=el('methodId'),payer=pb?pb.value:'';
+    if(ms&&payer!==lastPayer){fillMethods(payer);lastPayer=payer;}
+    showFld(ms,!!ms&&!!payer);
+    showFld(el('method'),!ms||!payer||ms.value==='__other');
+    var m=ms&&payer?(payerMethods(payer)||[]).find(function(x){return x.id===ms.value;}):null;
     var credit=!!(m&&m.type==='credito');
     showFld(el('cuotas'),credit);showFld(el('payDate'),credit);
   }
@@ -1258,7 +1285,6 @@ function openItem(k,id,pre){
   });
 
   panel.addEventListener('click',function(e){
-    if(e.target.closest('#shfill')){fillRest();return;}
     var rm=e.target.closest('[data-rmatt]');
     if(rm){removeAttachment(k,ensureId(),rm.getAttribute('data-rmatt'));redraw();return;}
     var rl=e.target.closest('[data-rmlink]');
@@ -1271,7 +1297,12 @@ function openItem(k,id,pre){
   });
   var pbSel=el('paidBy');if(pbSel)pbSel.dataset.prevValue=pbSel.value;
   panel.addEventListener('input',function(e){
-    if(e.target.name==='amount'||e.target.name==='cur'||String(e.target.name).indexOf('sh_')===0){updSum();$('#formmsg',panel).textContent='';}
+    var nm=String(e.target.name||'');
+    if(nm.indexOf('sh_')===0){
+      lastEdited=Array.prototype.indexOf.call(box.querySelectorAll('[name^=sh_]'),e.target);
+      spread(lastEdited);
+    }else if(nm==='amount'&&el('split').value==='amounts')spread(lastEdited);
+    if(nm==='amount'||nm==='cur'||nm.indexOf('sh_')===0){updSum();$('#formmsg',panel).textContent='';}
   });
 
   panel.addEventListener('change',function(e){
@@ -1461,14 +1492,16 @@ function sendSuggestion(owner,text){
   /* No se guarda localmente: es de la mochila del otro, que no podemos leer. */
   try{FB.fs.setDoc(fdoc('packing',it.id),it).catch(fbErr);}catch(e){}
 }
-/* Alias visibles: se copian al vínculo (claims) de este viaje, que ven los demás del viaje. */
+/* Se copian al vínculo (claims) de este viaje, que ven los demás: los alias marcados como visibles y
+   nombre+tipo de cada forma de pago (para elegirla cuando cargan un gasto que pagaste vos). */
+function myMethodsPub(){return METHODS.map(function(m){return {id:m.id,n:String(m.name||''),t:m.type||'otro'};});}
 function myCobro(){return METHODS.filter(function(m){return m.share&&m.alias&&(m.type==='banco'||m.type==='billetera');}).map(function(m){return {n:String(m.name||''),a:String(m.alias)};});}
 var methodsReady=false;
 function syncCobro(){
   if(!FB||AUTH!=='in'||!methodsReady||!myClaim||!CLAIMS[myClaim])return;
-  var want=myCobro();
-  if(JSON.stringify(want)===JSON.stringify(CLAIMS[myClaim].cobro||[]))return;
-  try{FB.fs.updateDoc(fdoc('claims',myClaim),{cobro:want}).catch(fbErr);}catch(e){}
+  var want=myCobro(),wm=myMethodsPub(),c=CLAIMS[myClaim];
+  if(JSON.stringify(want)===JSON.stringify(c.cobro||[])&&JSON.stringify(wm)===JSON.stringify(c.methods||[]))return;
+  try{FB.fs.updateDoc(fdoc('claims',myClaim),{cobro:want,methods:wm}).catch(fbErr);}catch(e){}
 }
 function saveMethod(m){
   if(!FB||AUTH!=='in')return;
@@ -1482,7 +1515,7 @@ function claimPerson(pid){
   if(!FB||AUTH!=='in'||!pid)return;
   if(myClaim&&myClaim!==pid)releaseClaim();
   if(CLAIMS[pid]&&CLAIMS[pid].uid===ME.uid)return;
-  FB.fs.setDoc(fdoc('claims',pid),{uid:ME.uid,name:ME.name||'',cobro:myCobro(),u:Date.now()}).catch(function(e){
+  FB.fs.setDoc(fdoc('claims',pid),{uid:ME.uid,name:ME.name||'',cobro:myCobro(),methods:myMethodsPub(),u:Date.now()}).catch(function(e){
     claimMsg=e&&e.code==='permission-denied'?'Esa persona ya la eligió otra cuenta. Elegí otra o agregate con tu nombre.':'No se pudo guardar. Probá de nuevo.';
     render();
   });
@@ -1613,7 +1646,8 @@ function listen(){
      sale antes, las reglas todavía no lo ven, la rechazan y el listener muere. */
   fs.onSnapshot(fs.collection(db,'trips',CODE,'claims'),{includeMetadataChanges:true},function(snap){
     var c={},mine='';
-    snap.docs.forEach(function(x){var d=x.data()||{};c[x.id]={uid:d.uid||'',name:d.name||'',cobro:Array.isArray(d.cobro)?d.cobro.filter(function(y){return y&&typeof y.a==='string'&&y.a;}).map(function(y){return {n:String(y.n||''),a:y.a};}):[]};if(d.uid===ME.uid&&!x.metadata.hasPendingWrites&&(!mine||x.id<mine))mine=x.id;});
+    snap.docs.forEach(function(x){var d=x.data()||{};c[x.id]={uid:d.uid||'',name:d.name||'',cobro:Array.isArray(d.cobro)?d.cobro.filter(function(y){return y&&typeof y.a==='string'&&y.a;}).map(function(y){return {n:String(y.n||''),a:y.a};}):[],
+      methods:Array.isArray(d.methods)?d.methods.filter(function(y){return y&&typeof y.id==='string'&&/^[a-z0-9]{1,24}$/i.test(y.id);}).map(function(y){return {id:y.id,n:String(y.n||''),t:String(y.t||'otro')};}):[]};if(d.uid===ME.uid&&!x.metadata.hasPendingWrites&&(!mine||x.id<mine))mine=x.id;});
     CLAIMS=c;
     if(mine!==myClaim||!claimsSeen){claimsSeen=true;myClaim=mine;subscribePacking();}
     if(!snap.metadata.hasPendingWrites)syncCobro();
