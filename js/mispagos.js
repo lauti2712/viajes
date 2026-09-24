@@ -22,14 +22,44 @@ function cardSchedule(m,charges){
   return {buckets:buckets,none:none};
 }
 function chargeRow(l){
-  var c=l.ch,d=c.payDate||c.date;
-  return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="'+c.src+'" data-id="'+c.id+'"><div class="et"><b>'+esc(c.title)+'</b><small>'+(d?'<span>'+esc(fShort(d))+'</span>':'')+(l.n>1?'<span>Cuota '+l.k+'/'+l.n+'</span>':'')+'</small></div><div class="ea"><b>'+money(l.amt,l.cur)+'</b></div></div>';
+  var c=l.ch,d=c.payDate||c.date,other=c.trip&&c.trip!==CODE;
+  /* Los de otro viaje llevan a ese viaje; los de este abren el gasto. */
+  var act=other?'data-act="gotrip" data-code="'+esc(c.trip)+'"':'data-act="edit" data-k="'+c.src+'" data-id="'+c.id+'"';
+  return '<div class="exp" role="button" tabindex="0" '+act+'><div class="et"><b>'+esc(c.title)+'</b><small>'+(d?'<span>'+esc(fShort(d))+'</span>':'')+(l.n>1?'<span>Cuota '+l.k+'/'+l.n+'</span>':'')+(pagosScope==='all'?'<span>🧳 '+esc(c.tripName||'Este viaje')+'</span>':'')+'</small></div><div class="ea"><b>'+money(l.amt,l.cur)+'</b></div></div>';
+}
+/* Mis pagos de todos los viajes: en cada viaje de "Mis viajes" se buscan los gastos pagados con mis
+   formas de pago (consulta en vivo, sin copias). El viaje abierto sale de los datos locales. */
+var pagosScope='trip',OTHER_CHARGES=[],otherState='';
+async function loadOtherCharges(){
+  if(!FB||AUTH!=='in')return;
+  var ids=METHODS.map(function(m){return m.id;}),trips=MYTRIPS.filter(function(t){return t.code!==CODE;});
+  otherState='loading';render();
+  var out=[],fs=FB.fs,failed=0;
+  for(var i=0;i<trips.length;i++){
+    for(var j=0;j<ids.length;j+=30){
+      try{
+        var snap=await fs.getDocs(fs.query(fs.collection(FB.db,'trips',trips[i].code,'items'),fs.where('methodId','in',ids.slice(j,j+30))));
+        snap.forEach(function(d){var x=d.data();var c=itemCost(x.k,x,'ARS');if(c){c.trip=trips[i].code;c.tripName=trips[i].name||'Viaje';out.push(c);}});
+      }catch(e){failed++;}
+    }
+  }
+  OTHER_CHARGES=out;otherState=failed?'partial':'ok';render();
+}
+function myCharges(){
+  var here=costs().map(function(c){c.trip=CODE;c.tripName=S.trip.name||'Este viaje';return c;});
+  return pagosScope==='all'?here.concat(OTHER_CHARGES):here;
 }
 function vPagos(){
   var h='<div class="bar"><h2>Mis pagos</h2><button class="primary" data-act="addmethod">+ Forma de pago</button></div>'
    +'<p class="sub">Tus tarjetas y cuentas son privadas y te sirven en todos tus viajes. Los demás solo ven el nombre en cada gasto. Nunca cargues el número completo: con los últimos 4 alcanza para reconocerla.</p>';
   if(!METHODS.length)return h+empty('Todavía no cargaste formas de pago','Agregá tus tarjetas de crédito (con las fechas de cierre y vencimiento de cada resumen), débito, cuentas o billeteras. Después, al cargar un gasto, elegís con cuál lo pagaste.');
-  var cs=costs(),t=today();
+  var all=pagosScope==='all',donde=all?'de tus viajes':'de este viaje';
+  h+='<div class="whopick" style="margin:0 0 6px;gap:6px"><button type="button" class="ghost'+(!all?' active':'')+'" data-act="pscope" data-scope="trip" style="padding:5px 12px;font-size:14px">Este viaje</button><button type="button" class="ghost'+(all?' active':'')+'" data-act="pscope" data-scope="all" style="padding:5px 12px;font-size:14px">Todos mis viajes</button>'
+    +(all?'<button type="button" class="ghost" data-act="pscope" data-scope="all" data-reload="1" style="padding:5px 12px;font-size:14px">🔄 Actualizar</button>':'')+'</div>';
+  if(all&&otherState==='loading')h+='<p class="hint">Buscando en tus '+MYTRIPS.length+' viajes…</p>';
+  if(all&&otherState==='partial')h+='<p class="warn">No se pudo leer alguno de tus viajes. Probá "Actualizar".</p>';
+  if(all&&MYTRIPS.length<2)h+='<p class="hint">Por ahora solo tenés este viaje en "Mis viajes". Cada viaje que abras se suma acá.</p>';
+  var cs=myCharges(),t=today();
   return h+METHODS.map(function(m){
     var ty=mtype(m),charges=cs.filter(function(c){return c.methodId===m.id;});
     var out='<section class="sec"><div class="mhead"><h3>'+ty[0]+' '+esc(m.name||'Sin nombre')+'</h3><small>'+esc([ty[1],m.bank,m.last4?'••'+m.last4:'',m.alias?'Alias '+m.alias+(m.share?' (visible para tus viajes)':''):''].filter(Boolean).join(' · '))+'</small><span class="sp"></span><button type="button" class="ghost" data-act="editmethod" data-id="'+esc(m.id)+'">Editar</button></div>';
@@ -39,13 +69,13 @@ function vPagos(){
       if(!(m.statements||[]).length)out+='<p class="warn">Cargá las fechas de cierre y vencimiento de los próximos resúmenes (tocá Editar).</p>';
       out+=shown.map(function(b,i){
         return '<div class="stmt'+(i===nextIdx?' next':'')+'"><div class="dh"><span>Cierra <b>'+esc(fShort(b.s.c))+'</b>'+(b.s.v?' · vence <b>'+esc(fShort(b.s.v))+'</b>':'')+'</span><b>'+(b.lines.length?totalsText(b.lines):'—')+'</b></div>'
-         +(b.lines.length?b.lines.map(chargeRow).join(''):'<p class="nada">Sin gastos de este viaje en este resumen.</p>')+'</div>';
+         +(b.lines.length?b.lines.map(chargeRow).join(''):'<p class="nada">Sin gastos '+donde+' en este resumen.</p>')+'</div>';
       }).join('');
       if(sc.none.length)out+='<div class="stmt"><div class="dh"><span><b>Sin resumen cargado</b></span><b>'+totalsText(sc.none)+'</b></div><p class="hint" style="margin:0 0 4px">Estos cargos caen en resúmenes que todavía no cargaste (o no tienen fecha de compra).</p>'+sc.none.map(chargeRow).join('')+'</div>';
-      if(!charges.length&&!shown.length)out+='<p class="nada">Todavía no hay gastos de este viaje con esta tarjeta.</p>';
+      if(!charges.length&&!shown.length)out+='<p class="nada">Todavía no hay gastos '+donde+' con esta tarjeta.</p>';
     }else{
       var lines=charges.map(function(c){return {ch:c,k:1,n:1,amt:c.amount,cur:c.cur};});
-      out+=lines.length?'<div class="stmt"><div class="dh"><span>En este viaje</span><b>'+totalsText(lines)+'</b></div>'+lines.map(chargeRow).join('')+'</div>':'<p class="nada">Todavía no hay gastos de este viaje con este medio.</p>';
+      out+=lines.length?'<div class="stmt"><div class="dh"><span>'+(all?'En tus viajes':'En este viaje')+'</span><b>'+totalsText(lines)+'</b></div>'+lines.map(chargeRow).join('')+'</div>':'<p class="nada">Todavía no hay gastos '+donde+' con este medio.</p>';
     }
     return out+'</section>';
   }).join('');

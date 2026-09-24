@@ -18,12 +18,20 @@ var pn=function(p){return nameOf(p);};
 function personColorVar(id){var idx=allPeople().findIndex(function(x){return x.id===id;});return idx>=0?'--p'+((idx%8)+1):'';}
 var dot=function(p){var v=personColorVar(p);return v?'<i class="dot" style="background:var('+v+')"></i>':'';};
 
+/* Un ítem con costo (transporte, alojamiento o gasto) llevado a una forma común. `cur0` = moneda base
+   del viaje (para ítems de otros viajes, en Mis pagos de todos los viajes). */
+function itemCost(src,x,cur0){
+  var a=parseFloat(x.amount)||0;if(a<=0||x.del)return null;
+  var title,date,cat;
+  if(src==='transports'){title=(x.from||'?')+' → '+(x.to||'?');date=(x.dep||'').slice(0,10);cat='Transporte';}
+  else if(src==='lodging'){title=x.name||'Alojamiento';date=x.in||'';cat='Alojamiento';}
+  else if(src==='expenses'){title=x.desc||'Gasto';date=x.date||'';cat=x.cat||'Otros';}
+  else return null;
+  return {id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:(x.cur||cur0||base()).toUpperCase(),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||''};
+}
 function costs(){
   var o=[];
-  function add(src,x,title,date,cat){var a=parseFloat(x.amount)||0;if(a<=0)return;o.push({id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:(x.cur||base()).toUpperCase(),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||''});}
-  live('transports').forEach(function(t){add('transports',t,(t.from||'?')+' → '+(t.to||'?'),(t.dep||'').slice(0,10),'Transporte')});
-  live('lodging').forEach(function(l){add('lodging',l,l.name||'Alojamiento',l.in||'','Alojamiento')});
-  live('expenses').forEach(function(e){add('expenses',e,e.desc||'Gasto',e.date||'',e.cat||'Otros')});
+  ['transports','lodging','expenses'].forEach(function(k){live(k).forEach(function(x){var c=itemCost(k,x);if(c)o.push(c);});});
   return o;
 }
 function sumBase(list){var t=0,miss=new Set();list.forEach(function(c){var b=toBase(c.amount,c.cur);if(b==null)miss.add((c.cur||'').toUpperCase());else t+=b;});return {t:t,miss:miss};}

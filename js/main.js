@@ -24,6 +24,7 @@ document.addEventListener('click',function(e){
   else if(a==='settle')openPayment(null,{from:t.dataset.from,to:t.dataset.to,amount:Math.round(parseFloat(t.dataset.amt)*100)/100,method:'Transferencia'});
   else if(a==='editpay')openPayment(t.dataset.id);
   else if(a==='mytrips')openTrips();
+  else if(a==='pscope'){pagosScope=t.dataset.scope;if(pagosScope==='all'&&(t.dataset.reload||!otherState))loadOtherCharges();else render();}
   else if(a==='newtrip')connectTo(genCode());
   else if(a==='gotrip'){if(t.dataset.code===CODE)closeSheet();else connectTo(t.dataset.code);}
   else if(a==='golocal'){try{localStorage.setItem(MODE_KEY,'local');}catch(e){}location.href=location.pathname;}
