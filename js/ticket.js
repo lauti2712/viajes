@@ -2,9 +2,10 @@
    servicio) y se completan total, fecha y comercio. La primera vez descarga el lector (~10 MB). */
 'use strict';
 var TESS_URL='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',tessP=null;
+var TESS_SRI='sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F';   /* si el CDN lo cambia, no se ejecuta */
 function loadTesseract(){
   if(window.Tesseract)return Promise.resolve(window.Tesseract);
-  if(!tessP)tessP=new Promise(function(ok,fail){var s=document.createElement('script');s.src=TESS_URL;s.onload=function(){ok(window.Tesseract);};s.onerror=function(){tessP=null;fail(new Error('No se pudo descargar el lector de tickets.'));};document.head.appendChild(s);});
+  if(!tessP)tessP=new Promise(function(ok,fail){var s=document.createElement('script');s.src=TESS_URL;s.integrity=TESS_SRI;s.crossOrigin='anonymous';s.onload=function(){ok(window.Tesseract);};s.onerror=function(){tessP=null;fail(new Error('No se pudo descargar el lector de tickets.'));};document.head.appendChild(s);});
   return tessP;
 }
 /* Achica (máx. 1600 px) y pasa a grises: mejora la lectura y la foto adjunta pesa poco. */

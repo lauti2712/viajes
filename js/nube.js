@@ -21,9 +21,13 @@ function pushPacking(it){
   if(!myClaim||it.owner!==myClaim)return; /* solo la propia; las sugerencias van por sendSuggestion */
   try{FB.fs.setDoc(fdoc('packing',it.id),clean(it)).catch(fbErr);}catch(e){}
 }
-function pushTrip(){if(!FB||!CODE||AUTH!=='in')return;try{FB.fs.setDoc(fdoc(),clean(S.trip)).catch(fbErr);}catch(e){}}
+/* Sin `patch` se manda el viaje entero; con `patch` solo esos campos (merge), para que si dos personas
+   cambian cosas distintas a la vez (el nombre y el dólar, por ejemplo) no se pise ninguna. */
+function pushTrip(patch){if(!FB||!CODE||AUTH!=='in')return;try{FB.fs.setDoc(fdoc(),clean(patch?Object.assign({u:S.trip.u},patch):S.trip),{merge:!!patch}).catch(fbErr);}catch(e){}}
 function pushAll(){if(!FB||AUTH!=='in')return;pushTrip();ITEM_KEYS.forEach(function(k){S[k].forEach(function(it){pushItem(k,it)})});}
-function applyItem(k,d){
+/* srv: el dato viene confirmado por el servidor (no es un eco de un cambio propio pendiente). Ante empate
+   de u gana el servidor: así, si dos personas editan lo mismo a la vez, todos terminan viendo lo mismo. */
+function applyItem(k,d,srv){
   var it={};
   Object.keys(d).forEach(function(key){
     if(key==='k')return;
@@ -35,7 +39,8 @@ function applyItem(k,d){
   if(!/^[a-z0-9]{1,24}$/i.test(it.id||''))return false;
   var i=S[k].findIndex(function(x){return x.id===it.id});
   if(i<0){S[k].push(it);return true;}
-  if((it.u||0)>(S[k][i].u||0)){S[k][i]=it;return true;}
+  var ru=+it.u||0,lu=+S[k][i].u||0;
+  if(ru>lu||(srv&&ru===lu&&JSON.stringify(it)!==JSON.stringify(S[k][i]))){S[k][i]=it;return true;}
   return false;
 }
 function sendSuggestion(owner,text){
@@ -79,12 +84,20 @@ function releaseClaim(){
 }
 function subscribePacking(){
   if(packUnsub){packUnsub();packUnsub=null;}
+  /* Lo propio que había localmente (p. ej. un viaje "solo en este dispositivo" que pasó a la nube) se
+     sube si el servidor no lo tiene o lo tiene más viejo; lo de los demás se descarta. */
+  if(!myClaim)return;   /* sin saber quién sos todavía, no se toca lo local (no se muestra igual) */
+  var mine=S.packing.filter(function(x){return x.owner===myClaim;}),first=true;
   S.packing=[];save();
-  if(!myClaim)return;
   var fs=FB.fs,owner=myClaim;
-  packUnsub=fs.onSnapshot(fs.query(fs.collection(FB.db,'trips',CODE,'packing'),fs.where('owner','==',owner)),function(snap){
+  packUnsub=fs.onSnapshot(fs.query(fs.collection(FB.db,'trips',CODE,'packing'),fs.where('owner','==',owner)),{includeMetadataChanges:true},function(snap){
+    if(first&&!snap.metadata.fromCache){
+      first=false;
+      var rem={};snap.docs.forEach(function(x){rem[x.id]=x.data().u||0;});
+      mine.forEach(function(it){if(rem[it.id]===undefined||(it.u||0)>rem[it.id]){S.packing.push(it);pushPacking(it);}});
+    }
     var changed=false;
-    snap.docChanges().forEach(function(ch){if(ch.type!=='removed'&&applyItem('packing',ch.doc.data()))changed=true;});
+    snap.docChanges().forEach(function(ch){if(ch.type!=='removed'&&applyItem('packing',ch.doc.data(),!snap.metadata.fromCache&&!ch.doc.metadata.hasPendingWrites))changed=true;});
     if(changed){save();render();checkNewAvisos();}
   },function(err){fbErr(err);});
   migrateLegacyPacking();
@@ -125,7 +138,7 @@ async function startCloud(){
   FB.au.onAuthStateChanged(FB.auth,function(u){
     if(u){
       ME={uid:u.uid,name:u.displayName||''};AUTH='in';loginMsg='';
-      if(!listening){listening=true;listenTrips();if(CODE)listen();}
+      if(!listening){listening=true;listenTrips();listenMeta();if(CODE)listen();}
       render();
     }else{
       if(AUTH==='in'){if(!loggingOut)location.reload();return;}
@@ -171,7 +184,7 @@ function forgetTrip(code){
   try{FB.fs.deleteDoc(FB.fs.doc(FB.db,'users',ME.uid,'trips',code)).catch(fbErr);}catch(e){}
 }
 function tripsListHtml(){
-  if(!tripsLoaded)return '<p class="nada">Cargando…</p>';
+  if(!tripsLoaded)return '<p class="nada">'+(AUTH==='offline'?'Sin conexión: tu lista de viajes aparece cuando vuelva la señal.':'Cargando…')+'</p>';
   if(!MYTRIPS.length)return empty('Todavía no tenés viajes','Armá uno nuevo o abrí el link que te pasaron: cada viaje que abras queda anotado acá.');
   return MYTRIPS.map(function(t){
     var fechas=t.start?fShort(t.start)+(t.end?' al '+fShort(t.end):''):'Sin fechas';
@@ -209,7 +222,7 @@ function logout(){
   if(!FB)return;
   loggingOut=true;
   FB.au.signOut(FB.auth).catch(function(){}).then(function(){
-    try{localStorage.removeItem(LS);localStorage.removeItem(WHOAMI_KEY);}catch(e){}
+    try{Object.keys(localStorage).forEach(function(k){if(k.indexOf(LS_BASE+':')===0)localStorage.removeItem(k);});localStorage.removeItem(WHOAMI_KEY);localStorage.removeItem('viaje-de-a-dos:dueAck');}catch(e){}
     return FB.fs.terminate(FB.db).then(function(){return FB.fs.clearIndexedDbPersistence(FB.db);}).catch(function(){});
   }).then(function(){location.reload();});
 }
@@ -217,10 +230,11 @@ function listen(){
   var fs=FB.fs,db=FB.db,tripReady=false;
   function maybeMigratePeople(){if(tripReady&&itemsReady)migratePeople();}
 
-  fs.onSnapshot(fdoc(),function(snap){
+  fs.onSnapshot(fdoc(),{includeMetadataChanges:true},function(snap){
     if(snap.exists()){
-      var r=fix({trip:snap.data()}).trip;
-      if((!S.trip.setup&&r.setup)||(r.u||0)>(S.trip.u||0)){S.trip=r;save();render();}
+      var r=fix({trip:snap.data()}).trip,srv=!snap.metadata.fromCache;
+      /* El viaje se guarda por partes (merge): lo del servidor puede traer cambios de otros con el mismo u. */
+      if((!S.trip.setup&&r.setup)||(r.u||0)>(S.trip.u||0)||(srv&&(r.u||0)===(S.trip.u||0)&&JSON.stringify(r)!==JSON.stringify(S.trip))){S.trip=r;save();render();}
       else if(S.trip.setup&&(S.trip.u||0)>(r.u||0)&&!snap.metadata.fromCache)pushTrip();
     }else if(!snap.metadata.fromCache){
       if(S.trip.setup)pushTrip();else if($('#sheet').hidden)openSettings();
@@ -236,7 +250,7 @@ function listen(){
       var d=ch.doc.data();
       if(!d)return;
       if(d.k==='packing'){if(d.del||!d.owner)delete LEGACY_PACK[ch.doc.id];else LEGACY_PACK[ch.doc.id]=d;return;}
-      if(CLOUD_KEYS.indexOf(d.k)>=0&&applyItem(d.k,d))changed=true;
+      if(CLOUD_KEYS.indexOf(d.k)>=0&&applyItem(d.k,d,!snap.metadata.fromCache&&!ch.doc.metadata.hasPendingWrites))changed=true;
     });
     if(!itemsReady&&!snap.metadata.fromCache){
       itemsReady=true;
@@ -256,18 +270,6 @@ function listen(){
     render();if(formRefresh)formRefresh();
   },function(err){fbErr(err);});
 
-  /* Actualización forzada desde admin.html: meta/app.reloadToken cambia -> cada app abierta se recarga.
-     El ?v= evita que el navegador o GitHub Pages devuelvan el HTML viejo desde caché. */
-  fs.onSnapshot(fs.doc(db,'meta','app'),{includeMetadataChanges:true},function(snap){
-    if(snap.metadata.fromCache&&!snap.exists())return;
-    var tok=(snap.exists()&&snap.data().reloadToken)||'-';  /* '-' = todavía nunca se forzó */
-    var seen='';try{seen=localStorage.getItem(RELOAD_KEY)||'';}catch(e){}
-    if(!seen){try{localStorage.setItem(RELOAD_KEY,tok);}catch(e){}return;}
-    if(tok===seen)return;
-    if($('#sheet').hidden)forceReload(tok);
-    else{reloadPending=tok;var b=$('#updbar');if(b)b.hidden=false;}
-  },function(){});
-
   var claimsSeen=false;
   /* La mochila se suscribe recién cuando el vínculo está confirmado por el servidor: si la consulta
      sale antes, las reglas todavía no lo ven, la rechazan y el listener muere. */
@@ -285,10 +287,24 @@ function listen(){
   window.addEventListener('offline',function(){setSync('offline')});
   window.addEventListener('online',function(){setSync('connecting')});
 }
+/* Se escucha siempre (también en la pantalla de inicio), no solo dentro de un viaje. */
+function listenMeta(){
+  /* Actualización forzada desde admin.html: meta/app.reloadToken cambia -> cada app abierta se recarga.
+     El ?v= evita que el navegador o GitHub Pages devuelvan el HTML viejo desde caché. */
+  FB.fs.onSnapshot(FB.fs.doc(FB.db,'meta','app'),{includeMetadataChanges:true},function(snap){
+    if(snap.metadata.fromCache&&!snap.exists())return;
+    var tok=(snap.exists()&&snap.data().reloadToken)||'-';  /* '-' = todavía nunca se forzó */
+    var seen='';try{seen=localStorage.getItem(RELOAD_KEY)||'';}catch(e){}
+    if(!seen){try{localStorage.setItem(RELOAD_KEY,tok);}catch(e){}return;}
+    if(tok===seen)return;
+    if($('#sheet').hidden)forceReload(tok);
+    else{reloadPending=tok;var b=$('#updbar');if(b)b.hidden=false;}
+  },function(){});
+}
 function parseCode(v){v=String(v||'').trim();try{var t=new URL(v).searchParams.get('t');if(t)v=t;}catch(e){}v=v.toLowerCase();return /^[a-z0-9]{12,40}$/.test(v)?v:'';}
 function genCode(){var a='abcdefghjkmnpqrstuvwxyz23456789',b=new Uint8Array(20),c='';window.crypto.getRandomValues(b);for(var i=0;i<20;i++)c+=a[b[i]%a.length];return c;}
 /* keep: conservar los datos locales (pasar un viaje "solo en este dispositivo" a la nube). */
-function connectTo(code,keep){try{if(!keep&&code!==CODE)localStorage.removeItem(LS);localStorage.setItem(CODE_KEY,code);localStorage.removeItem(MODE_KEY);}catch(e){}location.href=location.pathname;}
+function connectTo(code,keep){try{if(keep&&LS===LS_BASE){var d=localStorage.getItem(LS_BASE);if(d)localStorage.setItem(LS_BASE+':'+code,d);}setCode(code);localStorage.removeItem(MODE_KEY);}catch(e){}location.href=location.pathname;}
 function openConnect(){
   var panel=openSheet('Conectar el viaje',
    '<p class="hint">Para que todos vean lo mismo en tiempo real, el viaje se guarda en la nube con un código secreto. Cada uno entra con su cuenta de Google.</p><div class="stack">'

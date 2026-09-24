@@ -55,7 +55,7 @@ function openSync(){
   wipe.textContent=CODE?'Salir de este viaje':'Borrar todo el viaje';
   wipe.addEventListener('click',function(){
     if(!wipe.classList.contains('armed')){wipe.classList.add('armed');wipe.textContent=CODE?'¿Seguro? Los datos siguen en la nube. Tocá de nuevo':'¿Seguro? Se borra todo. Tocá de nuevo';return;}
-    if(CODE){try{localStorage.removeItem(LS);localStorage.removeItem(CODE_KEY);}catch(e){}location.href=location.pathname;}
+    if(CODE){try{localStorage.removeItem(LS);}catch(e){}setCode('');location.href=location.pathname;}
     else{S=blank();save();closeSheet();openSettings();}
   });
 }

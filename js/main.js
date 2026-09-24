@@ -48,7 +48,7 @@ document.addEventListener('keydown',function(e){
 });
 document.addEventListener('change',function(e){
   var r=e.target.closest&&e.target.closest('[data-rate]');
-  if(r){S.trip.rates[r.dataset.rate]=parseFloat(r.value)||0;S.trip.u=Date.now();save();pushTrip();render();return;}
+  if(r){var rc=curCode(r.dataset.rate,''),rv=parseFloat(r.value)||0;if(!rc)return;S.trip.rates[rc]=rv;S.trip.u=nextU(S.trip.u);save();var rp={};rp[rc]=rv;pushTrip({rates:rp});render();return;}
   var pc=e.target.closest&&e.target.closest('[data-pkcheck]');
   if(pc){upsert('packing',pc.getAttribute('data-pkcheck'),{checked:pc.checked?'1':''});render();}
 });

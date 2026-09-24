@@ -10,10 +10,10 @@ var fShort=function(s){var d=pd(s);return d?d.toLocaleDateString('es-AR',{day:'n
 var mon=function(s){var d=pd(s);return d?d.toLocaleDateString('es-AR',{month:'short'}).replace('.',''):''};
 var tm=function(s){var m=/T(\d{2}:\d{2})/.exec(s||'');return m?m[1]:''};
 var dayDiff=function(a,b){return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/864e5)};
-var base=function(){return (S.trip.base||'ARS').toUpperCase()};
+var base=function(){return curCode(S.trip.base,'ARS')};
 var fmtC={};
-function money(n,cur){cur=(cur||base()).toUpperCase();try{var f=fmtC[cur]||(fmtC[cur]=new Intl.NumberFormat('es-AR',{style:'currency',currency:cur,minimumFractionDigits:0,maximumFractionDigits:2}));return f.format(n);}catch(e){return cur+' '+(Math.round(n*100)/100).toLocaleString('es-AR');}}
-function toBase(a,cur){cur=(cur||base()).toUpperCase();if(cur===base())return a;var r=parseFloat(S.trip.rates[cur]);return r>0?a*r:null;}
+function money(n,cur){cur=curCode(cur,base());n=+n||0;try{var f=fmtC[cur]||(fmtC[cur]=new Intl.NumberFormat('es-AR',{style:'currency',currency:cur,minimumFractionDigits:0,maximumFractionDigits:2}));return f.format(n);}catch(e){return cur+' '+(Math.round(n*100)/100).toLocaleString('es-AR');}}
+function toBase(a,cur){cur=curCode(cur,base());if(cur===base())return a;var r=parseFloat(S.trip.rates[cur]);return r>0?a*r:null;}
 var pn=function(p){return nameOf(p);};
 function personColorVar(id){var idx=allPeople().findIndex(function(x){return x.id===id;});return idx>=0?'--p'+((idx%8)+1):'';}
 var dot=function(p){var v=personColorVar(p);return v?'<i class="dot" style="background:var('+v+')"></i>':'';};
@@ -27,7 +27,7 @@ function itemCost(src,x,cur0){
   else if(src==='lodging'){title=x.name||'Alojamiento';date=x.in||'';cat='Alojamiento';}
   else if(src==='expenses'){title=x.desc||'Gasto';date=x.date||'';cat=x.cat||'Otros';}
   else return null;
-  return {id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:(x.cur||cur0||base()).toUpperCase(),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||''};
+  return {id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:curCode(x.cur,cur0||base()),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||''};
 }
 function costs(){
   var o=[];
@@ -173,7 +173,7 @@ function openPayment(id,pre){
     ],
     onReady:function(panel){panel.addEventListener('change',function(e){if(e.target.name==='to')$('#payintro',panel).innerHTML=intro(e.target.value);});},
     validate:function(d){if(d.from===d.to)return 'Quién paga y quién recibe tienen que ser personas distintas.';if(!(parseFloat(d.amount)>0))return 'Poné un monto mayor a cero.';return '';},
-    onSave:function(d){d.amount=parseFloat(d.amount)||0;d.cur=(d.cur||base()).toUpperCase().slice(0,6);upsert('payments',ex?ex.id:null,d);},
+    onSave:function(d){d.amount=parseFloat(d.amount)||0;d.cur=curCode(d.cur,base());upsert('payments',ex?ex.id:null,d);},
     onDelete:ex?function(){remove('payments',ex.id);}:null
   });
 }
@@ -194,8 +194,8 @@ async function fetchBlueUsd(type){
     var j=await res.json();
     var v=j&&j[type]&&j[type].value_sell;
     if(typeof v==='number'&&v>0){
-      S.trip.rates.USD=v;S.trip.dollarType=type;S.trip.ratesUpdatedAt=Date.now();S.trip.u=Date.now();
-      save();pushTrip();
+      S.trip.rates.USD=v;S.trip.dollarType=type;S.trip.ratesUpdatedAt=Date.now();S.trip.u=nextU(S.trip.u);
+      save();pushTrip({rates:{USD:v},dollarType:type,ratesUpdatedAt:S.trip.ratesUpdatedAt});
       ratesFetchMsg='Cotización actualizada.';
     }else ratesFetchMsg='No se pudo leer la cotización. Probá de nuevo en un rato.';
   }catch(e){ratesFetchMsg='No se pudo actualizar la cotización. Probá de nuevo en un rato.';}
@@ -215,7 +215,7 @@ async function fetchRates(codes){
       else fail.push(c);
     }catch(e){fail.push(c);}
   }
-  if(ok.length){S.trip.ratesUpdatedAt=Date.now();S.trip.u=Date.now();save();pushTrip();}
+  if(ok.length){var rp={};ok.forEach(function(c){rp[c]=S.trip.rates[c];});S.trip.ratesUpdatedAt=Date.now();S.trip.u=nextU(S.trip.u);save();pushTrip({rates:rp,ratesUpdatedAt:S.trip.ratesUpdatedAt});}
   ratesFetchMsg=fail.length?('No se pudo actualizar la cotización de '+fail.join(' y ')+'. Probá de nuevo en un rato.'):'Cotización actualizada.';
   render();
 }

@@ -6,7 +6,7 @@ function bars(rows){if(!rows.length)return '<p class="sub">Sin datos todavía.</
 function costBlock(x){
   var a=parseFloat(x.amount)||0;
   if(a<=0)return '<div class="cost"><span class="pill pend">Sin costo cargado</span></div>';
-  var cur=(x.cur||base()).toUpperCase(),ok=x.status==='pagado',b=toBase(a,cur);
+  var cur=curCode(x.cur,base()),ok=x.status==='pagado',b=toBase(a,cur);
   return '<div class="cost"><b class="amt">'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+'<span class="pill '+(ok?'ok':'pend')+'">'+(ok?'Pagado':'Por pagar')+'</span>'+(x.paidBy?'<small class="who">'+dot(x.paidBy)+esc(pn(x.paidBy))+'</small>':'')+(x.method?'<small>'+esc(x.method)+'</small>':'')+(splitLabel(x)?'<small>'+esc(splitLabel(x))+'</small>':'')+'</div>';
 }
 function totLine(list){var t=sumBase(list),p=sumBase(list.filter(function(c){return c.status==='pagado'}));if(!list.length)return '';return '<div class="tot"><span>Total <b>'+money(t.t)+'</b></span><span>Pagado <b>'+money(p.t)+'</b></span><span>Por pagar <b>'+money(t.t-p.t)+'</b></span></div>'+(t.miss.size?warnMiss(t.miss):'');}
@@ -73,9 +73,9 @@ function attLinkChips(item){
 function fileIcon(type){return type&&type.indexOf('pdf')>=0?'📄':(type&&type.indexOf('image')>=0?'🖼️':'📎')}
 function humanSize(n){n=n||0;if(n<1024)return n+' B';if(n<1048576)return Math.round(n/1024)+' KB';return (n/1048576).toFixed(1)+' MB';}
 function ticket(t){
-  var ty=TYPES[t.type]||TYPES.otro,dd=(t.dep||'').slice(0,10),ad=(t.arr||'').slice(0,10);
+  var ty=TYPES[t.type]||TYPES.otro,dd=(t.dep||'').slice(0,10),ad=(t.arr||'').slice(0,10),dday=pd(dd);
   return '<div class="ticket" role="button" tabindex="0" data-act="edit" data-k="transports" data-id="'+t.id+'">'
-   +'<div class="stub"><span class="ic" aria-hidden="true">'+ty[0]+'</span>'+(dd?'<b>'+pd(dd).getDate()+'</b><small>'+esc(mon(dd))+'</small>':'<small>Sin fecha</small>')+'</div>'
+   +'<div class="stub"><span class="ic" aria-hidden="true">'+ty[0]+'</span>'+(dday?'<b>'+dday.getDate()+'</b><small>'+esc(mon(dd))+'</small>':'<small>Sin fecha</small>')+'</div>'
    +'<div class="tb"><div class="route">'+esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?')+'</div>'
    +((t.dep||t.arr)?'<div class="times"><div><span>Sale</span><b>'+(t.dep?esc(fShort(dd))+' '+tm(t.dep):'—')+'</b></div><div><span>Llega</span><b>'+(t.arr?esc(fShort(ad))+' '+tm(t.arr):'—')+'</b></div></div>':'')
    +((t.company||t.ref||(t.attachments&&t.attachments.length)||(t.links&&t.links.length))?'<div class="meta"><span>'+esc(ty[1])+(t.company?' de '+esc(t.company):'')+'</span>'+(t.ref?'<span class="ref">Reserva '+esc(t.ref)+'</span>':'')+attLinkChips(t)+'</div>':'')
@@ -104,7 +104,7 @@ function vAlojamiento(){
 }
 
 function costRow(k,item,desc,icon,catLabel,extra){
-  var a=parseFloat(item.amount)||0,cur=(item.cur||base()).toUpperCase(),b=toBase(a,cur);
+  var a=parseFloat(item.amount)||0,cur=curCode(item.cur,base()),b=toBase(a,cur);
   return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="'+k+'" data-id="'+item.id+'"><span class="ec" aria-hidden="true">'+icon+'</span><div class="et"><b>'+esc(desc)+'</b><small><span>'+esc(catLabel)+'</span>'+(item.paidBy?'<span class="who">'+dot(item.paidBy)+esc(pn(item.paidBy))+'</span>':'')+(item.method?'<span>'+esc(item.method)+'</span>':'')+attLinkChips(item)+(extra||'')+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(item.status==='pendiente'?'<span class="pill pend">Por pagar</span>':'')+'</div></div>';
 }
 function expRow(e,extra){return costRow('expenses',e,e.desc||'Gasto',CATS[e.cat]||'📌',e.cat||'Otros',extra);}
@@ -117,7 +117,7 @@ function vGastos(){
   function add(dateKey,item,rowFn,u){
     var amt=parseFloat(item.amount)||0,extra='';
     if(who){
-      var part=shareMap(item,amt)[who]||0,cur=(item.cur||base()).toUpperCase();
+      var part=shareMap(item,amt)[who]||0,cur=curCode(item.cur,base());
       if(part<=0&&item.paidBy!==who)return;
       extra='<span><b>'+(part>0?'Le toca '+esc(money(part,cur)):'No le toca parte')+'</b></span>';
       amt=part;
@@ -159,10 +159,10 @@ function vGastos(){
 function daysList(){
   var set=new Set(),s=pd(S.trip.start),e=pd(S.trip.end);
   if(s&&e){var n=dayDiff(s,e);if(n>=0&&n<=120){for(var i=0;i<=n;i++){set.add(iso(new Date(s.getFullYear(),s.getMonth(),s.getDate()+i)));}}}
-  live('plans').forEach(function(p){if(p.date)set.add(p.date)});
-  live('transports').forEach(function(t){if(t.dep)set.add(t.dep.slice(0,10));if(t.arr)set.add(t.arr.slice(0,10));});
-  live('lodging').forEach(function(l){if(l.in)set.add(l.in);if(l.out)set.add(l.out);});
-  return Array.from(set).sort();
+  live('plans').forEach(function(p){set.add(p.date)});
+  live('transports').forEach(function(t){set.add(String(t.dep||'').slice(0,10));set.add(String(t.arr||'').slice(0,10));});
+  live('lodging').forEach(function(l){set.add(l.in);set.add(l.out);});
+  return Array.from(set).filter(function(d){return pd(d);}).sort();   /* fechas mal cargadas no rompen el itinerario */
 }
 function autoRow(ic,time,title,sub){return '<div class="pl auto"><span class="t">'+esc(time)+'</span><div><b>'+ic+' '+esc(title)+'<span class="tag">Reserva</span></b>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div></div>';}
 function planRow(p){var ty=ITYPES[p.type]||ITYPES.otro;return '<div class="pl" role="button" tabindex="0" data-act="edit" data-k="plans" data-id="'+p.id+'"><span class="t">'+esc(p.time||'')+'</span><div><b>'+ty[0]+' '+esc(p.title||'Plan')+attLinkChips(p)+'</b>'+(p.place?'<small>'+esc(p.place)+'</small>':'')+(p.notes?'<small>'+esc(p.notes)+'</small>':'')+'</div></div>';}
@@ -195,10 +195,10 @@ var packSuggestMsg='',claimMsg='';
 /* Personas: todas viven en la lista `people` (1, 2 o las que sean). Los viajes viejos tenían p1/p2 fijos
    en el trip: se muestran igual hasta que migratePeople() los pasa a `people` con esos mismos ids,
    así los gastos (paidBy/split) y las mochilas (owner) siguen apuntando bien. */
-function legacyPeople(){return ['p1','p2'].filter(function(k){return S.trip[k]&&!S.people.some(function(x){return x.id===k});}).map(function(k){return {id:k,name:S.trip[k],c:k==='p1'?1:2};});}
+function legacyPeople(){return ['p1','p2'].filter(function(k){return S.trip[k]&&!S.people.some(function(x){return x.id===k});}).map(function(k){return {id:k,name:String(S.trip[k]),c:k==='p1'?1:2};});}
 function migratePeople(){['p1','p2'].forEach(function(k,i){if(S.trip[k]&&!S.people.some(function(x){return x.id===k}))upsert('people',null,{id:k,name:S.trip[k],c:i+1});});}
 function allPeople(){
-  return legacyPeople().concat(live('people').map(function(p){return {id:p.id,name:p.name,c:+p.c||1e15};}))
+  return legacyPeople().concat(live('people').map(function(p){return {id:p.id,name:String(p.name||'Sin nombre'),c:+p.c||1e15};}))
     .sort(function(a,b){return (a.c-b.c)||a.id.localeCompare(b.id);});
 }
 function nameOf(id){var p=allPeople().find(function(x){return x.id===id;});return p?p.name:'';}

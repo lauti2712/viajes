@@ -34,7 +34,8 @@ function finalText(){
 /* CSV para Excel en español: separador ; y coma decimal, con BOM para que respete los acentos. */
 function finalCsv(){
   var d=finalData(),num=function(n){return n==null?'':(Math.round(n*100)/100).toString().replace('.',',');};
-  var q=function(v){v=String(v==null?'':v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  /* Un texto que empieza con = + - @ Excel lo toma como fórmula: se le antepone ' para que quede como texto. */
+  var q=function(v){v=String(v==null?'':v);if(/^[=+\-@\t\r]/.test(v)&&!/^-?\d+(,\d+)?$/.test(v))v="'"+v;return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
   var rows=[['Fecha','Tipo','Qué','Categoría','Pagó','Estado','Forma de pago','Monto','Moneda','Monto en '+base(),'Reparto'].concat(d.ppl.map(function(p){return 'Le toca a '+p.name;}))];
   var tipos={expenses:'Gasto',transports:'Transporte',lodging:'Alojamiento'};
   d.cs.forEach(function(c){

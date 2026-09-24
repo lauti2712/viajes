@@ -69,7 +69,7 @@ function buildPaidByOptions(){return [['','Sin definir']].concat(allPeople().map
 /* Pasa el formulario de costo a datos: montos, reparto y forma de pago. `ex` es el ítem que se edita. */
 function normalizeCost(d,ex){
   if(!('amount' in d))return d;
-  d.amount=parseFloat(d.amount)||0;d.cur=(d.cur||base()).toUpperCase().slice(0,6);
+  d.amount=parseFloat(d.amount)||0;d.cur=curCode(d.cur,base());
   var sw=[],sh=[];
   Object.keys(d).forEach(function(k){
     if(k.indexOf('sw_')===0){sw.push(k.slice(3));delete d[k];}
@@ -467,10 +467,11 @@ function openSettings(){
     extra:'<hr>'+pplBlock(),
     onReady:bindPeople,
     onSave:function(d){
-      var nb=(d.base||'ARS').toUpperCase().slice(0,6);
-      if(nb!==base())S.trip.rates={};
-      Object.assign(S.trip,{name:d.name||'Nuestro viaje',start:d.start,end:d.end,base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true,u:Date.now()});
-      save();pushTrip();
+      var nb=curCode(d.base,'ARS'),newBase=nb!==base();
+      if(newBase)S.trip.rates={};
+      var patch={name:d.name||'Nuestro viaje',start:d.start||'',end:d.end||'',base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true};
+      Object.assign(S.trip,patch,{u:nextU(S.trip.u)});
+      save();pushTrip(newBase||first?null:patch);   /* moneda nueva o viaje nuevo: el viaje entero */
       /* Quien arma un viaje nuevo en la nube queda como su primera persona, ya vinculada a su cuenta. */
       if(first&&cloudMode()&&ME&&!myClaim&&!allPeople().length)claimPerson(upsert('people',null,{name:ME.name||'Yo',c:Date.now()}));
     }});
