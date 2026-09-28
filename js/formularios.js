@@ -106,11 +106,11 @@ var SPECS={
     {k:'arr',l:'Llega',t:'datetime-local'},
     {k:'_same',t:'html',html:'<label class="fld pksug" id="sameWrap" style="flex-direction:row;white-space:normal" hidden><input type="checkbox" name="same"> Se devuelve en el mismo lugar donde se retira</label>'},
     {k:'seats',l:'Asientos',t:'number',half:true,ph:'5'},
-    {k:'_riders',t:'html',html:''},   /* se completa en openItem: quiénes van en el auto alquilado */
+    {k:'_riders',t:'html',html:''},   /* se completa en openItem: quiénes viajan con este pasaje / van en el auto */
     {k:'company',l:'Empresa',t:'text',half:true,ph:'Aerolínea, bus…'},
     {k:'ref',l:'Código de reserva',t:'text',half:true},
     {k:'notes',l:'Notas',t:'textarea',ph:'Terminal, asiento, equipaje, hora de check-in…'}
-  ].concat(costF().map(function(f){return f.k==='split'?Object.assign({},f,{opts:[['riders','Los que van en este auto']].concat(f.opts)}):f;}))}},
+  ].concat(costF().map(function(f){return f.k==='split'?Object.assign({},f,{opts:[['riders','Los que viajan con este pasaje']].concat(f.opts)}):f;}))}},
   lodging:function(){return {title:['Nuevo alojamiento','Editar alojamiento'],fields:[
     {k:'name',l:'Nombre',t:'text',req:true,ph:'Hotel, depto, hostel…'},
     {k:'airbnb',l:'Link de Airbnb (opcional)',t:'text',ph:'https://www.airbnb.com.ar/rooms/…'},
@@ -136,7 +136,7 @@ var SPECS={
   ]}}
 };
 var DEFAULTS={
-  transports:function(){return {type:'vuelo',cur:base(),status:'pendiente',split:'equal',paidBy:myPersonId(),payDate:today()}},
+  transports:function(){var me=myPersonId();return {type:'vuelo',cur:base(),status:'pendiente',split:me?'riders':'equal',riders:me,paidBy:me,payDate:today()}},   /* cada uno carga su pasaje */
   lodging:function(){return {cur:base(),status:'pendiente',split:'guests',guests:myPersonId(),paidBy:myPersonId(),payDate:today()}},
   expenses:function(){return {date:today(),cat:'Comida',cur:base(),status:'pagado',split:'equal',paidBy:myPersonId(),payDate:today()}},
   plans:function(){var s=S.trip.start;return {type:'paseo',date:s&&s>today()?s:today()}}
@@ -198,7 +198,7 @@ function openItem(k,id,pre){
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="hint" id="tkmsg" style="margin:0"></span></div>':'';
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');});
-  if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes van en este auto');});
+  if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes viajan con este pasaje')+'<p class="hint" id="rdHint" style="margin:-6px 0 0">Cada uno carga sus pasajes. Si viajás junto con alguien en la misma reserva, tildalo también.</p>';});
   var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="msg err" id="formmsg" role="status" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
    +'<hr>'+attsBlock(ex)+'<hr>'+linksBlock(ex);
   var panel=openSheet(sp.title[ex?1:0],body);
@@ -209,8 +209,9 @@ function openItem(k,id,pre){
   function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging')d.guests=takeChecks(d,'g');
     if(k==='transports'){
       var rd=takeChecks(d,'rd');
-      if(d.type==='auto'){d.riders=rd;d.seats=String(parseInt(d.seats,10)||'');if(d.same){d.to=d.from;d.same='1';}else d.same='';}
-      else{d.riders='';d.seats='';d.same='';if(d.split==='riders')d.split='equal';}   /* "los del auto" solo existe en alquileres */
+      d.riders=rd;   /* pasajeros: en un alquiler son los que van en el auto */
+      if(d.type==='auto'){d.seats=String(parseInt(d.seats,10)||'');if(d.same){d.to=d.from;d.same='1';}else d.same='';}
+      else{d.seats='';d.same='';}
     }
     return d;}
   /* Alquiler de auto: los mismos campos del transporte, con nombres de retiro y devolución. */
@@ -221,9 +222,10 @@ function openItem(k,id,pre){
     Object.keys(TLBL).forEach(function(n){var i=el(n);if(i)i.closest('.fld').querySelector('span').textContent=TLBL[n][car?1:0];});
     el('from').placeholder=car?'Ej: Aeropuerto de Iguazú':'Ej: Rosario';el('to').placeholder=car?'Ej: Centro de Puerto Iguazú':'Ej: Bariloche';el('company').placeholder=car?'Localiza, Hertz…':'Aerolínea, bus…';
     $('#sameWrap',panel).hidden=!car;
-    showFld(el('seats'),car);var rb=$('#rdBox',panel);if(rb)rb.hidden=!car;
-    var so=el('split').querySelector('option[value=riders]');if(so)so.hidden=!car;
-    if(!car&&el('split').value==='riders'){el('split').value='equal';drawSplit();}
+    showFld(el('seats'),car);
+    var rb=$('#rdBox',panel);if(rb)rb.querySelector('span').textContent=car?'Quiénes van en este auto':'Quiénes viajan con este pasaje';
+    var rh=$('#rdHint',panel);if(rh)rh.hidden=car;
+    var so=el('split').querySelector('option[value=riders]');if(so)so.textContent=car?'Los que van en este auto':'Los que viajan con este pasaje';
     var tw=el('to').closest('.fld');tw.hidden=same;el('to').required=!same;
   }
   function ensureId(){
@@ -253,7 +255,7 @@ function openItem(k,id,pre){
     var mode=el('split').value,ppl=allPeople(),st=splitState(),h='';
     if(mode==='riders'){
       var rn=Array.prototype.filter.call(f.querySelectorAll('[name^=rd_]'),function(c){return c.checked;}).map(function(c){return nameOf(c.name.slice(3));});
-      h='<p class="hint" style="margin:0">'+(rn.length?'Se divide entre los que van en el auto: '+esc(rn.join(', '))+'.':'Todavía nadie se subió: se divide entre todos.')+' Si alguien se sube o se baja, se actualiza solo.</p>';
+      var car0=el('type').value==='auto';h='<p class="hint" style="margin:0">'+(rn.length?'Se divide entre '+(car0?'los que van en el auto':'los que viajan con este pasaje')+': '+esc(rn.join(', '))+'.':'Todavía no marcaste '+(car0?'quiénes van':'quiénes viajan')+': se divide entre todos.')+(car0?' Si alguien se sube o se baja, se actualiza solo.':'')+'</p>';
     }
     else if(mode==='guests'){
       var gn=Array.prototype.filter.call(f.querySelectorAll('[name^=g_]'),function(c){return c.checked;}).map(function(c){return nameOf(c.name.slice(2));});

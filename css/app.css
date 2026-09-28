@@ -80,10 +80,10 @@ h1{font-family:var(--display);font-weight:800;font-size:clamp(22px,6vw,42px);lin
 .tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line);margin-top:8px}
 .tabs .in{max-width:780px;margin:0 auto;padding:8px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .tabs .in::-webkit-scrollbar{display:none}
-.tab{flex:none;display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;padding:8px 14px;border-radius:999px;font-weight:600;color:var(--muted)}
-.tab svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tab{position:relative;flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;padding:9px 0;min-width:44px;border-radius:999px;font-weight:600;color:var(--muted)}
+.tab .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tab svg{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current="page"]{background:var(--ink);color:var(--paper)}
-@media (max-width:420px){.tab{padding:8px 12px;gap:6px}.tab svg{width:17px;height:17px}}
 main{max-width:780px;margin:0 auto;padding:18px 16px 90px}
 
 .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -338,3 +338,4 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .vehs{margin-bottom:18px}
 .vehs .stay{border-left-color:var(--mint)}
 .grps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
+.itpast{display:block;width:100%;margin:0 0 14px;font-size:14px}

@@ -61,7 +61,7 @@ function splitLabel(x){
     return ids.length&&all.some(function(id){return ids.indexOf(id)<0;})?'Entre '+ids.map(nameOf).filter(Boolean).join(', '):'';
   }
   if(sp==='amounts')return 'Por montos';
-  if(sp==='riders'){var rr=String(x.riders||'').split(',').filter(Boolean).map(nameOf).filter(Boolean);return rr.length?'Entre los que van en el auto: '+rr.join(', '):'Entre todos (nadie se subió todavía)';}
+  if(sp==='riders'){var rr=String(x.riders||'').split(',').filter(Boolean).map(nameOf).filter(Boolean);return rr.length?'Entre los que van: '+rr.join(', '):'Entre todos (sin pasajeros marcados)';}
   if(sp==='guests'){var g=String(x.guests||'').split(',').filter(Boolean).map(nameOf).filter(Boolean);return g.length?'Entre los que se quedan: '+g.join(', '):'Entre todos (nadie marcó que se queda)';}
   if(sp==='some')return 'Entre '+splitIds(x).map(nameOf).filter(Boolean).join(', ');
   return 'Solo '+nameOf(sp);

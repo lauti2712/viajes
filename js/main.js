@@ -31,6 +31,7 @@ document.addEventListener('click',function(e){
   else if(a==='vehedit')openVehicle(t.dataset.id);
   else if(a==='myvehadd')openMyVehicle(null);
   else if(a==='myvehedit')openMyVehicle(t.dataset.id);
+  else if(a==='itinpast'){itinPast=!itinPast;render();}
   else if(a==='wxoff')setPref('showWeather',false);
   else if(a==='final')openFinal();
   else if(a==='avisos')openAvisos();

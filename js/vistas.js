@@ -79,6 +79,7 @@ function ticket(t){
    +'<div class="tb"><div class="route">'+(car?(same?'Retiro y devolución en '+esc(t.from||'?'):esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?')):esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?'))+'</div>'
    +((t.dep||t.arr)?'<div class="times"><div><span>'+(car?'Retiro':'Sale')+'</span><b>'+(t.dep?esc(fShort(dd))+' '+tm(t.dep):'—')+'</b></div><div><span>'+(car?'Devolución':'Llega')+'</span><b>'+(t.arr?esc(fShort(ad))+' '+tm(t.arr):'—')+'</b></div></div>':'')
    +((t.company||t.ref||(t.attachments&&t.attachments.length)||(t.links&&t.links.length))?'<div class="meta"><span>'+esc(ty[1])+(t.company?' de '+esc(t.company):'')+'</span>'+(t.ref?'<span class="ref">Reserva '+esc(t.ref)+'</span>':'')+attLinkChips(t)+'</div>':'')
+   +(!car&&paxNames(t.riders).length?'<div class="meta"><span>👥 '+esc(joinNames(paxNames(t.riders)))+'</span></div>':'')
    +(t.notes?'<p class="note">'+esc(t.notes)+'</p>':'')
    +costBlock(t)+'</div></div>';
 }
@@ -166,21 +167,47 @@ function daysList(){
 }
 function autoRow(ic,time,title,sub){return '<div class="pl auto"><span class="t">'+esc(time)+'</span><div><b>'+ic+' '+esc(title)+'<span class="tag">Reserva</span></b>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div></div>';}
 function planRow(p){var ty=ITYPES[p.type]||ITYPES.otro;return '<div class="pl" role="button" tabindex="0" data-act="edit" data-k="plans" data-id="'+p.id+'"><span class="t">'+esc(p.time||'')+'</span><div><b>'+ty[0]+' '+esc(p.title||'Plan')+attLinkChips(p)+'</b>'+(p.place?'<small>'+esc(p.place)+'</small>':'')+(p.notes?'<small>'+esc(p.notes)+'</small>':'')+'</div></div>';}
+function paxNames(r){return livingIds(r).map(nameOf).filter(Boolean);}
+function joinNames(a){return a.length<2?a.join(''):a.slice(0,-1).join(', ')+' y '+a[a.length-1];}
+/* Pasajes del día: cada uno carga el suyo, así que los que salen y llegan igual (mismo horario y tramo) se juntan
+   en una sola fila con todos los que viajan. */
+function paxRows(d){
+  var g={},out=[];
+  live('transports').forEach(function(x){
+    var dd=(x.dep||'').slice(0,10),ad=(x.arr||'').slice(0,10);
+    [['dep',dd],['arr',ad]].forEach(function(e){
+      if(e[1]!==d)return;
+      var key=e[0]+'|'+x.type+'|'+(x[e[0]]||'')+'|'+String(x.from||'').toLowerCase()+'|'+String(x.to||'').toLowerCase();
+      if(!g[key]){g[key]={end:e[0],x:x,ids:[],refs:[],cos:[]};out.push(g[key]);}
+      livingIds(x.riders).forEach(function(id){if(g[key].ids.indexOf(id)<0)g[key].ids.push(id);});
+      if(x.ref&&g[key].refs.indexOf(x.ref)<0)g[key].refs.push(x.ref);
+      if(x.company&&g[key].cos.indexOf(x.company)<0)g[key].cos.push(x.company);
+    });
+  });
+  return out.map(function(r){
+    var x=r.x,ty=TYPES[x.type]||TYPES.otro,car=x.type==='auto',dep=r.end==='dep',n=r.ids.map(nameOf).filter(Boolean);
+    var sub=[r.cos.join(', '),r.refs.length?'Reserva '+r.refs.join(', '):''].filter(Boolean).join(' · ');
+    var who=n.length&&(dep||!car)?(car?(dep?'Van: ':''):(dep?(n.length>1?'Se van: ':'Se va: '):(n.length>1?'Llegan: ':'Llega: ')))+joinNames(n):'';
+    var title=car?(dep?'Retiro del auto en '+(x.from||'?'):'Devolución del auto en '+(x.to||x.from||'?')):(dep?'Sale: '+(x.from||'?')+' → '+(x.to||'?'):'Llega a '+(x.to||'?'));
+    return {k:tm(x[r.end])||(dep?'00:00':'00:01'),h:autoRow(ty[0],tm(x[r.end]),title,[who,dep||car?sub:''].filter(Boolean).join(' · '))};
+  });
+}
+/* El itinerario arranca en hoy: los días que ya pasaron se ven con "Ver días anteriores". */
+var itinPast=false;
 function vItinerario(){
   var days=daysList(),t=today(),s=pd(S.trip.start);
   var wxOn=PREFS.showWeather!==false;
   if(wxOn)loadWeather();
   var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>'+(wxOn?wxSummary():'');
   if(!days.length)return h+empty('Todavía no hay días armados','Poné las fechas del viaje en Ajustes, o agregá un plan con su fecha. Los transportes y el alojamiento aparecen solos en su día.');
+  var past=days.filter(function(d){return d<t;}).length;
+  if(past===days.length)past=0;   /* viaje terminado: se ve completo */
+  if(past)h+='<button type="button" class="ghost itpast" data-act="itinpast">'+(itinPast?'Ocultar días anteriores':'Ver días anteriores ('+past+')')+'</button>';
+  if(past&&!itinPast)days=days.slice(past);
   return h+days.map(function(d){
     var items=[];
     live('plans').filter(function(p){return p.date===d}).forEach(function(p){items.push({k:p.time||'99:98',h:planRow(p)})});
-    live('transports').forEach(function(x){
-      var ty=TYPES[x.type]||TYPES.otro,dd=(x.dep||'').slice(0,10),ad=(x.arr||'').slice(0,10);
-      var car=x.type==='auto',sub=[x.company,x.ref?'Reserva '+x.ref:''].filter(Boolean).join(', ');
-      if(dd===d)items.push({k:tm(x.dep)||'00:00',h:autoRow(ty[0],tm(x.dep),car?'Retiro del auto en '+(x.from||'?'):'Sale: '+(x.from||'?')+' → '+(x.to||'?'),sub)});
-      if(ad===d)items.push({k:tm(x.arr)||'00:01',h:autoRow(ty[0],tm(x.arr),car?'Devolución del auto en '+(x.to||x.from||'?'):'Llega a '+(x.to||'?'),car?sub:'')});
-    });
+    items=items.concat(paxRows(d));
     live('lodging').forEach(function(l){
       if(l.out===d)items.push({k:'10:00',h:autoRow('🛏️','','Check-out: '+(l.name||''),'')});
       if(l.in===d)items.push({k:'15:00',h:autoRow('🛏️','','Check-in: '+(l.name||''),l.address||'')});
