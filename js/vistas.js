@@ -198,7 +198,7 @@ function vItinerario(){
   var days=daysList(),t=today(),s=pd(S.trip.start);
   var wxOn=PREFS.showWeather!==false;
   if(wxOn)loadWeather();
-  var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>'+(wxOn?wxSummary():'');
+  var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>'+(wxOn?wxSummary():(wxRange()?'<button type="button" class="ghost wxon" data-act="wxon">🌤️ Mostrar clima</button>':''));
   if(!days.length)return h+empty('Todavía no hay días armados','Poné las fechas del viaje en Ajustes, o agregá un plan con su fecha. Los transportes y el alojamiento aparecen solos en su día.');
   var past=days.filter(function(d){return d<t;}).length;
   if(past===days.length)past=0;   /* viaje terminado: se ve completo */

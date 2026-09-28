@@ -339,3 +339,4 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .vehs .stay{border-left-color:var(--mint)}
 .grps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
 .itpast{display:block;width:100%;margin:0 0 14px;font-size:14px}
+.wxon{padding:4px 12px;font-size:13px;margin:0 0 12px}

@@ -33,6 +33,7 @@ document.addEventListener('click',function(e){
   else if(a==='myvehedit')openMyVehicle(t.dataset.id);
   else if(a==='itinpast'){itinPast=!itinPast;render();}
   else if(a==='wxoff')setPref('showWeather',false);
+  else if(a==='wxon')setPref('showWeather',true);
   else if(a==='final')openFinal();
   else if(a==='avisos')openAvisos();
   else if(a==='gopagos'){tab='pagos';closeSheet();}
