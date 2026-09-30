@@ -80,10 +80,14 @@ h1{font-family:var(--display);font-weight:800;font-size:clamp(22px,6vw,42px);lin
 .tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line);margin-top:8px}
 .tabs .in{max-width:780px;margin:0 auto;padding:8px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .tabs .in::-webkit-scrollbar{display:none}
-.tab{position:relative;flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;padding:9px 0;min-width:44px;border-radius:999px;font-weight:600;color:var(--muted)}
+.tab{position:relative;flex:1 1 0;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:transparent;padding:6px 0;min-width:44px;min-height:50px;border-radius:14px;font-weight:600;color:var(--muted)}
 .tab .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tab svg{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current="page"]{background:var(--ink);color:var(--paper)}
+/* Solo la pestaña activa muestra su nombre, chiquito debajo del ícono. */
+.tab[aria-current="page"] .sr{position:static;width:auto;height:auto;overflow:visible;clip:auto;font-size:10.5px;line-height:1;letter-spacing:.01em}
+.tab[aria-current="page"] svg{width:20px;height:20px}
+.tab[aria-current="page"]{flex-grow:1.6;padding:6px 6px}
 main{max-width:780px;margin:0 auto;padding:18px 16px 90px}
 
 .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -340,3 +344,48 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .grps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
 .itpast{display:block;width:100%;margin:0 0 14px;font-size:14px}
 .wxon{padding:4px 12px;font-size:13px;margin:0 0 12px}
+.mbr .mbn{flex:1;display:flex;flex-direction:column;min-width:0}
+.mbr .mbn small{color:var(--muted);font-size:12px}
+.mbr .sm{flex:none}
+.logbox summary{cursor:pointer;font-weight:700;padding:4px 0}
+.logrow{border-top:1px solid var(--line);padding:9px 0}
+.logrow:first-child{border-top:0}
+.logrow .lh{display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}
+.logrow .lh small{margin-left:auto;color:var(--muted);font-size:12px}
+.logrow ul{margin:4px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+.logrow s{opacity:.7}
+/* Tarjeta "Hoy" del itinerario */
+.hoy{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--sun);border-radius:14px;padding:12px 14px;margin:0 0 16px}
+.hoy .hh{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.hoy .hh b{font-size:17px}
+.hoy .hh>span{color:var(--muted);font-size:13px}
+.hoy .hh .wx{margin-left:auto}
+.hrow{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
+.hrow:first-of-type{border-top:0}
+.hic{font-size:20px;line-height:1.2;flex:none;width:26px;text-align:center}
+.hrow small{display:block;color:var(--muted);font-size:12px}
+.hrow b{display:block}
+.hrow span{display:block;color:var(--muted);font-size:13px}
+/* Secciones plegables de los formularios */
+.fgrp{grid-column:1/-1;border:1px solid var(--line);border-radius:12px;padding:0 12px}
+.fgrp>summary{display:flex;align-items:center;gap:8px;padding:11px 0;cursor:pointer;font-weight:700;list-style:none}
+.fgrp>summary::-webkit-details-marker{display:none}
+.fgrp>summary::after{content:'▾';margin-left:6px;color:var(--muted);transition:transform .15s}
+.fgrp[open]>summary::after{transform:rotate(180deg)}
+.fgrp>summary small{margin-left:auto;font-weight:500;color:var(--muted);font-size:13px;display:flex;gap:6px}
+.fgrp>.grid{padding:2px 0 12px}
+details.sideSec.fgrp{margin:14px 0}
+details.sideSec.fgrp .sideSec{margin-top:4px}
+/* Gastos: cuentas arriba, filtro por persona */
+.cuentas{margin:0 0 16px}
+.cuentas h3{font-size:14px;color:var(--muted);margin:0 0 6px}
+.whopick.gwho{margin:0 0 6px;gap:6px;align-items:center}
+.gwho .lbl{font-size:13px;color:var(--muted);font-weight:700;margin-right:2px}
+.warn .sm{margin-left:4px}
+/* Utilidades (van al final para ganarle a los estilos de cada componente) */
+.m0{margin:0!important}.p0{padding:0!important}
+.mt0{margin-top:0}.mt2{margin:2px 0 0}.mt4{margin-top:4px}.mt8{margin-top:8px}.mt10{margin-top:10px}.mt12{margin-top:12px}.mt14{margin-top:14px}.mtn6{margin-top:-6px}
+.mb4{margin-bottom:4px}.mb6{margin-bottom:6px}.mb8{margin-bottom:8px}.mb10{margin-bottom:10px}.mb12{margin-bottom:12px}
+.g6{gap:6px}.fnone{flex:none}.full{grid-column:1/-1}.sp14{height:14px}
+.chk{flex-direction:row!important;white-space:normal}
+.fgrp,.fgrp *{box-sizing:border-box}

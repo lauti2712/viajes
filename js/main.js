@@ -9,7 +9,7 @@ document.addEventListener('click',function(e){
   var pd=e.target.closest&&e.target.closest('[data-pkdel]');
   if(pd){remove('packing',pd.getAttribute('data-pkdel'));render();return;}
   var fg=e.target.closest&&e.target.closest('[data-forget]');
-  if(fg){e.stopPropagation();if(!fg.classList.contains('armed')){fg.classList.add('armed');fg.textContent='¿Quitar?';return;}forgetTrip(fg.getAttribute('data-forget'));render();if(formRefresh)formRefresh();return;}
+  if(fg){e.stopPropagation();if(!fg.classList.contains('armed')){fg.classList.add('armed');fg.textContent='¿Quitar?';return;}forgetTrip(fg.getAttribute('data-forget'));if(NOACCESS){setCode('');location.href=location.pathname;return;}render();if(formRefresh)formRefresh();return;}
   var t=e.target.closest('[data-tab],[data-act],[data-close]');if(!t)return;
   if(t.hasAttribute('data-close')){closeSheet();return;}
   if(t.dataset.tab){tab=t.dataset.tab;render();window.scrollTo(0,0);return;}
@@ -34,6 +34,9 @@ document.addEventListener('click',function(e){
   else if(a==='itinpast'){itinPast=!itinPast;render();}
   else if(a==='wxoff')setPref('showWeather',false);
   else if(a==='wxon')setPref('showWeather',true);
+  else if(a==='rates')openRates();
+  else if(a==='trash')openTrash();
+  else if(a==='history')openHistory();
   else if(a==='final')openFinal();
   else if(a==='avisos')openAvisos();
   else if(a==='gopagos'){tab='pagos';closeSheet();}
@@ -42,6 +45,7 @@ document.addEventListener('click',function(e){
   else if(a==='pscope'){pagosScope=t.dataset.scope;if(pagosScope==='all'&&(t.dataset.reload||!otherState))loadOtherCharges();else render();}
   else if(a==='newtrip')connectTo(genCode());
   else if(a==='gotrip'){if(t.dataset.code===CODE)closeSheet();else connectTo(t.dataset.code);}
+  else if(a==='gohome'){setCode('');location.href=location.pathname;}
   else if(a==='golocal'){try{localStorage.setItem(MODE_KEY,'local');}catch(e){}location.href=location.pathname;}
   else if(a==='wholater'){whoLater=true;render();}
   else if(a==='gwho'){gastosWho=t.dataset.who||'';render();}

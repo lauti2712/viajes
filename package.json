@@ -3,9 +3,11 @@
   "private": true,
   "description": "App de viajes compartidos (index.html + js/). Se publica tal cual en GitHub Pages; esto es solo para desarrollo.",
   "scripts": {
+    "test": "node --test tests/cuentas.test.mjs",
     "emu": "firebase emulators:start",
     "test:rules": "firebase emulators:exec --only firestore,storage \"node --test tests/rules.test.mjs\"",
-    "deploy:rules": "firebase deploy --only firestore:rules,storage"
+    "deploy:rules": "firebase deploy --only firestore:rules,storage",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

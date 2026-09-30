@@ -32,6 +32,7 @@ tr:last-child td{border-bottom:0}
 .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted)}
 a.openlink{color:var(--sea);font-weight:700;text-decoration:none}
 a.openlink:hover{text-decoration:underline}
+button.bk{padding:3px 9px;font-size:13px}
 </style>
 </head>
 <body>
@@ -50,6 +51,11 @@ a.openlink:hover{text-decoration:underline}
       <button id="forceUpd" type="button">🔄 Forzar actualización</button>
     </div>
     <p class="status" id="updMsg"></p>
+    <div class="cfgrow">
+      <div><b>Copia de seguridad</b><p class="status" style="margin:2px 0 0">Descarga todos los viajes en un archivo (datos del viaje, ítems, personas vinculadas, miembros e historial). Las mochilas no, porque son privadas. También podés bajar un viaje solo desde su fila.</p></div>
+      <button id="backupAll" type="button">⬇️ Copia de todo</button>
+    </div>
+    <p class="status" id="bkMsg"></p>
   </section>
   <div class="toolbar">
     <input type="search" id="q" placeholder="Buscar por nombre, código o persona…">
@@ -59,7 +65,7 @@ a.openlink:hover{text-decoration:underline}
   <p class="status" id="status">Cargando…</p>
   <div class="tblwrap">
     <table id="tbl" hidden>
-      <thead><tr><th>Viaje</th><th>Personas</th><th>Fechas</th><th>Ítems</th><th>Código</th><th>Actualizado</th><th></th></tr></thead>
+      <thead><tr><th>Viaje</th><th>Personas</th><th>Fechas</th><th>Ítems</th><th>Código</th><th>Actualizado</th><th></th><th></th></tr></thead>
       <tbody id="tb"></tbody>
     </table>
   </div>
@@ -170,11 +176,46 @@ function render(){
      +'<td class="code">'+esc(r.code)+'</td>'
      +'<td>'+relTime(r.u)+'</td>'
      +'<td><a class="openlink" href="index.html?t='+encodeURIComponent(r.code)+'" target="_blank" rel="noopener">Abrir →</a></td>'
+     +'<td><button type="button" class="bk" data-bk="'+esc(r.code)+'" title="Descargar copia de este viaje">⬇️</button></td>'
      +'</tr>';
   }).join('');
 }
 
 q.addEventListener('input',render);
+
+/* ---------- Copia de seguridad (JSON) ---------- */
+async function tripBackup(code){
+  var out={code:code};
+  var t=await getDoc(doc(db,'trips',code));out.trip=t.exists()?t.data():null;
+  for(var sub of ['items','claims','members','banned','log']){
+    try{var sn=await getDocs(collection(db,'trips',code,sub));out[sub]=sn.docs.map(function(d){return Object.assign({_id:d.id},d.data());});}
+    catch(e){out[sub]={error:e&&e.code||String(e)};}
+  }
+  return out;
+}
+function saveJson(name,data){
+  var a=document.createElement('a'),u=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+  a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);
+}
+var stamp=function(){var d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');};
+var bkMsg=document.getElementById('bkMsg');
+tb.addEventListener('click',async function(e){
+  var b=e.target.closest('[data-bk]');if(!b)return;
+  b.disabled=true;
+  try{var code=b.getAttribute('data-bk');saveJson('viaje-'+code+'-'+stamp()+'.json',{v:1,at:Date.now(),trips:[await tripBackup(code)]});}
+  catch(err){bkMsg.textContent='No se pudo: '+(err&&err.message||err);bkMsg.className='status err';}
+  b.disabled=false;
+});
+document.getElementById('backupAll').addEventListener('click',async function(){
+  var btn=this;btn.disabled=true;bkMsg.className='status';
+  try{
+    var snap=await getDocs(collection(db,'trips')),trips=[];
+    for(var i=0;i<snap.docs.length;i++){bkMsg.textContent='Copiando viaje '+(i+1)+' de '+snap.docs.length+'…';trips.push(await tripBackup(snap.docs[i].id));}
+    saveJson('viajes-copia-'+stamp()+'.json',{v:1,at:Date.now(),trips:trips});
+    bkMsg.textContent='Listo: '+trips.length+' viaje'+(trips.length===1?'':'s')+' en el archivo.';
+  }catch(err){bkMsg.textContent='No se pudo: '+(err&&err.message||err);bkMsg.className='status err';}
+  btn.disabled=false;
+});
 document.getElementById('refresh').addEventListener('click',load);
 
 /* Actualización forzada: cambia meta/app.reloadToken y cada app abierta se recarga (ver index.html). */

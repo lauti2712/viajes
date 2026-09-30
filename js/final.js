@@ -65,7 +65,7 @@ function openFinal(){
   var panel=openSheet('Resumen final','<p class="hint">Todo el viaje en un lugar: cuánto puso y cuánto le toca a cada uno, las transferencias para quedar a mano, los pagos entre ustedes y la lista de gastos.</p>'
    +'<div class="stack"><button type="button" class="primary" id="fprint">📄 Ver / guardar como PDF</button><button type="button" class="ghost" id="fcsv">📊 Descargar Excel (CSV)</button><button type="button" class="ghost" id="ftext">💬 Copiar resumen para WhatsApp</button>'
    +(navigator.share?'<button type="button" class="ghost" id="fshare">📤 Compartir…</button>':'')+'</div><p class="msg" id="fmsg" role="status"></p>'
-   +'<label class="fld" style="margin-top:10px"><span>Vista previa del texto</span><textarea class="box" id="ftxt" rows="8" readonly></textarea></label>');
+   +'<label class="mt10 fld"><span>Vista previa del texto</span><textarea class="box" id="ftxt" rows="8" readonly></textarea></label>');
   var txt=finalText();$('#ftxt',panel).value=txt;
   var msg=$('#fmsg',panel),say=function(t){msg.textContent=t;};
   $('#fprint',panel).addEventListener('click',function(){

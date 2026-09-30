@@ -20,7 +20,7 @@ var formRefresh=null;
 function closeSheet(){formRefresh=null;var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');if(reloadPending){forceReload(reloadPending);return;}render();if(pendingJoin.length)setTimeout(askJoin,0);}
 function sheetForm(o){
   var v=o.values||{};
-  var panel=openSheet(o.title,(o.intro||'')+'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<p class="msg err" id="sfmsg" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));
+  var panel=openSheet(o.title,(o.intro||'')+'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<p class="full m0 msg err" id="sfmsg"></p><div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));
   var f=$('#sf',panel);
   if(o.onReady)o.onReady(panel);
   f.addEventListener('submit',function(e){
@@ -104,7 +104,7 @@ var SPECS={
     {k:'to',l:'Destino',t:'text',half:true,req:true,ph:'Ej: Bariloche'},
     {k:'dep',l:'Sale',t:'datetime-local'},
     {k:'arr',l:'Llega',t:'datetime-local'},
-    {k:'_same',t:'html',html:'<label class="fld pksug" id="sameWrap" style="flex-direction:row;white-space:normal" hidden><input type="checkbox" name="same"> Se devuelve en el mismo lugar donde se retira</label>'},
+    {k:'_same',t:'html',html:'<label class="chk fld pksug" id="sameWrap" hidden><input type="checkbox" name="same"> Se devuelve en el mismo lugar donde se retira</label>'},
     {k:'seats',l:'Asientos',t:'number',half:true,ph:'5'},
     {k:'_riders',t:'html',html:''},   /* se completa en openItem: quiénes viajan con este pasaje / van en el auto */
     {k:'company',l:'Empresa',t:'text',half:true,ph:'Aerolínea, bus…'},
@@ -196,13 +196,14 @@ function openItem(k,id,pre){
   if(vals.split&&['equal','some','amounts','guests','riders'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
   if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
   var curId=id||null;
-  var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="hint" id="tkmsg" style="margin:0"></span></div>':'';
+  var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');});
-  if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes viajan con este pasaje')+'<p class="hint" id="rdHint" style="margin:-6px 0 0">Cada uno carga sus pasajes. Si viajás junto con alguien en la misma reserva, tildalo también.</p>';});
-  var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="msg err" id="formmsg" role="status" style="grid-column:1/-1;margin:0"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
-   +'<hr>'+attsBlock(ex)+'<hr>'+linksBlock(ex);
+  if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes viajan con este pasaje')+'<p class="full mtn6 hint" id="rdHint">Cada uno carga sus pasajes. Si viajás junto con alguien en la misma reserva, tildalo también.</p>';});
+  var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="full m0 msg err" id="formmsg" role="status"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
+   +'<details class="sideSec fgrp"'+(ex&&((ex.attachments||[]).length||(ex.links||[]).length)?' open':'')+'><summary><span>📎 Archivos y links</span><small>'+(ex?attLinkChips(ex):'')+'</small></summary>'+attsBlock(ex)+linksBlock(ex)+'</details>'+(ex?itemLogHtml():'');
   var panel=openSheet(sp.title[ex?1:0],body);
   var f=$('#sf',panel);
+  bindItemLog(panel,ex?ex.id:'');
   var el=function(nm){return f.querySelector('[name='+nm+']');};
   function showFld(input,on){if(!input)return;var w=input.closest('.fld');if(w)w.hidden=!on;input.disabled=!on;}
 
@@ -255,15 +256,15 @@ function openItem(k,id,pre){
     var mode=el('split').value,ppl=allPeople(),st=splitState(),h='';
     if(mode==='riders'){
       var rn=Array.prototype.filter.call(f.querySelectorAll('[name^=rd_]'),function(c){return c.checked;}).map(function(c){return nameOf(c.name.slice(3));});
-      var car0=el('type').value==='auto';h='<p class="hint" style="margin:0">'+(rn.length?'Se divide entre '+(car0?'los que van en el auto':'los que viajan con este pasaje')+': '+esc(rn.join(', '))+'.':'Todavía no marcaste '+(car0?'quiénes van':'quiénes viajan')+': se divide entre todos.')+(car0?' Si alguien se sube o se baja, se actualiza solo.':'')+'</p>';
+      var car0=el('type').value==='auto';h='<p class="m0 hint">'+(rn.length?'Se divide entre '+(car0?'los que van en el auto':'los que viajan con este pasaje')+': '+esc(rn.join(', '))+'.':'Todavía no marcaste '+(car0?'quiénes van':'quiénes viajan')+': se divide entre todos.')+(car0?' Si alguien se sube o se baja, se actualiza solo.':'')+'</p>';
     }
     else if(mode==='guests'){
       var gn=Array.prototype.filter.call(f.querySelectorAll('[name^=g_]'),function(c){return c.checked;}).map(function(c){return nameOf(c.name.slice(2));});
-      h='<p class="hint" style="margin:0">'+(gn.length?'Se divide entre los que se quedan acá: '+esc(gn.join(', '))+'.':'Todavía no marcaste quiénes se quedan: se divide entre todos.')+' Si alguien se suma o se va del alojamiento, se actualiza solo.</p>';
+      h='<p class="m0 hint">'+(gn.length?'Se divide entre los que se quedan acá: '+esc(gn.join(', '))+'.':'Todavía no marcaste quiénes se quedan: se divide entre todos.')+' Si alguien se suma o se va del alojamiento, se actualiza solo.</p>';
     }
     else if(mode==='equal'){
       var fixed=ex&&(ex.split||'equal')==='equal'&&ex.splitWith?splitIds(ex).map(nameOf).filter(Boolean):null;
-      h='<p class="hint" style="margin:0">'+(fixed?'Se divide entre '+esc(fixed.join(', '))+' (los que estaban cuando se cargó). Para sumar o sacar a alguien, elegí "Algunos".'
+      h='<p class="m0 hint">'+(fixed?'Se divide entre '+esc(fixed.join(', '))+' (los que estaban cuando se cargó). Para sumar o sacar a alguien, elegí "Algunos".'
         :'Se divide entre todas las personas del viaje'+(ppl.length?' ('+ppl.map(function(p){return esc(p.name);}).join(', ')+')':'')+'. Si después se suma alguien, te vamos a preguntar si entra en este gasto.')+'</p>';
     }
     else if(mode==='some'){
@@ -273,7 +274,7 @@ function openItem(k,id,pre){
       var had=Object.keys(st.amt).length;
       lastEdited=had?ppl.length-1:-1;
       h='<div class="rates">'+ppl.map(function(p){return '<label class="rate"><span style="min-width:90px">'+dot(p.id)+esc(p.name)+'</span><input type="number" step="any" min="0" inputmode="decimal" name="sh_'+esc(p.id)+'" value="'+esc(st.amt[p.id]||'')+'" placeholder="0"></label>';}).join('')+'</div>'
-       +'<p class="hint" style="margin:8px 0 0">Al escribir el monto de alguien, lo que falta se reparte en partes iguales entre los que siguen. <span id="shsum"></span></p>';
+       +'<p class="mt8 hint">Al escribir el monto de alguien, lo que falta se reparte en partes iguales entre los que siguen. <span id="shsum"></span></p>';
     }
     box.innerHTML=(mode!=='guests'&&mode!=='riders'?groupChipsHtml():'')+h;
     if(mode==='amounts'&&lastEdited<0)spread(-1);
@@ -313,7 +314,7 @@ function openItem(k,id,pre){
     var nm=esc(nameOf(payer)),linked=!!CLAIMS[payer];
     hint.innerHTML=list.length?'':payer===myPersonId()?'Todavía no cargaste tus formas de pago: agregalas en "Mis pagos".'
       :linked?nm+' todavía no cargó sus formas de pago en la app.'
-      :nm+' todavía no vinculó su cuenta de Google en este viaje.'+(!myPersonId()?' <button type="button" class="ghost" data-claimhere="'+esc(payer)+'" style="padding:3px 10px;font-size:13px">Soy '+nm+'</button>':'');
+      :nm+' todavía no vinculó su cuenta de Google en este viaje.'+(!myPersonId()?' <button type="button" class="sm ghost" data-claimhere="'+esc(payer)+'">Soy '+nm+'</button>':'');
   }
   /* Si llegan formas de pago o vínculos con el formulario abierto, se actualiza el desplegable. */
   formRefresh=function(){var ms=el('methodId'),pb=el('paidBy');if(ms&&pb&&pb.value){fillMethods(pb.value,true);syncPay();}};
@@ -328,6 +329,18 @@ function openItem(k,id,pre){
   }
   if(el('amount')){drawSplit();syncPay();}
   if(k==='transports'){var sm=f.querySelector('[name=same]');if(sm)sm.checked=vals.same==='1';syncTType();}
+  /* Lo básico a la vista; costo, reserva y notas plegados (abiertos si ya tienen algo cargado). */
+  var COSTN=['amount','cur','status','paidBy','methodId','method','cuotas','payDate','split','#splitBox'];
+  var costSum=function(){var a=parseFloat((el('amount')||{}).value)||0;return a>0?money(a,curCode((el('cur')||{}).value,base()))+' · '+((el('status')||{}).value==='pagado'?'Pagado':'Por pagar'):'Sin cargar';};
+  var has=function(n){return n.some(function(x){var i=el(x);return i&&String(i.value||'').trim();});};
+  if(k==='transports'||k==='lodging')groupFields(panel,f,[
+    {l:'💲 Costo y quién paga',names:COSTN,open:!!(ex&&parseFloat(ex.amount)>0),sum:costSum},
+    k==='transports'?{l:'🎫 Empresa, reserva y notas',names:['company','ref','notes'],open:!!ex&&has(['company','ref','notes'])}
+                    :{l:'📍 Dirección, reserva y notas',names:['airbnb','address','ref','notes'],open:!!ex&&has(['airbnb','address','ref','notes'])}
+  ]);
+  if(k==='plans')groupFields(panel,f,[{l:'📍 Lugar y notas',names:['place','notes'],open:!!ex&&has(['place','notes'])}]);
+  var fx=$('#formmsg',panel);   /* si algo está mal adentro de una sección plegada, se abre */
+  if(fx)new MutationObserver(function(){if(fx.textContent)Array.prototype.forEach.call(panel.querySelectorAll('details.fgrp'),function(d){d.open=true;});}).observe(fx,{childList:true,characterData:true,subtree:true});
 
   f.addEventListener('submit',function(e){
     e.preventDefault();
@@ -447,9 +460,9 @@ function askJoin(){
   var list=nm?costs().filter(function(c){return c.split==='equal'&&splitIds(c).indexOf(pid)<0;}):[];
   if(!list.length){askJoin();return;}
   var panel=openSheet('¿'+nm+' entra en gastos anteriores?','<p class="hint">Estos gastos ya estaban cargados y se dividían entre todos los que había. Tildá los que también le tocan a '+esc(nm)+'. Los que no tildes quedan como estaban.</p>'
-    +'<div class="row" style="margin-bottom:10px"><button type="button" class="ghost" id="jall" style="padding:6px 12px;font-size:13px">Tildar todos</button></div>'
+    +'<div class="mb10 row"><button type="button" class="sm ghost" id="jall">Tildar todos</button></div>'
     +'<div class="stack">'+list.map(function(c){return '<label class="pkchk"><input type="checkbox" data-join="'+c.src+'|'+c.id+'"><span>'+esc(c.title)+' · '+money(c.amount,c.cur)+(c.date?' · '+esc(fShort(c.date)):'')+'</span></label>';}).join('')+'</div>'
-    +'<div class="acts" style="margin-top:14px"><button type="button" class="ghost" data-close>Ninguno</button><button type="button" class="primary" id="jok">Listo</button></div>');
+    +'<div class="mt14 acts"><button type="button" class="ghost" data-close>Ninguno</button><button type="button" class="primary" id="jok">Listo</button></div>');
   $('#jall',panel).addEventListener('click',function(){Array.prototype.forEach.call(panel.querySelectorAll('[data-join]'),function(c){c.checked=true;});});
   $('#jok',panel).addEventListener('click',function(){
     Array.prototype.forEach.call(panel.querySelectorAll('[data-join]:checked'),function(c){
@@ -515,7 +528,7 @@ function pplBlock(){
       var cl=cloudMode()?CLAIMS[p.id]:null;
       return '<div class="pplrow">'+dot(p.id)+'<input type="text" data-pname="'+esc(p.id)+'" value="'+esc(p.name)+'" aria-label="Nombre" autocomplete="off">'
        +(cl?'<small title="Vinculada a una cuenta de Google">🔗 '+esc(cl.name||'cuenta')+'</small>':'')
-       +(cl&&org&&cl.uid!==ME.uid?'<button type="button" class="ghost" data-unlink="'+esc(p.id)+'" style="padding:3px 9px;font-size:12px;flex:none">Desvincular</button>':'')
+       +(cl&&org&&cl.uid!==ME.uid?'<button type="button" class="sm fnone ghost" data-unlink="'+esc(p.id)+'">Desvincular</button>':'')
        +'<button type="button" class="x" data-pdel="'+esc(p.id)+'" aria-label="Quitar a '+esc(p.name)+'">✕</button></div>';
     }).join(''):'<p class="nada">'+(cloudMode()&&ME?'Al guardar, quedás vos'+(ME.name?' ('+esc(ME.name)+')':'')+' como primera persona. Después podés sumar a los demás.':'Todavía no hay nadie.')+'</p>')
    +'</div><form class="pplform"><input type="text" data-pnew placeholder="Nombre" autocomplete="off" required><button type="submit" class="ghost">+ Agregar persona</button></form><p class="msg" data-pplmsg></p></div>';
@@ -555,12 +568,52 @@ function bindPeople(panel){
     redraw();var n=$('[data-pnew]',panel);if(n)n.focus();
   });
 }
+/* Mueve campos del formulario a secciones plegables (<details>). names: nombres de campos o '#id' de bloques. */
+function groupFields(panel,f,groups){
+  var wrap=function(n){if(n.charAt(0)==='#')return $(n,panel);var i=f.querySelector('[name='+n+']');return i&&i.closest('.fld');};
+  groups.forEach(function(g){
+    var els=g.names.map(wrap).filter(Boolean);if(!els.length)return;
+    var d=document.createElement('details');d.className='fgrp';d.open=!!g.open;
+    d.innerHTML='<summary><span>'+esc(g.l)+'</span><small></small></summary><div class="grid"></div>';
+    els[0].parentNode.insertBefore(d,els[0]);
+    var box=d.querySelector('.grid');els.forEach(function(x){box.appendChild(x);});
+    if(g.sum){var upd=function(){d.querySelector('summary small').textContent=g.sum();};upd();f.addEventListener('input',upd);f.addEventListener('change',upd);}
+  });
+}
+/* Quiénes tienen acceso (cuentas que entraron con el link). El organizador puede sacar a alguien y cerrar el link. */
+function membersBlockHtml(){
+  if(!cloudMode()||AUTH!=='in')return '';
+  var org=isOrganizer(),ms=Object.keys(MEMBERS).map(function(k){return MEMBERS[k];}).sort(function(a,b){return a.at-b.at;}),bn=Object.keys(BANNED).map(function(k){return BANNED[k];});
+  var who=function(uid){var p=Object.keys(CLAIMS).filter(function(pid){return CLAIMS[pid].uid===uid&&nameOf(pid);}).map(nameOf);return p.length?'es '+p.join(' y ')+' en el viaje':'todavía no eligió quién es';};
+  return '<div class="sideSec" id="mbrWrap"><h3>Quiénes tienen acceso</h3><p class="hint">Las cuentas que entraron con el link. Solo ellas ven el viaje.'+(org?' Si sacás a alguien, no puede volver a entrar aunque tenga el link; sus gastos quedan.':'')+'</p><div class="attlist">'
+   +(ms.length?ms.map(function(m){
+      var me=m.uid===ME.uid,own=m.uid===S.trip.owner;
+      return '<div class="pplrow mbr"><span class="mbn"><b>'+esc(m.name||'Sin nombre')+(me?' (vos)':'')+'</b><small>'+(own?'Organiza · ':'')+esc(who(m.uid))+'</small></span>'
+       +(org&&!me?'<button type="button" class="ghost sm" data-kick="'+esc(m.uid)+'">Sacar</button>':'')+'</div>';
+    }).join(''):'<p class="nada">Cargando…</p>')+'</div>'
+   +(org&&bn.length?'<p class="hint" style="margin:10px 0 4px">Sacados del viaje:</p><div class="attlist">'+bn.map(function(b){return '<div class="pplrow mbr"><span class="mbn"><b>'+esc(b.name||'Sin nombre')+'</b></span><button type="button" class="ghost sm" data-unban="'+esc(b.uid)+'">Volver a permitir</button></div>';}).join('')+'</div>':'')
+   +(org?'<label class="chk mt10 fld pksug"><input type="checkbox" data-lock'+(S.trip.locked?' checked':'')+'> Cerrar el link: nadie nuevo puede entrar (los que ya están siguen)</label>':(S.trip.locked?'<p class="hint">El link está cerrado: no puede entrar nadie nuevo.</p>':''))
+   +'<p class="msg" data-mbrmsg></p></div>';
+}
+function bindMembers(panel){
+  function redraw(msg){var w=$('#mbrWrap',panel);if(w)w.outerHTML=membersBlockHtml();var m=$('[data-mbrmsg]',panel);if(m&&msg)m.textContent=msg;}
+  formRefresh=function(){redraw();};
+  panel.addEventListener('click',function(e){
+    var k=e.target.closest('[data-kick]');
+    if(k){var uid0=k.getAttribute('data-kick'),nm=(MEMBERS[uid0]||{}).name||'esa cuenta';
+      if(!k.classList.contains('armed')){k.classList.add('armed');k.textContent='¿Sacar a '+nm+'?';return;}
+      k.disabled=true;kickMember(uid0).then(function(){redraw(nm+' ya no tiene acceso al viaje.');});return;}
+    var u=e.target.closest('[data-unban]');
+    if(u){unbanMember(u.getAttribute('data-unban'));redraw('Listo: puede volver a entrar con el link.');}
+  });
+  panel.addEventListener('change',function(e){if(e.target.hasAttribute('data-lock'))setLocked(e.target.checked);});
+}
 /* Categorías propias del viaje (S.trip.cats = [{name,icon}]), además de las fijas de CATS. Se editan en
    Ajustes y se guardan con "Guardar". */
 function catsBlockHtml(list){
-  return '<div class="sideSec" id="catsWrap"><h3>Categorías de gastos propias</h3><p class="hint" style="margin:0 0 8px">Además de las de siempre, podés sumar las que use este viaje (por ejemplo "Nafta del auto" o "Regalos").</p>'
-   +'<div class="row" style="gap:6px;margin-bottom:8px">'+(list.length?list.map(function(c,i){return '<span class="chip">'+esc(c.icon||'🏷️')+' '+esc(c.name)+'<button type="button" class="x" data-catdel="'+i+'" aria-label="Quitar '+esc(c.name)+'" style="border:0;background:none;color:var(--muted);padding:0 0 0 4px">✕</button></span>';}).join(''):'<span class="nada" style="padding:0">Ninguna todavía.</span>')+'</div>'
-   +'<div class="pplform" style="margin-top:0"><input type="text" id="catIcon" maxlength="4" placeholder="🏷️" aria-label="Emoji" style="flex:none;width:56px;text-align:center"><input type="text" id="catName" maxlength="30" placeholder="Nombre de la categoría" autocomplete="off"><button type="button" class="ghost" id="catAdd">+ Agregar</button></div><p class="msg err" id="catMsg" style="margin:4px 0 0"></p></div>';
+  return '<div class="sideSec" id="catsWrap"><h3>Categorías de gastos propias</h3><p class="mb8 hint">Además de las de siempre, podés sumar las que use este viaje (por ejemplo "Nafta del auto" o "Regalos").</p>'
+   +'<div class="g6 mb8 row">'+(list.length?list.map(function(c,i){return '<span class="chip">'+esc(c.icon||'🏷️')+' '+esc(c.name)+'<button type="button" class="x" data-catdel="'+i+'" aria-label="Quitar '+esc(c.name)+'" style="border:0;background:none;color:var(--muted);padding:0 0 0 4px">✕</button></span>';}).join(''):'<span class="p0 nada">Ninguna todavía.</span>')+'</div>'
+   +'<div class="mt0 pplform"><input type="text" id="catIcon" maxlength="4" placeholder="🏷️" aria-label="Emoji" style="flex:none;width:56px;text-align:center"><input type="text" id="catName" maxlength="30" placeholder="Nombre de la categoría" autocomplete="off"><button type="button" class="ghost" id="catAdd">+ Agregar</button></div><p class="mt4 msg err" id="catMsg"></p></div>';
 }
 function bindCats(panel,list){
   function redraw(){var w=$('#catsWrap',panel);if(w)w.outerHTML=catsBlockHtml(list);}
@@ -587,8 +640,8 @@ function openSettings(){
       {k:'info',l:'Info útil (seguro de viaje, contacto de emergencia, dirección del alojamiento…)',t:'textarea',ph:'Lo que quieran tener a mano aunque no haya señal'}
     ],
     intro:shareBlockHtml(),
-    extra:'<hr>'+pplBlock()+'<hr>'+catsBlockHtml(cats),
-    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);bindCityField(panel);bindCats(panel,cats);},
+    extra:'<hr>'+pplBlock()+(cloudMode()&&AUTH==='in'?'<hr>'+membersBlockHtml():'')+'<hr>'+catsBlockHtml(cats)+'<hr><div class="row"><button type="button" class="ghost" data-act="rates">💱 Tipos de cambio</button><button type="button" class="ghost" data-act="trash">🗑️ Papelera'+(trashItems().length?' ('+trashItems().length+')':'')+'</button>'+(cloudMode()&&AUTH==='in'?'<button type="button" class="ghost" data-act="history">🕘 Últimos cambios</button>':'')+'</div>',
+    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);bindMembers(panel);bindCityField(panel);bindCats(panel,cats);},
     validate:function(d){
       if(d.start&&d.end&&d.end<d.start)return 'La fecha "Hasta" es anterior a "Desde". Revisá las fechas del viaje.';
       var q=$('#cityQ');if(!d.cityJson&&q&&q.value.trim()&&!q.closest('[hidden]'))return 'Elegí la ciudad principal de la lista (o dejala vacía).';

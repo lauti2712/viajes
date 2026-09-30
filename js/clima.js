@@ -65,9 +65,9 @@ function wxSummary(){
   var r=wxRange();if(!r)return '';
   var ds=Object.keys(WX.days);
   var head='<div class="wxbox"><button type="button" class="ghost sm wxoff" data-act="wxoff" title="Podés volver a mostrarlo con «Mostrar clima»">Ocultar</button><b>'+flagOf(r.c.cc)+' '+esc(r.c.name)+'</b>';
-  if(WX.state==='loading')return head+' <span class="hint" style="margin:0">Buscando el clima…</span></div>';
+  if(WX.state==='loading')return head+' <span class="m0 hint">Buscando el clima…</span></div>';
   if(!ds.length)return head+'</div>';
   var mx=Math.round(ds.reduce(function(t,d){return t+WX.days[d].max;},0)/ds.length),mn=Math.round(ds.reduce(function(t,d){return t+WX.days[d].min;},0)/ds.length);
   var txt=WX.kind==='fc'?'Pronóstico: máximas de '+mx+'° y mínimas de '+mn+'° en promedio.':WX.kind==='typ'?'Clima típico para esas fechas: máximas de ~'+mx+'° y mínimas de ~'+mn+'°. Cuando falten 16 días aparece el pronóstico.':'Hizo máximas de '+mx+'° y mínimas de '+mn+'° en promedio.';
-  return head+' <span class="hint" style="margin:0">'+txt+'</span></div>';
+  return head+' <span class="m0 hint">'+txt+'</span></div>';
 }

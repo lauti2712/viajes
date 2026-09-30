@@ -23,7 +23,16 @@ function pushPacking(it){
 }
 /* Sin `patch` se manda el viaje entero; con `patch` solo esos campos (merge), para que si dos personas
    cambian cosas distintas a la vez (el nombre y el dólar, por ejemplo) no se pise ninguna. */
-function pushTrip(patch){if(!FB||!CODE||AUTH!=='in')return;try{FB.fs.setDoc(fdoc(),clean(patch?Object.assign({u:S.trip.u},patch):S.trip),{merge:!!patch}).catch(fbErr);}catch(e){}}
+/* El viaje entero se reescribe (sin merge, para que se vayan las cotizaciones viejas al cambiar de moneda);
+   owner y locked salen de lo último que dijo el servidor: las reglas no dejan cambiarlos sin ser el organizador. */
+var TRIP_SRV={owner:'',locked:false};
+function pushTrip(patch){
+  if(!FB||!CODE||AUTH!=='in')return;
+  var body;
+  if(patch)body=Object.assign({u:S.trip.u},patch);
+  else{body=Object.assign({},S.trip);if(TRIP_SRV.owner)body.owner=TRIP_SRV.owner;body.locked=TRIP_SRV.owner===ME.uid?!!S.trip.locked:TRIP_SRV.locked;if(!body.owner)delete body.owner;}
+  try{FB.fs.setDoc(fdoc(),clean(body),{merge:!!patch}).catch(fbErr);}catch(e){}
+}
 function pushAll(){if(!FB||AUTH!=='in')return;pushTrip();ITEM_KEYS.forEach(function(k){S[k].forEach(function(it){pushItem(k,it)})});}
 /* srv: el dato viene confirmado por el servidor (no es un eco de un cambio propio pendiente). Ante empate
    de u gana el servidor: así, si dos personas editan lo mismo a la vez, todos terminan viendo lo mismo. */
@@ -138,7 +147,7 @@ async function startCloud(){
   FB.au.onAuthStateChanged(FB.auth,function(u){
     if(u){
       ME={uid:u.uid,name:u.displayName||'',email:u.email||''};AUTH='in';loginMsg='';
-      if(!listening){listening=true;listenTrips();listenMeta();listenPrefs();listenMyVehicles();if(CODE)listen();}
+      if(!listening){listening=true;listenTrips();listenMeta();listenPrefs();listenMyVehicles();if(CODE)enterTrip();}
       render();
     }else{
       if(AUTH==='in'){if(!loggingOut)location.reload();return;}
@@ -189,7 +198,7 @@ function tripsListHtml(){
   return MYTRIPS.map(function(t){
     var fechas=t.start?fShort(t.start)+(t.end?' al '+fShort(t.end):''):'Sin fechas';
     return '<div class="exp trow" role="button" tabindex="0" data-act="gotrip" data-code="'+esc(t.code)+'"><span class="ec" aria-hidden="true">🧳</span><div class="et"><b>'+esc(t.name||'Viaje sin nombre')+(t.code===CODE?'<span class="here">Estás acá</span>':'')+'</b><small><span>'+esc(fechas)+'</span>'+(t.lastOpen?'<span>Abierto '+esc(relTime(t.lastOpen))+'</span>':'')+'</small></div>'
-     +'<div class="ea"><button type="button" class="ghost" data-forget="'+esc(t.code)+'" style="padding:4px 9px;font-size:13px" aria-label="Quitar de mi lista">✕</button></div></div>';
+     +'<div class="ea"><button type="button" class="sm ghost" data-forget="'+esc(t.code)+'" aria-label="Quitar de mi lista">✕</button></div></div>';
   }).join('');
 }
 function vHome(){
@@ -198,7 +207,7 @@ function vHome(){
    +'<section class="sec"><h2>¿Te pasaron un link?</h2><form class="pplform" id="joinform"><input type="text" id="joinc" placeholder="Pegá el link o el código" autocomplete="off" required><button type="submit" class="ghost">Abrir</button></form><p class="msg err" id="joinmsg"></p></section>';
 }
 function openTrips(){
-  var panel=openSheet('Mis viajes','<div class="row" style="margin-bottom:12px"><button type="button" class="primary" data-act="newtrip">+ Viaje nuevo</button></div><div id="tripsl">'+tripsListHtml()+'</div><p class="hint" style="margin-top:12px">El ✕ solo lo saca de tu lista; el viaje sigue existiendo para los demás.</p>');
+  var panel=openSheet('Mis viajes','<div class="mb12 row"><button type="button" class="primary" data-act="newtrip">+ Viaje nuevo</button></div><div id="tripsl">'+tripsListHtml()+'</div><p class="mt12 hint">El ✕ solo lo saca de tu lista; el viaje sigue existiendo para los demás.</p>');
   formRefresh=function(){var w=$('#tripsl',panel);if(w)w.innerHTML=tripsListHtml();};
 }
 function login(){
@@ -233,6 +242,7 @@ function listen(){
   fs.onSnapshot(fdoc(),{includeMetadataChanges:true},function(snap){
     if(snap.exists()){
       var r=fix({trip:snap.data()}).trip,srv=!snap.metadata.fromCache;
+      if(srv){TRIP_SRV={owner:r.owner||'',locked:r.locked===true};}
       /* El viaje se guarda por partes (merge): lo del servidor puede traer cambios de otros con el mismo u. */
       if((!S.trip.setup&&r.setup)||(r.u||0)>(S.trip.u||0)||(srv&&(r.u||0)===(S.trip.u||0)&&JSON.stringify(r)!==JSON.stringify(S.trip))){S.trip=r;save();render();}
       else if(S.trip.setup&&(S.trip.u||0)>(r.u||0)&&!snap.metadata.fromCache)pushTrip();
@@ -241,7 +251,8 @@ function listen(){
     }
     if(!snap.metadata.fromCache&&!tripReady){tripReady=true;maybeMigratePeople();}
     if(!snap.metadata.fromCache&&snap.exists())recordTrip();
-  },function(err){fbErr(err);if(!err||err.code!=='permission-denied')setSync('err');});
+  },function(err){if(err&&err.code==='permission-denied'){deniedTrip();return;}fbErr(err);setSync('err');});
+  listenMembers();
 
   fs.onSnapshot(fs.collection(db,'trips',CODE,'items'),{includeMetadataChanges:true},function(snap){
     var changed=false;
@@ -323,3 +334,60 @@ function openConnect(){
   $('#join',panel).addEventListener('click',function(){var c=parseCode($('#joinc',panel).value);if(!c){$('#msg',panel).textContent='Ese código no es válido. Pegá el link completo tal cual te lo pasaron.';return;}connectTo(c);});
   $('#localonly',panel).addEventListener('click',function(){try{localStorage.setItem(MODE_KEY,'local');}catch(e){}location.href=location.pathname;});
 }
+
+/* ---------- Miembros: quiénes entraron al viaje con el link ----------
+   Las reglas solo dejan ver y editar el viaje a sus miembros (trips/{code}/members/{uid}). Abrir el link
+   te anota; el organizador puede sacar a alguien (queda en banned y no puede volver) o cerrar el link. */
+var MEMBERS={},BANNED={},NOACCESS=false,JOINED_KEY='viaje-de-a-dos:joined';
+function joinedList(){try{var l=JSON.parse(localStorage.getItem(JOINED_KEY)||'[]');return Array.isArray(l)?l:[];}catch(e){return [];}}
+function markJoined(on){var l=joinedList().filter(function(c){return c!==CODE;});if(on)l.push(CODE);try{localStorage.setItem(JOINED_KEY,JSON.stringify(l.slice(-200)));}catch(e){}}
+/* Resuelve true si quedó anotado; false si las reglas no lo dejan (lo sacaron o el viaje está cerrado). */
+function joinTrip(){
+  var p=FB.fs.setDoc(fdoc('members',ME.uid),{uid:ME.uid,name:ME.name||'',at:Date.now()},{merge:true})
+    .then(function(){markJoined(true);return true;},function(e){return !(e&&e.code==='permission-denied');});
+  /* sin señal no hay respuesta del servidor: se sigue con lo guardado en el dispositivo */
+  return Promise.race([p,new Promise(function(r){setTimeout(function(){r(true);},6000);})]);
+}
+function enterTrip(){
+  if(joinedList().indexOf(CODE)>=0||navigator.onLine===false){listen();return;}
+  joinTrip().then(function(){listen();});
+}
+/* Sin permiso para leer el viaje: o se anotó recién (se reintenta una vez), o lo sacaron / está cerrado. */
+function deniedTrip(){
+  var k='viaje-de-a-dos:rejoin:'+CODE,tried=false;try{tried=sessionStorage.getItem(k)==='1';}catch(e){}
+  if(!tried){try{sessionStorage.setItem(k,'1');}catch(e){}joinTrip().then(function(ok){if(ok)location.reload();else noAccess();});return;}
+  noAccess();
+}
+function noAccess(){
+  NOACCESS=true;markJoined(false);
+  try{localStorage.removeItem(LS);}catch(e){}   /* la copia local de un viaje al que ya no tiene acceso */
+  S=blank();setSync('');render();
+}
+function vNoAccess(){
+  return '<div class="gate"><h2>No tenés acceso a este viaje</h2><p>Quien organiza el viaje te sacó, o cerró el link para que no entre gente nueva. Si creés que es un error, pedile que te vuelva a habilitar.</p>'
+   +'<button type="button" class="primary" data-act="gohome">Ir a mis viajes</button>'
+   +'<p class="hint"><button type="button" class="sm ghost" data-forget="'+esc(CODE)+'">Quitarlo de mi lista</button></p></div>';
+}
+function listenMembers(){
+  var fs=FB.fs;
+  fs.onSnapshot(fs.collection(FB.db,'trips',CODE,'members'),function(snap){
+    var m={};snap.docs.forEach(function(x){var d=x.data()||{};m[x.id]={uid:x.id,name:String(d.name||''),at:+d.at||0};});
+    MEMBERS=m;if(formRefresh)formRefresh();
+  },function(){});
+  fs.onSnapshot(fs.collection(FB.db,'trips',CODE,'banned'),function(snap){
+    var b={};snap.docs.forEach(function(x){var d=x.data()||{};b[x.id]={uid:x.id,name:String(d.name||'')};});
+    BANNED=b;if(formRefresh)formRefresh();
+  },function(){});
+}
+/* Sacar a alguien: queda bloqueado, deja de ser miembro y se sueltan sus vínculos con personas del viaje
+   (sus gastos quedan; la persona queda libre). */
+function kickMember(uid){
+  if(!isOrganizer()||uid===ME.uid)return Promise.resolve();
+  var fs=FB.fs,b=fs.writeBatch(FB.db),m=MEMBERS[uid]||{};
+  b.set(fdoc('banned',uid),{uid:uid,name:m.name||'',at:Date.now(),by:ME.uid});
+  b.delete(fdoc('members',uid));
+  Object.keys(CLAIMS).forEach(function(pid){if(CLAIMS[pid].uid===uid)b.delete(fdoc('claims',pid));});
+  return b.commit().catch(fbErr);
+}
+function unbanMember(uid){if(!isOrganizer())return;FB.fs.deleteDoc(fdoc('banned',uid)).catch(fbErr);}
+function setLocked(on){if(!isOrganizer())return;S.trip.locked=!!on;S.trip.u=nextU(S.trip.u);save();pushTrip({locked:!!on});}

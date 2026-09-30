@@ -47,8 +47,8 @@ function openProfile(){
   h+='<section class="psec"><div class="bar"><h3>Formas de pago</h3><button type="button" class="ghost sm" data-act="addmethod">+ Agregar</button></div>'
    +(METHODS.length?METHODS.map(function(m){var ty=mtype(m);return '<div class="exp" role="button" tabindex="0" data-act="editmethod" data-id="'+esc(m.id)+'" style="grid-template-columns:34px 1fr"><span class="ec" aria-hidden="true">'+ty[0]+'</span><div class="et"><b>'+esc(methodLabel(m))+'</b><small><span>'+esc(ty[1])+'</span>'+(m.alias&&m.share?'<span>Alias visible: '+esc(m.alias)+'</span>':'')+'</small></div></div>';}).join('')
      :'<p class="nada">Todavía no cargaste ninguna. Sirven para elegir con qué pagaste cada gasto y para que te paguen a tu alias.</p>')
-   +(cloudMode()?'<div class="row" style="margin-top:10px"><button type="button" class="ghost" data-act="gopagos">💳 Ver mis pagos y resúmenes de tarjeta</button></div>':'')+'</section>';
-  h+='<section class="psec"><h3 style="margin-bottom:8px">Preferencias</h3><label class="pkchk"><input type="checkbox" data-pref="showWeather"'+(PREFS.showWeather!==false?' checked':'')+'><span>Mostrar el clima en el itinerario</span></label></section>';
+   +(cloudMode()?'<div class="mt10 row"><button type="button" class="ghost" data-act="gopagos">💳 Ver mis pagos y resúmenes de tarjeta</button></div>':'')+'</section>';
+  h+='<section class="psec"><h class="mb8"3>Preferencias</h3><label class="pkchk"><input type="checkbox" data-pref="showWeather"'+(PREFS.showWeather!==false?' checked':'')+'><span>Mostrar el clima en el itinerario</span></label></section>';
   if(typeof isStandalone==='function'&&!isStandalone()&&(installEvt||isIOS()))h+='<section class="psec"><button type="button" class="ghost" data-act="install">📲 Instalar la app en este dispositivo</button></section>';
   h+='<section class="psec"><button type="button" class="danger" data-act="logout">Salir de la cuenta</button></section>';
   var panel=openSheet('Mi perfil',h);
@@ -63,8 +63,8 @@ var whoLater=false;
 function whoBanner(){
   if(!cloudMode()||AUTH!=='in'||!claimsLoaded||whoLater||tab==='mochila'||myPersonId())return '';
   var free=allPeople().filter(function(p){return !CLAIMS[p.id]||CLAIMS[p.id].uid===ME.uid;});
-  return '<div class="infobox" style="border-left-color:var(--sun)"><h3>¿Quién sos en este viaje?</h3><p style="margin-bottom:10px">Elegilo una vez y queda vinculado a tu cuenta de Google: así los demás pueden elegir tus formas de pago al cargar un gasto, ven tu alias y tenés tu mochila.</p>'
-   +'<div class="whopick" style="margin:0">'+free.map(function(p){return '<button type="button" class="primary" data-act="whoami" data-who="'+esc(p.id)+'">Soy '+esc(p.name)+'</button>';}).join('')
+  return '<div class="infobox" style="border-left-color:var(--sun)"><h3>¿Quién sos en este viaje?</h3><p class="mb10">Elegilo una vez y queda vinculado a tu cuenta de Google: así los demás pueden elegir tus formas de pago al cargar un gasto, ven tu alias y tenés tu mochila.</p>'
+   +'<div class="m0 whopick">'+free.map(function(p){return '<button type="button" class="primary" data-act="whoami" data-who="'+esc(p.id)+'">Soy '+esc(p.name)+'</button>';}).join('')
    +'<button type="button" class="ghost" data-tab="mochila">No estoy en la lista</button><button type="button" class="ghost" data-act="wholater">Ahora no</button></div>'+(claimMsg?'<p class="msg err">'+esc(claimMsg)+'</p>':'')+'</div>';
 }
 function gated(){return (cloudMode()||homeMode())&&(AUTH==='pending'||AUTH==='out');}
@@ -74,7 +74,7 @@ function vGate(){
    +'<button type="button" class="primary" data-act="login">Continuar con Google</button>'
    +(loginMsg?'<p class="msg err">'+esc(loginMsg)+'</p>':'')
    +'<p class="hint">Si abriste el link desde Instagram o Facebook y no te deja entrar, abrilo en Chrome o Safari.</p>'
-   +(homeMode()?'<p class="hint"><button type="button" class="ghost" data-act="golocal" style="padding:5px 12px;font-size:13px">Usar sin cuenta, solo en este dispositivo</button></p>':'')+'</div>';
+   +(homeMode()?'<p class="hint"><button type="button" class="sm ghost" data-act="golocal">Usar sin cuenta, solo en este dispositivo</button></p>':'')+'</div>';
 }
 function render(){
   var g=gated();
@@ -83,6 +83,7 @@ function render(){
   renderHead();
   if(g){$('#main').innerHTML=vGate();return;}
   if(homeMode()){$('#main').innerHTML=vHome();return;}
+  if(NOACCESS){document.body.classList.add('gated');$('#main').innerHTML=vNoAccess();return;}
   var canPay=cloudMode()&&AUTH==='in';
   if(tab==='pagos'&&!canPay)tab='itinerario';   /* Mis pagos se abre desde el perfil */
   $('#main').innerHTML=whoBanner()+VIEWS[tab]();

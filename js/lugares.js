@@ -33,7 +33,7 @@ function cityFieldHtml(c){
   c=cleanCity(c);
   return '<div class="fld" id="cityFld"><span>Ciudad principal del viaje</span>'
    +'<div class="cityPick"'+(c?'':' hidden')+'><b>'+(c?flagOf(c.cc)+' '+esc(cityLabel(c)):'')+'</b><button type="button" class="ghost sm" id="cityChange">Cambiar</button></div>'
-   +'<div class="citySearch"'+(c?' hidden':'')+'><input type="text" id="cityQ" placeholder="Ej: Puerto Iguazú" autocomplete="off" aria-label="Buscar ciudad"><div class="cityList" id="cityList" role="listbox"></div><small class="hint" id="cityMsg" style="margin:0">Escribí y elegí de la lista: así queda en el mapa y trae el clima.</small></div>'
+   +'<div class="citySearch"'+(c?' hidden':'')+'><input type="text" id="cityQ" placeholder="Ej: Puerto Iguazú" autocomplete="off" aria-label="Buscar ciudad"><div class="cityList" id="cityList" role="listbox"></div><small class="m0 hint" id="cityMsg">Escribí y elegí de la lista: así queda en el mapa y trae el clima.</small></div>'
    +'<input type="hidden" name="cityJson" value="'+esc(c?JSON.stringify(c):'')+'"></div>';
 }
 function bindCityField(panel){

@@ -183,7 +183,7 @@ function openPayment(id,pre){
   });
 }
 
-function warnMiss(set){var l=Array.from(set).filter(Boolean);return l.length?'<p class="warn">Falta el tipo de cambio de '+esc(l.join(', '))+'. Cargalo en Resumen para que la suma sea correcta.</p>':'';}
+function warnMiss(set){var l=Array.from(set).filter(Boolean);return l.length?'<p class="warn">Falta el tipo de cambio de '+esc(l.join(', '))+'. <button type="button" class="ghost sm" data-act="rates">Cargar tipo de cambio</button></p>':'';}
 function relTime(ts){
   var s=Math.floor((Date.now()-ts)/1000);
   if(s<60)return 'recién';
@@ -193,7 +193,7 @@ function relTime(ts){
 }
 var ratesFetchMsg='';
 async function fetchBlueUsd(type){
-  ratesFetchMsg='Actualizando cotización…';render();
+  ratesFetchMsg='Actualizando cotización…';render();if(formRefresh)formRefresh();
   try{
     var res=await fetch('https://api.bluelytics.com.ar/v2/latest');
     var j=await res.json();
@@ -204,12 +204,12 @@ async function fetchBlueUsd(type){
       ratesFetchMsg='Cotización actualizada.';
     }else ratesFetchMsg='No se pudo leer la cotización. Probá de nuevo en un rato.';
   }catch(e){ratesFetchMsg='No se pudo actualizar la cotización. Probá de nuevo en un rato.';}
-  render();
+  render();if(formRefresh)formRefresh();
 }
 async function fetchRates(codes){
   codes=codes.filter(function(c){return c!==base();});
   if(!codes.length)return;
-  ratesFetchMsg='Actualizando cotización…';render();
+  ratesFetchMsg='Actualizando cotización…';render();if(formRefresh)formRefresh();
   var ok=[],fail=[];
   for(var i=0;i<codes.length;i++){
     var c=codes[i];
@@ -222,5 +222,5 @@ async function fetchRates(codes){
   }
   if(ok.length){var rp={};ok.forEach(function(c){rp[c]=S.trip.rates[c];});S.trip.ratesUpdatedAt=Date.now();S.trip.u=nextU(S.trip.u);save();pushTrip({rates:rp,ratesUpdatedAt:S.trip.ratesUpdatedAt});}
   ratesFetchMsg=fail.length?('No se pudo actualizar la cotización de '+fail.join(' y ')+'. Probá de nuevo en un rato.'):'Cotización actualizada.';
-  render();
+  render();if(formRefresh)formRefresh();
 }

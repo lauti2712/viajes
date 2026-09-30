@@ -73,8 +73,9 @@ try{
 function save(){try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){}}
 var live=function(k){return S[k].filter(function(x){return !x.del})};
 /* eb = persona que hizo el último cambio, ct = cuándo se creó (para los avisos). */
-function upsert(k,id,data){var now=Date.now(),by=editorId(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:nextU(S[k][i].u),eb:by});}else{it=Object.assign({id:uid(),u:now,ct:now,eb:by},data);S[k].push(it);}save();pushItem(k,it);return it.id;}
-function remove(k,id){var x=S[k].find(function(y){return y.id===id});if(x){x.del=true;x.u=nextU(x.u);x.eb=editorId();save();pushItem(k,x);}}
+function upsert(k,id,data){var now=Date.now(),by=editorId(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it,prev=i>=0?S[k][i]:null;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:nextU(S[k][i].u),eb:by});}else{it=Object.assign({id:uid(),u:now,ct:now,eb:by},data);S[k].push(it);}save();pushItem(k,it);logIt(k,prev,it);return it.id;}
+function remove(k,id){var x=S[k].find(function(y){return y.id===id});if(x){var prev=Object.assign({},x);x.del=true;x.u=nextU(x.u);x.eb=editorId();save();pushItem(k,x);logIt(k,prev,x);}}
+function logIt(k,prev,it){if(typeof logChange==='function')try{logChange(k,prev,it);}catch(e){}}
 /* Preferencias de cada persona (users/{uid}/prefs/app en la nube; copia en el dispositivo). */
 var PREFS={showWeather:true};
 try{Object.assign(PREFS,JSON.parse(localStorage.getItem('viaje-de-a-dos:prefs')||'{}'));}catch(e){}

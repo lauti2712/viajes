@@ -46,7 +46,7 @@ function dueSoon(){
 function avisosCount(){return avisosList().length+dueSoon().filter(function(d){return !dueAck[d.key];}).length;}
 function openAvisos(){
   var list=avisosList(),due=dueSoon(),h='';
-  if(due.length)h+='<h3 style="margin-bottom:6px">Vencimientos de tus tarjetas</h3>'+due.map(function(d){
+  if(due.length)h+='<h class="mb6"3>Vencimientos de tus tarjetas</h3>'+due.map(function(d){
     var dd=dayDiff(pd(today()),pd(d.v));
     return '<div class="exp" role="button" tabindex="0" data-act="gopagos"><span class="ec" aria-hidden="true">💳</span><div class="et"><b>'+esc(d.m.name)+' vence '+(dd===0?'hoy':dd===1?'mañana':'el '+esc(fShort(d.v)))+'</b><small><span>Gastos de tus viajes en ese resumen</span></small></div><div class="ea"><b>'+d.total+'</b></div></div>';
   }).join('')+'<hr>';
@@ -57,7 +57,7 @@ function openAvisos(){
   var np=('Notification' in window)?Notification.permission:'na';
   h+='<hr><p class="hint">'+(np==='granted'?'Los avisos del navegador están activados: te llegan mientras la app esté abierta, aunque estés en otra pestaña.'
     :np==='denied'?'Bloqueaste los avisos del navegador para este sitio; se pueden volver a permitir desde la configuración del navegador.'
-    :np==='default'?'<button type="button" class="ghost" data-act="notifon" style="padding:6px 12px;font-size:13px">Activar avisos del navegador</button> Te avisa aunque estés en otra pestaña (con la app abierta).':'')+'</p>';
+    :np==='default'?'<button type="button" class="sm ghost" data-act="notifon">Activar avisos del navegador</button> Te avisa aunque estés en otra pestaña (con la app abierta).':'')+'</p>';
   openSheet('Avisos',h);
   markSeen(due);
 }

@@ -23,10 +23,46 @@ service cloud.firestore {
     }
 
     match /trips/{tripId} {
-      // Para entrar a un viaje hay que tener el código y haber iniciado sesión con Google.
-      // Listar todos los viajes queda solo para el admin.
-      allow get, create, update: if signedIn();
+      function tripPath() {
+        return /databases/$(database)/documents/trips/$(tripId);
+      }
+      // Miembro: entró al viaje con el link (trips/{id}/members/{uid}). Solo los miembros ven y editan el viaje.
+      function isMember() {
+        return signedIn() && exists(/databases/$(database)/documents/trips/$(tripId)/members/$(request.auth.uid));
+      }
+      // Organizador: la cuenta guardada en trip.owner. Puede sacar gente y cerrar el link.
+      function isOwner() {
+        return signedIn() && exists(tripPath()) && get(tripPath()).data.get('owner', '') == request.auth.uid;
+      }
+      function same(field, def) {
+        return request.resource.data.get(field, def) == resource.data.get(field, def);
+      }
+
+      // Listar todos los viajes queda solo para el admin (admin.html).
+      allow get: if isMember() || isAdmin();
       allow list: if isAdmin();
+      allow create: if isMember() && request.resource.data.get('owner', request.auth.uid) == request.auth.uid;
+      // owner se fija una sola vez (el que armó el viaje) y locked solo lo cambia el organizador.
+      allow update: if isMember()
+        && (same('owner', '') || (resource.data.get('owner', '') == '' && request.resource.data.owner == request.auth.uid))
+        && (same('locked', false) || isOwner());
+
+      // Entrar con el link: cada uno se anota a sí mismo, salvo que el organizador lo haya sacado
+      // o haya cerrado el viaje a gente nueva. Salir: uno mismo o el organizador.
+      match /members/{userId} {
+        allow read: if isMember() || isAdmin();
+        allow create: if signedIn() && userId == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && !exists(/databases/$(database)/documents/trips/$(tripId)/banned/$(userId))
+          && (!exists(tripPath()) || get(tripPath()).data.get('locked', false) != true);
+        allow update: if signedIn() && userId == request.auth.uid && request.resource.data.uid == request.auth.uid;
+        allow delete: if signedIn() && (userId == request.auth.uid || isOwner());
+      }
+      // Cuentas que el organizador sacó del viaje: no pueden volver a entrar con el link.
+      match /banned/{userId} {
+        allow read: if isMember() || isAdmin();
+        allow create, delete: if isOwner() && userId != request.auth.uid;
+      }
 
       function claimPath(personId) {
         return /databases/$(database)/documents/trips/$(tripId)/claims/$(personId);
@@ -38,30 +74,37 @@ service cloud.firestore {
           && get(claimPath(personId)).data.uid == request.auth.uid;
       }
 
-      // Transportes, alojamiento, gastos, planes y personas: compartidos entre quienes tengan el código.
-      // No hay delete: la app borra marcando del:true.
+      // Transportes, alojamiento, gastos, planes y personas: compartidos entre los miembros.
+      // No hay delete: la app borra marcando del:true (así queda en la papelera).
       match /items/{itemId} {
-        allow read, create, update: if signedIn();
+        allow read: if isMember() || isAdmin();
+        allow create, update: if isMember();
+      }
+      // Historial de cambios: se agrega, nunca se edita ni se borra.
+      match /log/{logId} {
+        allow read: if isMember() || isAdmin();
+        allow create: if isMember() && request.resource.data.uid == request.auth.uid;
       }
 
       // Vínculo persona del viaje -> cuenta de Google. Cada persona la puede tomar una sola cuenta.
+      // El organizador puede soltar el vínculo de alguien que sacó del viaje.
       match /claims/{personId} {
-        allow read: if signedIn();
-        allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-        allow update: if signedIn() && resource.data.uid == request.auth.uid
+        allow read: if isMember() || isAdmin();
+        allow create: if isMember() && request.resource.data.uid == request.auth.uid;
+        allow update: if isMember() && resource.data.uid == request.auth.uid
           && request.resource.data.uid == request.auth.uid;
-        allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+        allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isOwner());
       }
 
       // Mochila: cada lista la lee y edita solo su dueño. Los demás pueden crear sugerencias
       // (suggested == '1' y from == su propia persona), pero no leerlas después.
       match /packing/{itemId} {
         allow read: if signedIn() && owns(resource.data.owner);
-        allow create: if signedIn() && (
+        allow create: if isMember() && (
           owns(request.resource.data.owner)
           || (request.resource.data.get('suggested', '') == '1' && owns(request.resource.data.get('from', '')))
         );
-        allow update: if signedIn() && owns(resource.data.owner)
+        allow update: if isMember() && owns(resource.data.owner)
           && request.resource.data.owner == resource.data.owner;
       }
     }

@@ -4,10 +4,13 @@ service firebase.storage {
     match /trips/{tripId}/{allPaths=**} {
       // Los links de descarga que guarda la app (con token) siguen funcionando para abrir archivos.
       allow read: if request.auth != null;
+      // Subir y borrar archivos: solo los miembros del viaje.
       allow create, update: if request.auth != null
+        && firestore.exists(/databases/(default)/documents/trips/$(tripId)/members/$(request.auth.uid))
         && request.resource.size < 20 * 1024 * 1024
         && request.resource.contentType.matches('image/.*|application/pdf');
-      allow delete: if request.auth != null;
+      allow delete: if request.auth != null
+        && firestore.exists(/databases/(default)/documents/trips/$(tripId)/members/$(request.auth.uid));
     }
   }
 }

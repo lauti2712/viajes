@@ -22,6 +22,10 @@ function upcoming(){
   return ev.sort(function(a,b){return a.k.localeCompare(b.k)}).slice(0,4);
 }
 
+function openRates(){
+  var panel=openSheet('Tipos de cambio','<div id="ratesl">'+(ratesSectionHtml()||'<p class="nada">Todo está en '+esc(base())+': no hace falta ningún tipo de cambio.</p>')+'</div>');
+  formRefresh=function(){var w=$('#ratesl',panel);if(w)w.innerHTML=ratesSectionHtml();};
+}
 function ratesSectionHtml(){
   var cs=costs();
   var curs=Array.from(new Set(cs.map(function(c){return c.cur}))).filter(function(c){return c!==base()});
@@ -29,9 +33,9 @@ function ratesSectionHtml(){
   if(!curs.length)return '';
   var isArs=base()==='ARS';
   var updBtns=isArs
-   ?('<div class="row" style="gap:6px"><button type="button" class="ghost'+(S.trip.dollarType==='blue'?' active':'')+'" data-act="fetchusd" data-type="blue" style="padding:6px 10px;font-size:13px">💵 Blue</button><button type="button" class="ghost'+(S.trip.dollarType==='oficial'?' active':'')+'" data-act="fetchusd" data-type="oficial" style="padding:6px 10px;font-size:13px">💵 Oficial</button><button type="button" class="ghost" data-act="fetchrates" data-codes="BRL" style="padding:6px 10px;font-size:13px">🔄 Real</button></div>')
-   :('<button type="button" class="ghost" data-act="fetchrates" data-codes="USD,BRL" style="padding:6px 12px;font-size:13px">🔄 Actualizar cotización</button>');
-  return '<section class="sec"><div class="bar" style="margin-bottom:6px"><h2>Tipos de cambio</h2>'+updBtns+'</div><p class="sub">Cuánto vale 1 unidad de cada moneda en '+esc(base())+'. Con esto se suma todo junto.'+(S.trip.ratesUpdatedAt?(isArs?' Dólar ('+(S.trip.dollarType==='blue'?'blue':'oficial')+') y real':' Dólar y real')+' se actualizaron '+relTime(S.trip.ratesUpdatedAt)+'.':'')+'</p>'
+   ?('<div class="g6 row"><button type="button" class="sm ghost'+(S.trip.dollarType==='blue'?' active':'')+'" data-act="fetchusd" data-type="blue">💵 Blue</button><button type="button" class="sm ghost'+(S.trip.dollarType==='oficial'?' active':'')+'" data-act="fetchusd" data-type="oficial">💵 Oficial</button><button type="button" class="sm ghost" data-act="fetchrates" data-codes="BRL">🔄 Real</button></div>')
+   :('<button type="button" class="sm ghost" data-act="fetchrates" data-codes="USD,BRL">🔄 Actualizar cotización</button>');
+  return '<section class="sec"><div class="mb6 bar"><h2>Tipos de cambio</h2>'+updBtns+'</div><p class="sub">Cuánto vale 1 unidad de cada moneda en '+esc(base())+'. Con esto se suma todo junto.'+(S.trip.ratesUpdatedAt?(isArs?' Dólar ('+(S.trip.dollarType==='blue'?'blue':'oficial')+') y real':' Dólar y real')+' se actualizaron '+relTime(S.trip.ratesUpdatedAt)+'.':'')+'</p>'
    +(ratesFetchMsg?'<p class="msg'+(ratesFetchMsg.indexOf('No se pudo')===0?' err':'')+'">'+esc(ratesFetchMsg)+'</p>':'')
    +'<div class="rates">'+curs.map(function(c){var v=S.trip.rates[c];return '<label class="rate'+(v>0?'':' miss')+'"><span>1 '+esc(c)+' =</span><input type="number" step="any" min="0" inputmode="decimal" data-rate="'+esc(c)+'" value="'+(v>0?v:'')+'" placeholder="0"><span>'+esc(base())+'</span></label>'}).join('')+'</div></section>';
 }
@@ -97,7 +101,7 @@ function vAlojamiento(){
   return h+totLine(costs().filter(function(c){return c.src==='lodging'}))+L.map(function(l){
     var n=(l.in&&l.out)?dayDiff(pd(l.in),pd(l.out)):0;
     return '<div class="stay" role="button" tabindex="0" data-act="edit" data-k="lodging" data-id="'+l.id+'"><div class="nm">'+esc(l.name||'Alojamiento')+(safeUrl(l.airbnb)?' <a class="abnb" href="'+esc(safeUrl(l.airbnb))+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Airbnb ↗</a>':'')+'</div>'
-     +(l.address?'<div class="sub" style="margin:2px 0 0">'+esc(l.address)+'</div>':'')
+     +(l.address?'<div class="mt2 sub">'+esc(l.address)+'</div>':'')
      +'<div class="dates"><span>Entrada <b>'+(l.in?esc(fShort(l.in)):'—')+'</b></span><span>Salida <b>'+(l.out?esc(fShort(l.out)):'—')+'</b></span>'+(n>0?'<span><b>'+n+(n===1?' noche':' noches')+'</b></span>':'')+attLinkChips(l)+'</div>'
      +(l.ref?'<div class="meta"><span class="ref">Reserva '+esc(l.ref)+'</span></div>':'')
      +(l.notes?'<p class="note">'+esc(l.notes)+'</p>':'')+guestsLine(l)+costBlock(l)+'</div>';
@@ -135,25 +139,26 @@ function vGastos(){
   });
   var keys=Object.keys(g).sort().reverse();
   var h='<div class="bar"><h2>Gastos</h2><button class="primary" data-act="add" data-k="expenses">+ Anotar gasto</button></div>';
-  if(ppl.length>1)h+='<div class="whopick" style="margin:0 0 14px;gap:6px"><button type="button" class="ghost'+(!who?' active':'')+'" data-act="gwho" data-who="" style="padding:5px 12px;font-size:14px">Todos</button>'
-    +ppl.map(function(p){return '<button type="button" class="ghost'+(who===p.id?' active':'')+'" data-act="gwho" data-who="'+esc(p.id)+'" style="padding:5px 12px;font-size:14px">'+dot(p.id)+esc(p.name)+'</button>';}).join('')+'</div>';
-  h+=balanceHtml(who);
-  if(who&&!keys.length)return h+empty('No hay gastos de '+esc(nameOf(who)),'Ningún gasto cargado lo pagó '+esc(nameOf(who))+' ni le toca una parte.')+paymentsHtml(who)+ratesSectionHtml();
-  if(!keys.length)return h+empty('Todavía no anotaron gastos','Cuando estén de viaje, anotá cada gasto: qué fue, cuánto, quién pagó y cómo. Acá se agrupan por día, y también suman los transportes y el alojamiento que cargaste con costo.')+ratesSectionHtml();
+  var bal=balanceHtml(who);
+  if(bal)h+='<section class="cuentas"><h3>'+(who?'Las cuentas de '+esc(nameOf(who)):'Quién le debe a quién')+'</h3>'+bal+'</section>';
+  if(ppl.length>1)h+='<div class="whopick gwho"><span class="lbl">Ver gastos de</span><button type="button" class="ghost sm'+(!who?' active':'')+'" data-act="gwho" data-who="">Todos</button>'
+    +ppl.map(function(p){return '<button type="button" class="ghost sm'+(who===p.id?' active':'')+'" data-act="gwho" data-who="'+esc(p.id)+'">'+dot(p.id)+esc(p.name)+'</button>';}).join('')+'</div>';
+  if(who&&!keys.length)return h+empty('No hay gastos de '+esc(nameOf(who)),'Ningún gasto cargado lo pagó '+esc(nameOf(who))+' ni le toca una parte.')+paymentsHtml(who);
+  if(!keys.length)return h+empty('Todavía no anotaron gastos','Cuando estén de viaje, anotá cada gasto: qué fue, cuánto, quién pagó y cómo. Acá se agrupan por día, y también suman los transportes y el alojamiento que cargaste con costo.');
   var allEntries=[].concat.apply([],keys.map(function(k){return g[k]}));
   var all=sumBase(allEntries.map(function(x){return {amount:x.amount,cur:x.cur}}).filter(function(c){return c.amount>0}));
   var nd=keys.filter(function(k){return k!=='0'}).length,dl=parseFloat(S.trip.daily)||0;
   if(who){
     var paid=sumBase(costs().filter(function(c){return c.status==='pagado'&&c.paidBy===who;})).t,net=settleUp().net[who]||0;
-    h+='<dl class="stats" style="margin-top:12px"><div><dt>Le toca en total</dt><dd>'+money(all.t)+'</dd></div><div><dt>Pagó</dt><dd>'+money(paid)+'</dd></div><div><dt>'+(net>0.5?'Le deben':net<-0.5?'Debe':'Saldo')+'</dt><dd>'+money(Math.abs(net))+'</dd></div></dl>'+(all.miss.size?warnMiss(all.miss):'')+'<div style="height:14px"></div>';
+    h+='<dl class="mt12 stats"><div><dt>Le toca en total</dt><dd>'+money(all.t)+'</dd></div><div><dt>Pagó</dt><dd>'+money(paid)+'</dd></div><div><dt>'+(net>0.5?'Le deben':net<-0.5?'Debe':'Saldo')+'</dt><dd>'+money(Math.abs(net))+'</dd></div></dl>'+(all.miss.size?warnMiss(all.miss):'')+'<div class="sp14"></div>';
   }else
-  h+='<dl class="stats" style="margin-top:12px"><div><dt>Gastos anotados</dt><dd>'+money(all.t)+'</dd></div>'+(nd?'<div><dt>Promedio por día</dt><dd>'+money(all.t/nd)+'</dd></div>':'')+(dl>0?'<div><dt>Presupuesto diario</dt><dd>'+money(dl)+'</dd></div>':'')+'</dl>'+(all.miss.size?warnMiss(all.miss):'')+'<div style="height:14px"></div>';
+  h+='<dl class="mt12 stats"><div><dt>Gastos anotados</dt><dd>'+money(all.t)+'</dd></div>'+(nd?'<div><dt>Promedio por día</dt><dd>'+money(all.t/nd)+'</dd></div>':'')+(dl>0?'<div><dt>Presupuesto diario</dt><dd>'+money(dl)+'</dd></div>':'')+'</dl>'+(all.miss.size&&!bal?warnMiss(all.miss):'')+'<div class="sp14"></div>';
   h+=keys.map(function(k){
     var items=g[k].slice().sort(function(a,b){return (b.u||0)-(a.u||0)});
     var s=sumBase(items.map(function(x){return {amount:x.amount,cur:x.cur}})),over=dl>0&&s.t>dl;
     return '<section class="day"><div class="dh"><h3>'+(k==='0'?'Sin fecha':esc(fLong(k)))+'</h3><b class="'+(over?'over':'')+'">'+money(s.t)+'</b></div>'+(dl>0?'<div class="prog"><span class="'+(over?'over':'')+'" style="width:'+Math.min(100,s.t/dl*100)+'%"></span></div>':'')+items.map(function(x){return x.row}).join('')+'</section>';
   }).join('');
-  h+=paymentsHtml(who)+ratesSectionHtml();
+  h+=paymentsHtml(who);
   return h;
 }
 
@@ -192,13 +197,40 @@ function paxRows(d){
     return {k:tm(x[r.end])||(dep?'00:00':'00:01'),h:autoRow(ty[0],tm(x[r.end]),title,[who,dep||car?sub:''].filter(Boolean).join(' · '))};
   });
 }
+/* Tarjeta "Hoy" (solo durante el viaje): lo próximo que sale, dónde duermen esta noche, el plan que
+   sigue y el clima. Prioriza lo de uno (pasajes donde viaja, alojamiento donde se queda). */
+function hoyHtml(wxOn){
+  var t=today(),s=S.trip.start,e=S.trip.end||s;
+  if(!s||t<s||t>e)return '';
+  var me=myPersonId(),d=new Date(),hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),now=t+'T'+hm;
+  var tmw=iso(new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)),rows=[];
+  var row=function(ic,lbl,main,sub){return '<div class="hrow"><span class="hic" aria-hidden="true">'+ic+'</span><div><small>'+esc(lbl)+'</small><b>'+esc(main)+'</b>'+(sub?'<span>'+esc(sub)+'</span>':'')+'</div></div>';};
+  var when=function(dt){var dd=dt.slice(0,10);return (dd===t?'hoy':dd===tmw?'mañana':fShort(dd))+(tm(dt)?' a las '+tm(dt):'');};
+  var mineOr=function(list,f){var m=me?list.filter(function(x){return idsOf(x[f]).indexOf(me)>=0;}):[];return m.length?m:list;};
+  /* Plan que sigue hoy */
+  var P=live('plans').filter(function(p){return p.date===t;}).sort(function(a,b){return (a.time||'99').localeCompare(b.time||'99');});
+  var up=P.filter(function(p){return !p.time||p.time>=hm;});
+  if(up.length){var p0=up[0];rows.push(row((ITYPES[p0.type]||ITYPES.otro)[0],p0.time?'Hoy a las '+p0.time:'Hoy',p0.title||'Plan',[p0.place,up.length>1?'y '+(up.length-1)+' más hoy':''].filter(Boolean).join(' · ')));}
+  else if(P.length)rows.push(row('✅','Hoy','Ya pasaron los planes de hoy',''));
+  /* Próximo transporte */
+  var T=live('transports').filter(function(x){return x.dep&&x.dep>=now;}).sort(function(a,b){return a.dep.localeCompare(b.dep);});
+  var nx=mineOr(T.filter(function(x){return !x.riders||idsOf(x.riders).length;}),'riders')[0];
+  if(nx){var ty=TYPES[nx.type]||TYPES.otro,car=nx.type==='auto',pax=paxNames(nx.riders);
+    rows.push(row(ty[0],'Próximo, '+when(nx.dep),car?'Retiro del auto en '+(nx.from||'?'):(nx.from||'?')+' → '+(nx.to||'?'),[nx.company,pax.length?(car?'Van ':'Viajan ')+joinNames(pax):''].filter(Boolean).join(' · ')));}
+  /* Dónde duermen esta noche */
+  var L=mineOr(live('lodging').filter(function(l){return l.in&&l.out&&l.in<=t&&t<l.out;}),'guests');
+  L.forEach(function(l){rows.push(row('🛏️','Esta noche',l.name||'Alojamiento',[l.address,l.out===tmw?'Check-out mañana':''].filter(Boolean).join(' · ')));});
+  var dn=dayDiff(pd(s),pd(t))+1,tot=dayDiff(pd(s),pd(e))+1;
+  return '<section class="hoy"><div class="hh"><b>Hoy</b><span>Día '+dn+' de '+tot+'</span>'+(wxOn?wxChip(t):'')+'</div>'
+   +(rows.length?rows.join(''):'<p class="nada">Nada cargado para hoy. Día libre.</p>')+'</section>';
+}
 /* El itinerario arranca en hoy: los días que ya pasaron se ven con "Ver días anteriores". */
 var itinPast=false;
 function vItinerario(){
   var days=daysList(),t=today(),s=pd(S.trip.start);
   var wxOn=PREFS.showWeather!==false;
   if(wxOn)loadWeather();
-  var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>'+(wxOn?wxSummary():(wxRange()?'<button type="button" class="ghost wxon" data-act="wxon">🌤️ Mostrar clima</button>':''));
+  var h='<div class="bar"><h2>Itinerario</h2><button class="primary" data-act="add" data-k="plans">+ Agregar plan</button></div>'+hoyHtml(wxOn)+(wxOn?wxSummary():(wxRange()?'<button type="button" class="ghost wxon" data-act="wxon">🌤️ Mostrar clima</button>':''));
   if(!days.length)return h+empty('Todavía no hay días armados','Poné las fechas del viaje en Ajustes, o agregá un plan con su fecha. Los transportes y el alojamiento aparecen solos en su día.');
   var past=days.filter(function(d){return d<t;}).length;
   if(past===days.length)past=0;   /* viaje terminado: se ve completo */
@@ -265,7 +297,7 @@ function pickerHtml(people){
   var sugName=cloud&&ME.name&&!people.some(function(p){return p.name.trim().toLowerCase()===ME.name.trim().toLowerCase();})?ME.name:'';
   h+='<form class="pkadd addperson"><input type="text" data-persontext placeholder="Tu nombre, si no está en la lista" value="'+esc(sugName)+'" autocomplete="off" required><button type="submit" class="ghost">+ Agregarme</button></form>';
   if(claimMsg)h+='<p class="msg err">'+esc(claimMsg)+'</p>';
-  if(!cloud)h+='<p class="hint" style="margin-top:14px">Ojo: es solo una preferencia de este dispositivo, no una contraseña. Cualquiera que use este celular puede tocar "cambiar" y ver otra lista.</p>';
+  if(!cloud)h+='<p class="mt14 hint">Ojo: es solo una preferencia de este dispositivo, no una contraseña. Cualquiera que use este celular puede tocar "cambiar" y ver otra lista.</p>';
   return h;
 }
 function vMochila(){
@@ -281,7 +313,7 @@ function vMochila(){
      +'<button type="submit" class="ghost">Sugerir</button></form>'
      +(packSuggestMsg?'<p class="msg">'+esc(packSuggestMsg)+'</p>':'')+'</div>';
   }
-  return '<div class="bar"><h2>Mi mochila</h2><button type="button" class="ghost" data-act="whoswitch" style="padding:6px 12px;font-size:13px">Sos '+esc(me.name)+' · cambiar</button></div>'
+  return '<div class="bar"><h2>Mi mochila</h2><button type="button" class="sm ghost" data-act="whoswitch">Sos '+esc(me.name)+' · cambiar</button></div>'
    +'<p class="sub">'+(cloudMode()?'Esta lista es solo tuya: está vinculada a tu cuenta de Google y nadie más la puede ver.':'Esta lista es solo tuya: los demás no la ven.')+(others.length?' Podés sugerirles algo a los demás sin ver lo que tienen en la suya.':'')+'</p>'
    +myPackList(who)+sug;
 }

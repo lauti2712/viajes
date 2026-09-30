@@ -22,7 +22,8 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await setDoc(doc(db, 'trips', T), { name: 'Prueba', setup: true, u: 1 });
+    await setDoc(doc(db, 'trips', T), { name: 'Prueba', setup: true, u: 1, owner: 'ana' });
+    for (const u of ['ana', 'beto']) await setDoc(doc(db, 'trips', T, 'members', u), { uid: u, name: u });
     await setDoc(doc(db, 'trips', T, 'items', 'g1'), { k: 'expenses', id: 'g1', amount: 100, u: 1 });
     await setDoc(doc(db, 'trips', T, 'claims', 'pa'), { uid: 'ana', name: 'Ana' });
     await setDoc(doc(db, 'trips', T, 'claims', 'pb'), { uid: 'beto', name: 'Beto' });
@@ -45,6 +46,55 @@ test('sin sesión no se lee ni se escribe nada', async () => {
 test('solo el admin lista todos los viajes', async () => {
   await assertFails(getDocs(collection(as('ana', 'ana@x.com'), 'trips')));
   await assertSucceeds(getDocs(collection(as('admin', ADMIN), 'trips')));
+});
+
+test('solo los miembros ven el viaje; entrar con el link te suma', async () => {
+  const carla = as('carla');
+  await assertFails(getDoc(doc(carla, 'trips', T)));
+  await assertFails(getDocs(collection(carla, 'trips', T, 'items')));
+  await assertFails(setDoc(doc(carla, 'trips', T, 'items', 'x1'), { k: 'expenses', id: 'x1' }));
+  await assertFails(setDoc(doc(carla, 'trips', T, 'members', 'beto'), { uid: 'beto' }));   // no se anota a otro
+  await assertSucceeds(setDoc(doc(carla, 'trips', T, 'members', 'carla'), { uid: 'carla', name: 'Carla' }));
+  await assertSucceeds(getDoc(doc(carla, 'trips', T)));
+  await assertSucceeds(getDocs(collection(carla, 'trips', T, 'items')));
+});
+
+test('viaje nuevo: el que lo crea queda de organizador', async () => {
+  const dani = as('dani'), N = 'viajenuevo0000001';
+  await assertFails(setDoc(doc(dani, 'trips', N), { name: 'x', owner: 'dani' }));   // primero se anota
+  await assertSucceeds(setDoc(doc(dani, 'trips', N, 'members', 'dani'), { uid: 'dani' }));
+  await assertFails(setDoc(doc(dani, 'trips', N), { name: 'x', owner: 'otro' }));
+  await assertSucceeds(setDoc(doc(dani, 'trips', N), { name: 'x', owner: 'dani' }));
+});
+
+test('el organizador saca a alguien y no puede volver a entrar', async () => {
+  const ana = as('ana'), beto = as('beto');
+  await assertFails(setDoc(doc(beto, 'trips', T, 'banned', 'ana'), { uid: 'ana' }));        // solo el organizador
+  await assertFails(deleteDoc(doc(beto, 'trips', T, 'members', 'ana')));
+  await assertSucceeds(setDoc(doc(ana, 'trips', T, 'banned', 'beto'), { uid: 'beto' }));
+  await assertSucceeds(deleteDoc(doc(ana, 'trips', T, 'members', 'beto')));
+  await assertSucceeds(deleteDoc(doc(ana, 'trips', T, 'claims', 'pb')));
+  await assertFails(getDoc(doc(beto, 'trips', T)));
+  await assertFails(setDoc(doc(beto, 'trips', T, 'members', 'beto'), { uid: 'beto' }));
+  await assertSucceeds(deleteDoc(doc(ana, 'trips', T, 'banned', 'beto')));                // volver a permitir
+  await assertSucceeds(setDoc(doc(beto, 'trips', T, 'members', 'beto'), { uid: 'beto' }));
+});
+
+test('viaje cerrado: nadie nuevo entra con el link; solo el organizador lo cierra', async () => {
+  await assertFails(updateDoc(doc(as('beto'), 'trips', T), { locked: true }));
+  await assertFails(updateDoc(doc(as('beto'), 'trips', T), { owner: 'beto' }));
+  await assertSucceeds(updateDoc(doc(as('beto'), 'trips', T), { name: 'Otro nombre' }));
+  await assertSucceeds(updateDoc(doc(as('ana'), 'trips', T), { locked: true }));
+  await assertFails(setDoc(doc(as('carla'), 'trips', T, 'members', 'carla'), { uid: 'carla' }));
+});
+
+test('historial: los miembros agregan, nadie edita ni borra', async () => {
+  const beto = as('beto');
+  await assertSucceeds(setDoc(doc(beto, 'trips', T, 'log', 'l1'), { uid: 'beto', k: 'expenses', id: 'g1' }));
+  await assertFails(setDoc(doc(beto, 'trips', T, 'log', 'l2'), { uid: 'ana' }));
+  await assertFails(updateDoc(doc(beto, 'trips', T, 'log', 'l1'), { k: 'x' }));
+  await assertFails(deleteDoc(doc(beto, 'trips', T, 'log', 'l1')));
+  await assertFails(getDocs(collection(as('carla'), 'trips', T, 'log')));
 });
 
 test('con sesión y código se usa el viaje, pero no se borra nada', async () => {
@@ -74,6 +124,8 @@ test('nadie toma ni suelta el vínculo de otro', async () => {
   await assertFails(setDoc(doc(beto, 'trips', T, 'claims', 'pa'), { uid: 'beto' }));
   await assertFails(deleteDoc(doc(beto, 'trips', T, 'claims', 'pa')));
   await assertSucceeds(updateDoc(doc(beto, 'trips', T, 'claims', 'pb'), { cobro: [{ n: 'MP', a: 'beto.mp' }] }));
+  await assertFails(setDoc(doc(as('carla'), 'trips', T, 'claims', 'pc'), { uid: 'carla', name: 'Carla' }));   // todavía no entró
+  await setDoc(doc(as('carla'), 'trips', T, 'members', 'carla'), { uid: 'carla' });
   await assertSucceeds(setDoc(doc(as('carla'), 'trips', T, 'claims', 'pc'), { uid: 'carla', name: 'Carla' }));
 });
 
@@ -95,5 +147,6 @@ test('storage: con sesión, solo imágenes/PDF', async () => {
   await assertSucceeds(uploadBytes(img, new Uint8Array([1, 2, 3]), { contentType: 'image/png' }));
   await assertFails(uploadBytes(ref(st, `trips/${T}/expenses/g1/x.html`), new Uint8Array([1]), { contentType: 'text/html' }));
   await assertFails(uploadBytes(ref(env.unauthenticatedContext().storage(), `trips/${T}/a.png`), new Uint8Array([1]), { contentType: 'image/png' }));
+  await assertFails(uploadBytes(ref(env.authenticatedContext('carla').storage(), `trips/${T}/b.png`), new Uint8Array([1]), { contentType: 'image/png' }));
   await assertSucceeds(deleteObject(img));
 });
