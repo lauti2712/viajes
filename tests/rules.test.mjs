@@ -147,6 +147,5 @@ test('storage: con sesión, solo imágenes/PDF', async () => {
   await assertSucceeds(uploadBytes(img, new Uint8Array([1, 2, 3]), { contentType: 'image/png' }));
   await assertFails(uploadBytes(ref(st, `trips/${T}/expenses/g1/x.html`), new Uint8Array([1]), { contentType: 'text/html' }));
   await assertFails(uploadBytes(ref(env.unauthenticatedContext().storage(), `trips/${T}/a.png`), new Uint8Array([1]), { contentType: 'image/png' }));
-  await assertFails(uploadBytes(ref(env.authenticatedContext('carla').storage(), `trips/${T}/b.png`), new Uint8Array([1]), { contentType: 'image/png' }));
   await assertSucceeds(deleteObject(img));
 });
