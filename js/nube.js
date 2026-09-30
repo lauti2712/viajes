@@ -302,7 +302,8 @@ function listen(){
 function listenPrefs(){
   FB.fs.onSnapshot(FB.fs.doc(FB.db,'users',ME.uid,'prefs','app'),function(snap){
     if(!snap.exists())return;var d=snap.data()||{};
-    if(typeof d.showWeather==='boolean'&&d.showWeather!==PREFS.showWeather){PREFS.showWeather=d.showWeather;try{localStorage.setItem('viaje-de-a-dos:prefs',JSON.stringify(PREFS));}catch(e){}render();}
+    var ch=false;['showWeather','wxShort'].forEach(function(k){if(typeof d[k]==='boolean'&&d[k]!==!!PREFS[k]){PREFS[k]=d[k];ch=true;}});
+    if(ch){try{localStorage.setItem('viaje-de-a-dos:prefs',JSON.stringify(PREFS));}catch(e){}render();}
   },function(){});
 }
 /* Se escucha siempre (también en la pantalla de inicio), no solo dentro de un viaje. */

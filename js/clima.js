@@ -64,10 +64,14 @@ function wxChip(date){
 function wxSummary(){
   var r=wxRange();if(!r)return '';
   var ds=Object.keys(WX.days);
-  var head='<div class="wxbox"><button type="button" class="ghost sm wxoff" data-act="wxoff" title="Podés volver a mostrarlo con «Mostrar clima»">Ocultar</button><b>'+flagOf(r.c.cc)+' '+esc(r.c.name)+'</b>';
-  if(WX.state==='loading')return head+' <span class="m0 hint">Buscando el clima…</span></div>';
-  if(!ds.length)return head+'</div>';
+  /* "Leer menos" esconde el texto del resumen; el clima de cada día sigue en el itinerario. */
+  var less=!!PREFS.wxShort,
+      off='<button type="button" class="ghost sm" data-act="wxoff" title="Podés volver a mostrarlo con «Mostrar clima»">Ocultar</button>',
+      head=function(tog){return '<div class="wxbox"><span class="wxbtns">'+(tog?'<button type="button" class="ghost sm" data-act="wxless">'+(less?'Leer más':'Leer menos')+'</button>':'')+off+'</span><b>'+flagOf(r.c.cc)+' '+esc(r.c.name)+'</b>';};
+  if(WX.state==='loading')return head(false)+' <span class="m0 hint">Buscando el clima…</span></div>';
+  if(!ds.length)return head(false)+'</div>';
+  if(less)return head(true)+'</div>';
   var mx=Math.round(ds.reduce(function(t,d){return t+WX.days[d].max;},0)/ds.length),mn=Math.round(ds.reduce(function(t,d){return t+WX.days[d].min;},0)/ds.length);
   var txt=WX.kind==='fc'?'Pronóstico: máximas de '+mx+'° y mínimas de '+mn+'° en promedio.':WX.kind==='typ'?'Clima típico para esas fechas: máximas de ~'+mx+'° y mínimas de ~'+mn+'°. Cuando falten 16 días aparece el pronóstico.':'Hizo máximas de '+mx+'° y mínimas de '+mn+'° en promedio.';
-  return head+' <span class="m0 hint">'+txt+'</span></div>';
+  return head(true)+' <span class="m0 hint">'+txt+'</span></div>';
 }
