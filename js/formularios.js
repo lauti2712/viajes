@@ -53,7 +53,7 @@ function costF(){
     {k:'method',l:'Cómo se pagó',t:'text',list:'methods',ph:'Efectivo, Visa 3 cuotas, transferencia…'},
     {k:'cuotas',l:'Cuotas',t:'number',half:true,ph:'1'},
     {k:'payDate',l:'Fecha de la compra',t:'date',half:true},
-    {k:'split',l:'Para quién es',t:'select',opts:[['equal','Todos, a partes iguales'],['some','Algunos, a partes iguales'],['amounts','Por montos']]},
+    {k:'split',l:'Para quién es',t:'select',opts:[['equal','Todos, a partes iguales'],['self','Para mí (gasto propio, no se reparte)'],['some','Algunos, a partes iguales'],['amounts','Por montos']]},
     {k:'_splitbox',t:'html',html:'<div class="fld" id="splitBox"></div>'}
   ]);
 }
@@ -90,6 +90,7 @@ function normalizeCost(d,ex){
 }
 function splitProblem(d){
   var amt=parseFloat(d.amount)||0,keys=Object.keys(d);
+  if(d.split==='self'&&!d.paidBy)return 'Para un gasto propio, elegí quién lo pagó.';
   if(d.split==='some'&&!keys.some(function(k){return k.indexOf('sw_')===0;}))return 'Tildá al menos a una persona.';
   if(d.split==='amounts'){
     var sum=keys.filter(function(k){return k.indexOf('sh_')===0;}).reduce(function(t,k){return t+(parseFloat(d[k])||0);},0);
@@ -193,7 +194,7 @@ function openItem(k,id,pre){
   var sp=SPECS[k](),ex=id?S[k].find(function(x){return x.id===id}):null;
   var vals=Object.assign({},ex||Object.assign({},DEFAULTS[k](),pre||{}));
   /* Gastos viejos "solo de X": se muestran como "algunos" con esa sola persona. */
-  if(vals.split&&['equal','some','amounts','guests','riders'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
+  if(vals.split&&['equal','self','some','amounts','guests','riders'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
   if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
@@ -262,6 +263,10 @@ function openItem(k,id,pre){
       var gn=Array.prototype.filter.call(f.querySelectorAll('[name^=g_]'),function(c){return c.checked;}).map(function(c){return nameOf(c.name.slice(2));});
       h='<p class="m0 hint">'+(gn.length?'Se divide entre los que se quedan acá: '+esc(gn.join(', '))+'.':'Todavía no marcaste quiénes se quedan: se divide entre todos.')+' Si alguien se suma o se va del alojamiento, se actualiza solo.</p>';
     }
+    else if(mode==='self'){
+      var pb=el('paidBy')&&el('paidBy').value;
+      h='<p class="m0 hint">'+(pb&&nameOf(pb)?'Es un gasto propio de '+esc(nameOf(pb))+': queda anotado, pero no se reparte ni le suma deudas a nadie.':'Elegí quién pagó: el gasto queda solo para esa persona.')+'</p>';
+    }
     else if(mode==='equal'){
       var fixed=ex&&(ex.split||'equal')==='equal'&&ex.splitWith?splitIds(ex).map(nameOf).filter(Boolean):null;
       h='<p class="m0 hint">'+(fixed?'Se divide entre '+esc(fixed.join(', '))+' (los que estaban cuando se cargó). Para sumar o sacar a alguien, elegí "Algunos".'
@@ -276,7 +281,7 @@ function openItem(k,id,pre){
       h='<div class="rates">'+ppl.map(function(p){return '<label class="rate"><span style="min-width:90px">'+dot(p.id)+esc(p.name)+'</span><input type="number" step="any" min="0" inputmode="decimal" name="sh_'+esc(p.id)+'" value="'+esc(st.amt[p.id]||'')+'" placeholder="0"></label>';}).join('')+'</div>'
        +'<p class="mt8 hint">Al escribir el monto de alguien, lo que falta se reparte en partes iguales entre los que siguen. <span id="shsum"></span></p>';
     }
-    box.innerHTML=(mode!=='guests'&&mode!=='riders'?groupChipsHtml():'')+h;
+    box.innerHTML=(mode!=='guests'&&mode!=='riders'&&mode!=='self'?groupChipsHtml():'')+h;
     if(mode==='amounts'&&lastEdited<0)spread(-1);
     updSum();
   }
@@ -413,7 +418,7 @@ function openItem(k,id,pre){
       fi.value='';
       return;
     }
-    if(e.target.name==='split'){drawSplit();$('#formmsg',panel).textContent='';return;}
+    if(e.target.name==='split'){if(e.target.value==='self'&&el('paidBy')&&!el('paidBy').value&&myPersonId()){el('paidBy').value=myPersonId();syncPay();}drawSplit();$('#formmsg',panel).textContent='';return;}
     if(e.target.name==='type'||e.target.name==='same'){
       /* al elegir "Alquiler de auto", el costo pasa a repartirse entre los que van en el auto */
       if(e.target.name==='type'&&e.target.value==='auto'&&el('split').value==='equal'&&!ex){el('split').value='riders';var me0=myPersonId(),c0=me0&&f.querySelector('[name=rd_'+me0+']');if(c0)c0.checked=true;drawSplit();}
@@ -432,6 +437,7 @@ function openItem(k,id,pre){
         drawSplit();
       }
       sel.dataset.prevValue=sel.value;
+      if(el('split').value==='self')drawSplit();
       syncPay();
     }
   });

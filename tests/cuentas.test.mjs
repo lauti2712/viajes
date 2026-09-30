@@ -76,6 +76,15 @@ test('un pasajero que ya no está en el viaje no se lleva parte', () => {
   assert.deepEqual(net(c), { ana: 45, beto: -45, caro: 0 });
 });
 
+test('para mí: gasto propio, no genera deudas', () => {
+  const c = app(P3, (c) => {
+    c.add('expenses', gasto({ amount: 5000, paidBy: 'beto', split: 'self' }));
+    c.add('expenses', gasto({ amount: 300, paidBy: 'ana' }));
+  });
+  assert.deepEqual(net(c), { ana: 200, beto: -100, caro: -100 });
+  assert.equal(c.splitLabel(c.S.expenses[0]), 'Gasto propio de Beto');
+});
+
 test('gasto viejo "solo de X"', () => {
   const c = app(P3, (c) => c.add('expenses', gasto({ amount: 50, paidBy: 'ana', split: 'beto' })));
   assert.deepEqual(net(c), { ana: 50, beto: -50, caro: 0 });

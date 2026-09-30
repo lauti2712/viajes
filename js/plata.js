@@ -46,6 +46,8 @@ function shareMap(c,b){
     var sh=(c.shares||[]).filter(function(x){return (parseFloat(x.a)||0)>0;}),tot=sh.reduce(function(t,x){return t+parseFloat(x.a);},0);
     if(tot>0){sh.forEach(function(x){out[x.p]=(out[x.p]||0)+b*parseFloat(x.a)/tot;});return out;}
   }
+  /* 'self': gasto propio de quien lo pagó; no se reparte ni genera deudas. */
+  if(sp==='self'){if(c.paidBy)out[c.paidBy]=b;return out;}
   /* 'guests': un alojamiento repartido entre los que se quedan ahí (si no marcó nadie, entre todos). */
   if(sp==='riders'){var rs=String(c.riders||'').split(',').filter(function(id){return ids.indexOf(id)>=0;});var rw=rs.length?rs:ids;rw.forEach(function(id){out[id]=b/rw.length;});return out;}
   if(sp==='guests'){var gs=String(c.guests||'').split(',').filter(function(id){return ids.indexOf(id)>=0;});var gw=gs.length?gs:ids;gw.forEach(function(id){out[id]=b/gw.length;});return out;}
@@ -61,6 +63,7 @@ function splitLabel(x){
     return ids.length&&all.some(function(id){return ids.indexOf(id)<0;})?'Entre '+ids.map(nameOf).filter(Boolean).join(', '):'';
   }
   if(sp==='amounts')return 'Por montos';
+  if(sp==='self')return 'Gasto propio'+(nameOf(x.paidBy)?' de '+nameOf(x.paidBy):'');
   if(sp==='riders'){var rr=String(x.riders||'').split(',').filter(Boolean).map(nameOf).filter(Boolean);return rr.length?'Entre los que van: '+rr.join(', '):'Entre todos (sin pasajeros marcados)';}
   if(sp==='guests'){var g=String(x.guests||'').split(',').filter(Boolean).map(nameOf).filter(Boolean);return g.length?'Entre los que se quedan: '+g.join(', '):'Entre todos (nadie marcó que se queda)';}
   if(sp==='some')return 'Entre '+splitIds(x).map(nameOf).filter(Boolean).join(', ');
