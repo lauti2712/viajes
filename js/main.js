@@ -65,6 +65,14 @@ document.addEventListener('keydown',function(e){
 document.addEventListener('change',function(e){
   var r=e.target.closest&&e.target.closest('[data-rate]');
   if(r){var rc=curCode(r.dataset.rate,''),rv=parseFloat(r.value)||0;if(!rc)return;S.trip.rates[rc]=rv;S.trip.u=nextU(S.trip.u);save();var rp={};rp[rc]=rv;pushTrip({rates:rp});render();return;}
+  /* "Otra moneda…": se escribe el código (USD, CLP, UYU…) y queda elegida. */
+  if(e.target.tagName==='SELECT'&&e.target.value==='__other'&&(e.target.name==='cur'||e.target.name==='base')){
+    var sel=e.target,cc=curCode(window.prompt('Código de la moneda (3 letras, por ejemplo CLP, UYU, MXN):')||'','');
+    if(!cc){sel.value=sel.dataset.prev||base();return;}
+    if(!Array.prototype.some.call(sel.options,function(o){return o.value===cc;})){var op=document.createElement('option');op.value=op.textContent=cc;sel.insertBefore(op,sel.querySelector('option[value=__other]'));}
+    sel.value=cc;sel.dataset.prev=cc;sel.dispatchEvent(new Event('input',{bubbles:true}));return;
+  }
+  if(e.target.tagName==='SELECT'&&(e.target.name==='cur'||e.target.name==='base'))e.target.dataset.prev=e.target.value;
   var pf=e.target.closest&&e.target.closest('[data-pref]');
   if(pf){setPref(pf.getAttribute('data-pref'),pf.checked);return;}
   var pc=e.target.closest&&e.target.closest('[data-pkcheck]');
