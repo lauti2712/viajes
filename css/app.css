@@ -414,3 +414,4 @@ a.tel{color:var(--sea);font-weight:700;text-decoration:none}
 .mapbtn:hover{border-color:var(--sea)}
 .hrow .mapbtn{margin-left:auto;align-self:center}
 #addrList:empty{display:none}
+.pill.buy{background:color-mix(in srgb,var(--sea) 30%,transparent);color:var(--ink)}

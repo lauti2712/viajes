@@ -173,3 +173,16 @@ test('tarjeta: cuotas en los resúmenes armados solos (cierra 25, vence 5) y un 
   const s2 = Array.from(c.cardStatements({ closeDay: '31', dueDay: '10' }), (x) => x.c).filter((x) => x.startsWith('2026-11'));
   assert.deepEqual(s2, ['2026-11-30']);
 });
+
+test('por comprar: no genera deudas ni va a la tarjeta hasta que se compra', () => {
+  const c = app(P3, (c) => c.add('transports', { from: 'Rosario', to: 'Salta', amount: 300, paidBy: 'ana', status: 'comprar', split: 'riders', riders: 'ana,beto,caro' }));
+  assert.deepEqual(net(c), { ana: 0, beto: 0, caro: 0 });
+  const sc = c.cardSchedule({ closeDay: '25', dueDay: '5' }, [{ amount: 300, cur: 'ARS', payDate: '2026-10-02', status: 'comprar' }]);
+  assert.equal(sc.buckets.filter((b) => b.lines.length).length + sc.none.length, 0);
+});
+
+test('alojamiento sin nombre: se muestra por la dirección', () => {
+  const c = app(P3);
+  assert.equal(c.lodgeName({ address: 'Av. Córdoba 148, Puerto Iguazú' }), 'Av. Córdoba 148');
+  assert.equal(c.lodgeName({}), 'Alojamiento');
+});

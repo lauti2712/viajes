@@ -24,7 +24,7 @@ function itemCost(src,x,cur0){
   var a=parseFloat(x.amount)||0;if(a<=0||x.del)return null;
   var title,date,cat;
   if(src==='transports'){title=(x.from||'?')+' → '+(x.to||'?');date=(x.dep||'').slice(0,10);cat='Transporte';}
-  else if(src==='lodging'){title=x.name||'Alojamiento';date=x.in||'';cat='Alojamiento';}
+  else if(src==='lodging'){title=lodgeName(x);date=x.in||'';cat='Alojamiento';}
   else if(src==='expenses'){title=x.desc||'Gasto';date=x.date||'';cat=x.cat||'Otros';}
   else return null;
   return {id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:curCode(x.cur,cur0||base()),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',guests:src==='lodging'?(x.guests||''):'',riders:src==='transports'?(x.riders||''):'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||''};

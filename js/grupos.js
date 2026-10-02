@@ -10,7 +10,7 @@ function namesOf(list){return livingIds(list).map(nameOf).join(', ');}
 /* Accesos rápidos para el reparto: cada alojamiento con gente y cada auto con pasajeros. */
 function splitGroups(){
   var me=myPersonId(),g=[];
-  live('lodging').forEach(function(l){var ids=livingIds(l.guests);if(ids.length)g.push({key:'l'+l.id,ic:'🏠',name:l.name||'Alojamiento',ids:ids,mine:ids.indexOf(me)>=0});});
+  live('lodging').forEach(function(l){var ids=livingIds(l.guests);if(ids.length)g.push({key:'l'+l.id,ic:'🏠',name:lodgeName(l),ids:ids,mine:ids.indexOf(me)>=0});});
   live('vehicles').forEach(function(v){var ids=livingIds(v.riders);if(ids.length)g.push({key:'v'+v.id,ic:'🚗',name:vehName(v),ids:ids,mine:ids.indexOf(me)>=0});});
   rentals().forEach(function(t){var ids=livingIds(t.riders);if(ids.length)g.push({key:'t'+t.id,ic:'🚙',name:rentalName(t),ids:ids,mine:ids.indexOf(me)>=0});});
   return g.sort(function(a,b){return (b.mine-a.mine);});

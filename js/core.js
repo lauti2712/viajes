@@ -50,6 +50,8 @@ function curOpts(){
   extra.forEach(function(c){c=curCode(c,'');if(c&&!have[c]){have[c]=1;o.push([c,c]);}});
   return o;
 }
+/* Nombre del alojamiento para mostrar: si no tiene, la dirección (lo primero) o "Alojamiento". */
+function lodgeName(l){return (l&&(l.name||String(l.address||'').split(',')[0]))||'Alojamiento';}
 var ITYPES={paseo:['🚶','Paseo'],comida:['🍽️','Comida'],excursion:['🗺️','Excursión'],tramite:['📄','Trámite'],descanso:['🛌','Descanso'],otro:['📌','Otro']};
 
 /* ---------- Estado ---------- */

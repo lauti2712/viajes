@@ -29,6 +29,7 @@ function cardSchedule(m,charges){
   var st=cardStatements(m);
   var buckets=st.map(function(x){return {s:x,lines:[]};}),none=[];
   charges.forEach(function(ch){
+    if(ch.status==='comprar')return;   /* todavía no se compró: no está en la tarjeta */
     var d=ch.payDate||ch.date,n=Math.max(1,Math.min(60,parseInt(ch.cuotas,10)||1));
     var i0=d?st.findIndex(function(x){return d<=x.c;}):-1;
     for(var k=0;k<n;k++){

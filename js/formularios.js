@@ -44,7 +44,7 @@ function costF(){
   var f=[
     {k:'amount',l:'Monto',t:'number',half:true,ph:'0'},
     {k:'cur',l:'Moneda',t:'select',opts:curOpts(),half:true,def:base()},
-    {k:'status',l:'Estado del pago',t:'select',half:true,opts:[['pendiente','Por pagar'],['pagado','Pagado']]},
+    {k:'status',l:'Estado del pago',t:'select',half:true,opts:[['comprar','Por comprar (todavía no se compró)'],['pendiente','Por pagar'],['pagado','Pagado']]},
     {k:'paidBy',l:'Quién pagó',t:'select',half:true,opts:buildPaidByOptions()}
   ];
   /* Se elige entre las formas de pago de quien pagó (payerMethods); "Otro" deja escribirla a mano. */
@@ -116,11 +116,14 @@ var SPECS={
     {k:'notes',l:'Notas',t:'textarea',ph:'Terminal, asiento, equipaje, hora de check-in…'}
   ].concat(costF().map(function(f){return f.k==='split'?Object.assign({},f,{opts:[['riders','Los que viajan con este pasaje']].concat(f.opts)}):f;}))}},
   lodging:function(){return {title:['Nuevo alojamiento','Editar alojamiento'],fields:[
-    {k:'name',l:'Nombre',t:'text',req:true,ph:'Hotel, depto, hostel…'},
+    {k:'name',l:'Nombre (opcional)',t:'text',ph:'Hotel, depto, hostel…'},
     {k:'airbnb',l:'Link de la reserva (Airbnb, Booking, Despegar…)',t:'url',ph:'https://…'},
     {k:'_addr',t:'html',html:''},   /* se completa en openItem: buscador de dirección */
     {k:'in',l:'Entrada',t:'date',half:true},
+    {k:'inTime',l:'Check-in (hora)',t:'time',half:true},
     {k:'out',l:'Salida',t:'date',half:true},
+    {k:'outTime',l:'Check-out (hora)',t:'time',half:true},
+    {k:'_itin',t:'html',html:''},   /* se completa en openItem: mostrar en el itinerario */
     {k:'ref',l:'Código de reserva',t:'text'},
     {k:'notes',l:'Notas',t:'textarea',ph:'Horario de check-in, contacto, cómo llegar…'},
     {k:'_guests',t:'html',html:''}   /* se completa en openItem con los huéspedes */
@@ -202,7 +205,7 @@ function openItem(k,id,pre){
   if('cur' in vals||k!=='plans')vals.cur=curCode(vals.cur,base());   /* para que la lista de monedas la marque bien */
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
-  if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);});
+  if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="showItin"'+(vals.hideItin==='1'?'':' checked')+'> Mostrar el check-in y el check-out en el itinerario</label>';});
   if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes viajan con este pasaje')+'<p class="full mtn6 hint" id="rdHint">Cada uno carga sus pasajes. Si viajás junto con alguien en la misma reserva, tildalo también.</p>';});
   var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="full m0 msg err" id="formmsg" role="status"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
    +'<details class="sideSec fgrp"'+(ex&&((ex.attachments||[]).length||(ex.links||[]).length)?' open':'')+'><summary><span>📎 Archivos y links</span><small>'+(ex?attLinkChips(ex):'')+'</small></summary>'+attsBlock(ex)+linksBlock(ex)+'</details>'+(ex?itemLogHtml():'');
@@ -213,7 +216,7 @@ function openItem(k,id,pre){
   var el=function(nm){return f.querySelector('[name='+nm+']');};
   function showFld(input,on){if(!input)return;var w=input.closest('.fld');if(w)w.hidden=!on;input.disabled=!on;}
 
-  function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging')d.guests=takeChecks(d,'g');
+  function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging'){d.guests=takeChecks(d,'g');d.hideItin=d.showItin?'':'1';delete d.showItin;}
     if(k==='transports'){
       var rd=takeChecks(d,'rd');
       d.riders=rd;   /* pasajeros: en un alquiler son los que van en el auto */
@@ -341,7 +344,7 @@ function openItem(k,id,pre){
   if(k==='transports'){var sm=f.querySelector('[name=same]');if(sm)sm.checked=vals.same==='1';syncTType();}
   /* Lo básico a la vista; costo, reserva y notas plegados (abiertos si ya tienen algo cargado). */
   var COSTN=['amount','cur','status','paidBy','methodId','method','cuotas','payDate','split','#splitBox'];
-  var costSum=function(){var a=parseFloat((el('amount')||{}).value)||0;return a>0?money(a,curCode((el('cur')||{}).value,base()))+' · '+((el('status')||{}).value==='pagado'?'Pagado':'Por pagar'):'Sin cargar';};
+  var costSum=function(){var a=parseFloat((el('amount')||{}).value)||0;return a>0?money(a,curCode((el('cur')||{}).value,base()))+' · '+({pagado:'Pagado',comprar:'Por comprar'}[(el('status')||{}).value]||'Por pagar'):'Sin cargar';};
   var has=function(n){return n.some(function(x){var i=el(x);return i&&String(i.value||'').trim();});};
   if(k==='transports'||k==='lodging')groupFields(panel,f,[
     {l:'💲 Costo y quién paga',names:COSTN,open:!!(ex&&parseFloat(ex.amount)>0),sum:costSum},

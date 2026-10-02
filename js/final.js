@@ -40,7 +40,7 @@ function finalCsv(){
   var tipos={expenses:'Gasto',transports:'Transporte',lodging:'Alojamiento'};
   d.cs.forEach(function(c){
     var v=toBase(c.amount,c.cur),sm=v==null?{}:shareMap(c,v);
-    rows.push([c.date,tipos[c.src],c.title,c.cat,nameOf(c.paidBy),c.status==='pagado'?'Pagado':'Por pagar',c.method,num(c.amount),c.cur,num(v),splitLabel(c)||'Todos por igual'].concat(one?[]:d.ppl.map(function(p){return num(sm[p.id]||0);})));
+    rows.push([c.date,tipos[c.src],c.title,c.cat,nameOf(c.paidBy),c.status==='pagado'?'Pagado':c.status==='comprar'?'Por comprar':'Por pagar',c.method,num(c.amount),c.cur,num(v),splitLabel(c)||'Todos por igual'].concat(one?[]:d.ppl.map(function(p){return num(sm[p.id]||0);})));
   });
   if(!one){rows.push([]);rows.push(['Persona','Pagó','Le toca','Devolvió','Recibió','Saldo']);}
   if(!one)d.ppl.forEach(function(p){rows.push([p.name,num(d.paid[p.id]),num(d.parts[p.id]),num(d.sent[p.id]),num(d.recv[p.id]),num(d.net[p.id]||0)]);});
@@ -57,7 +57,7 @@ function finalHtml(){
     h+='<h2>Para quedar a mano</h2>'+(d.transfers.length?'<ul>'+d.transfers.map(function(x){var c=cobroOf(x.toId);return '<li><b>'+esc(x.from)+'</b> le transfiere <b>'+money(x.amt)+'</b> a <b>'+esc(x.to)+'</b>'+(c.length?' (alias '+esc(c.map(function(y){return y.a;}).join(' / '))+')':'')+'</li>';}).join('')+'</ul>':'<p>Están a mano.</p>');
   }
   if(d.payments.length)h+='<h2>Pagos entre ustedes</h2><ul>'+d.payments.map(function(x){return '<li>'+esc(fShort(x.date)||'')+' · '+esc(nameOf(x.from))+' le pagó '+money(parseFloat(x.amount)||0,x.cur)+' a '+esc(nameOf(x.to))+'</li>';}).join('')+'</ul>';
-  h+='<h2>Todos los gastos</h2><table><thead><tr><th>Fecha</th><th>Qué</th>'+(d.ppl.length>1?'<th>Pagó</th><th>Reparto</th>':'')+'<th class="r">Monto</th></tr></thead><tbody>'+d.cs.map(function(c){return '<tr><td>'+esc(fShort(c.date)||'—')+'</td><td>'+esc(c.title)+'<br><small>'+esc(c.cat)+(c.status!=='pagado'?' · por pagar':'')+'</small></td>'+(d.ppl.length>1?'<td>'+esc(nameOf(c.paidBy)||'—')+'</td><td>'+esc(splitLabel(c)||'Todos')+'</td>':'')+'<td class="r">'+money(c.amount,c.cur)+'</td></tr>';}).join('')+'</tbody></table>';
+  h+='<h2>Todos los gastos</h2><table><thead><tr><th>Fecha</th><th>Qué</th>'+(d.ppl.length>1?'<th>Pagó</th><th>Reparto</th>':'')+'<th class="r">Monto</th></tr></thead><tbody>'+d.cs.map(function(c){return '<tr><td>'+esc(fShort(c.date)||'—')+'</td><td>'+esc(c.title)+'<br><small>'+esc(c.cat)+(c.status==='comprar'?' · por comprar':c.status!=='pagado'?' · por pagar':'')+'</small></td>'+(d.ppl.length>1?'<td>'+esc(nameOf(c.paidBy)||'—')+'</td><td>'+esc(splitLabel(c)||'Todos')+'</td>':'')+'<td class="r">'+money(c.amount,c.cur)+'</td></tr>';}).join('')+'</tbody></table>';
   if(d.total.miss.size)h+='<p>Ojo: falta el tipo de cambio de '+esc(Array.from(d.total.miss).join(', '))+'.</p>';
   return h;
 }
