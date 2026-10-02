@@ -43,7 +43,7 @@ function sheetForm(o){
 function costF(){
   var f=[
     {k:'amount',l:'Monto',t:'number',half:true,ph:'0'},
-    {k:'cur',l:'Moneda',t:'text',list:'curs',half:true,def:base()},
+    {k:'cur',l:'Moneda',t:'select',opts:curOpts(),half:true,def:base()},
     {k:'status',l:'Estado del pago',t:'select',half:true,opts:[['pendiente','Por pagar'],['pagado','Pagado']]},
     {k:'paidBy',l:'Quién pagó',t:'select',half:true,opts:buildPaidByOptions()}
   ];
@@ -199,6 +199,7 @@ function openItem(k,id,pre){
   /* Gastos viejos "solo de X": se muestran como "algunos" con esa sola persona. */
   if(vals.split&&['equal','self','some','amounts','guests','riders'].indexOf(vals.split)<0){vals.splitWith=vals.split;vals.split='some';}
   if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
+  if('cur' in vals||k!=='plans')vals.cur=curCode(vals.cur,base());   /* para que la lista de monedas la marque bien */
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);});
@@ -652,7 +653,7 @@ function openSettings(){
       {k:'_city',t:'html',html:cityFieldHtml(t.city)},
       {k:'start',l:'Desde',t:'date',half:true},
       {k:'end',l:'Hasta',t:'date',half:true},
-      {k:'base',l:'Moneda para los totales',t:'text',list:'curs',half:true,ph:'ARS'},
+      {k:'base',l:'Moneda para los totales',t:'select',opts:curOpts(),half:true,def:'ARS'},
       {k:'daily',l:'Presupuesto diario (opcional)',t:'number',half:true,ph:'0'},
       {k:'budget',l:'Presupuesto total del viaje (opcional)',t:'number',half:true,ph:'0'},
       {k:'info',l:'Info útil (seguro de viaje, contacto de emergencia, dirección del alojamiento…)',t:'textarea',ph:'Lo que quieran tener a mano aunque no haya señal'}

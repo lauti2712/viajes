@@ -42,6 +42,14 @@ var CATS={'Comida':'🍽️','Café y bebidas':'☕','Supermercado':'🛒','Tran
 function tripCats(){var c=(typeof S!=='undefined'&&S.trip&&S.trip.cats);return Array.isArray(c)?c:[];}
 function catAll(){var o={};Object.keys(CATS).forEach(function(k){if(k!=='Otros')o[k]=CATS[k];});tripCats().forEach(function(c){if(c&&c.name&&c.name!=='Otros'&&!o[c.name])o[String(c.name).slice(0,30)]=String(c.icon||'🏷️').replace(/[<>&"'`]/g,'').slice(0,4)||'🏷️';});   /* el ícono lo carga cualquiera del viaje: sin HTML */o['Otros']=CATS['Otros'];return o;}
 function catIcon(n){if(!n)return '📌';var o=catAll();if(o[n])return o[n];if(n==='Transporte')return '✈️';if(n==='Alojamiento')return '🛏️';return '📌';}
+/* Monedas para elegir (lista desplegable): las comunes de la región + las que ya use el viaje. */
+var CURS=[['ARS','🇦🇷 Peso argentino'],['USD','🇺🇸 Dólar'],['EUR','🇪🇺 Euro'],['BRL','🇧🇷 Real'],['CLP','🇨🇱 Peso chileno'],['UYU','🇺🇾 Peso uruguayo'],['PYG','🇵🇾 Guaraní'],['BOB','🇧🇴 Boliviano'],['PEN','🇵🇪 Sol peruano'],['COP','🇨🇴 Peso colombiano'],['MXN','🇲🇽 Peso mexicano'],['GBP','🇬🇧 Libra'],['CAD','🇨🇦 Dólar canadiense'],['AUD','🇦🇺 Dólar australiano'],['JPY','🇯🇵 Yen'],['CHF','🇨🇭 Franco suizo'],['CNY','🇨🇳 Yuan'],['DOP','🇩🇴 Peso dominicano'],['CRC','🇨🇷 Colón'],['TRY','🇹🇷 Lira turca'],['THB','🇹🇭 Baht']];
+function curOpts(){
+  var o=CURS.map(function(c){return [c[0],c[0]+' · '+c[1]];}),have={};CURS.forEach(function(c){have[c[0]]=1;});
+  var extra=[(typeof S!=='undefined'&&S.trip&&S.trip.base)||''].concat(typeof S!=='undefined'?['transports','lodging','expenses','payments'].reduce(function(a,k){return a.concat((S[k]||[]).map(function(x){return x.cur;}));},[]):[]);
+  extra.forEach(function(c){c=curCode(c,'');if(c&&!have[c]){have[c]=1;o.push([c,c]);}});
+  return o;
+}
 var ITYPES={paseo:['🚶','Paseo'],comida:['🍽️','Comida'],excursion:['🗺️','Excursión'],tramite:['📄','Trámite'],descanso:['🛌','Descanso'],otro:['📌','Otro']};
 
 /* ---------- Estado ---------- */

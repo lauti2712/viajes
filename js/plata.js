@@ -166,7 +166,7 @@ function paymentsHtml(who){
 }
 function openPayment(id,pre){
   var ex=id?S.payments.find(function(x){return x.id===id;}):null,ppl=allPeople().map(function(p){return [p.id,p.name];});
-  var v=ex||Object.assign({date:today(),cur:base()},pre||{});
+  var v=Object.assign({},ex||Object.assign({date:today(),cur:base()},pre||{}));v.cur=curCode(v.cur,base());
   var intro=function(to){var c=cobroHtml(to);return c?'<p class="hint">Datos de '+esc(nameOf(to))+' para transferirle: '+c+'</p>':'';};
   sheetForm({title:ex?'Editar pago':'Registrar pago',values:v,
     intro:'<div id="payintro">'+intro(v.to)+'</div>',
@@ -174,7 +174,7 @@ function openPayment(id,pre){
       {k:'from',l:'Quién pagó',t:'select',half:true,opts:ppl},
       {k:'to',l:'A quién',t:'select',half:true,opts:ppl},
       {k:'amount',l:'Monto',t:'number',half:true,req:true,ph:'0'},
-      {k:'cur',l:'Moneda',t:'text',list:'curs',half:true},
+      {k:'cur',l:'Moneda',t:'select',opts:curOpts(),half:true},
       {k:'date',l:'Fecha',t:'date',half:true},
       {k:'method',l:'Cómo',t:'text',half:true,list:'methods',ph:'Transferencia, efectivo…'},
       {k:'note',l:'Nota (opcional)',t:'text'}
