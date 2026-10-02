@@ -229,7 +229,7 @@ function openItem(k,id,pre){
     $('#sameWrap',panel).hidden=!car;
     showFld(el('seats'),car);showFld(el('kmOut'),car);showFld(el('kmIn'),car);showFld(el('mech'),car);
     var rb=$('#rdBox',panel);if(rb)rb.querySelector('span').textContent=car?'Quiénes van en este auto':'Quiénes viajan con este pasaje';
-    var rh=$('#rdHint',panel);if(rh)rh.hidden=car;
+    var rh=$('#rdHint',panel);if(rh)rh.hidden=car||solo();
     var so=el('split').querySelector('option[value=riders]');if(so)so.textContent=car?'Los que van en este auto':'Los que viajan con este pasaje';
     var tw=el('to').closest('.fld');tw.hidden=same;el('to').required=!same;
   }
@@ -347,6 +347,12 @@ function openItem(k,id,pre){
                     :{l:'📍 Dirección, reserva y notas',names:['airbnb','address','ref','notes'],open:!!ex&&has(['airbnb','address','ref','notes'])}
   ]);
   if(k==='plans')groupFields(panel,f,[{l:'📍 Lugar y notas',names:['place','notes'],open:!!ex&&has(['place','notes'])}]);
+  /* Modo solo: quién pagó (vos) y para quién es no hace falta elegirlos. */
+  if(solo()&&(k==='transports'||k==='lodging'||k==='expenses')){
+    var me1=myPersonId(),pb1=el('paidBy');if(pb1&&!pb1.value&&me1){pb1.value=me1;syncPay();}
+    ['paidBy','split'].forEach(function(n){var i=el(n);if(i)i.closest('.fld').hidden=true;});
+    ['#splitBox','#rdBox','#rdHint','#gBox'].forEach(function(s){var x=$(s,panel);if(x)x.hidden=true;});
+  }
   var fx=$('#formmsg',panel);   /* si algo está mal adentro de una sección plegada, se abre */
   if(fx)new MutationObserver(function(){if(fx.textContent)Array.prototype.forEach.call(panel.querySelectorAll('details.fgrp'),function(d){d.open=true;});}).observe(fx,{childList:true,characterData:true,subtree:true});
 
@@ -638,7 +644,7 @@ function bindCats(panel,list){
 }
 function openSettings(){
   var t=S.trip,first=!t.setup,nd=first?newDates():null,cats=tripCats().filter(function(c){return c&&c.name;}).map(function(c){return {name:String(c.name).slice(0,30),icon:String(c.icon||'🏷️').slice(0,4)};});
-  sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:t.name,start:nd?nd.start:t.start,end:nd?nd.end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
+  sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:first&&t.name==='Nuestro viaje'?'':t.name,start:nd?nd.start:t.start,end:nd?nd.end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
     fields:[
       {k:'name',l:'Nombre del viaje',t:'text',ph:'Ej: Bariloche 2026'},
       {k:'_city',t:'html',html:cityFieldHtml(t.city)},
@@ -649,8 +655,8 @@ function openSettings(){
       {k:'budget',l:'Presupuesto total del viaje (opcional)',t:'number',half:true,ph:'0'},
       {k:'info',l:'Info útil (seguro de viaje, contacto de emergencia, dirección del alojamiento…)',t:'textarea',ph:'Lo que quieran tener a mano aunque no haya señal'}
     ],
-    intro:shareBlockHtml(),
-    extra:'<hr>'+pplBlock()+(cloudMode()&&AUTH==='in'?'<hr>'+membersBlockHtml():'')+'<hr>'+catsBlockHtml(cats)+'<hr><div class="row"><button type="button" class="ghost" data-act="rates">💱 Tipos de cambio</button><button type="button" class="ghost" data-act="trash">🗑️ Papelera'+(trashItems().length?' ('+trashItems().length+')':'')+'</button>'+(cloudMode()&&AUTH==='in'?'<button type="button" class="ghost" data-act="history">🕘 Últimos cambios</button>':'')+'</div>',
+    intro:solo()?'':shareBlockHtml(),
+    extra:(solo()?'<hr>'+catsBlockHtml(cats)+'<hr><details class="sideSec fgrp"><summary><span>👥 ¿Viaja alguien más?</span></summary>'+shareBlockHtml()+pplBlock()+'</details>':'<hr>'+pplBlock()+'<hr>'+catsBlockHtml(cats))+(cloudMode()&&AUTH==='in'&&(!solo()||Object.keys(MEMBERS).length>1)?'<hr>'+membersBlockHtml():'')+'<hr><div class="row"><button type="button" class="ghost" data-act="rates">💱 Tipos de cambio</button><button type="button" class="ghost" data-act="trash">🗑️ Papelera'+(trashItems().length?' ('+trashItems().length+')':'')+'</button>'+(cloudMode()&&AUTH==='in'?'<button type="button" class="ghost" data-act="history">🕘 Últimos cambios</button>':'')+'</div>',
     onReady:function(panel){bindShareBlock(panel);bindPeople(panel);bindMembers(panel);bindCityField(panel);bindCats(panel,cats);},
     validate:function(d){
       if(d.start&&d.end&&d.end<d.start)return 'La fecha "Hasta" es anterior a "Desde". Revisá las fechas del viaje.';
@@ -661,7 +667,7 @@ function openSettings(){
       clearNewDates();
       var nb=curCode(d.base,'ARS'),newBase=nb!==base();
       if(newBase)S.trip.rates={};
-      var patch={name:d.name||'Nuestro viaje',start:d.start||'',end:d.end||'',base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true};
+      var patch={name:d.name||pl('Nuestro viaje','Mi viaje'),start:d.start||'',end:d.end||'',base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true};
       if(first&&cloudMode()&&ME&&!S.trip.owner)patch.owner=ME.uid;   /* quien arma el viaje lo organiza */
       var city=null;try{city=cleanCity(JSON.parse(d.cityJson||'null'));}catch(e){}
       patch.city=city;

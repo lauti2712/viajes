@@ -36,14 +36,14 @@ function finalCsv(){
   var d=finalData(),num=function(n){return n==null?'':(Math.round(n*100)/100).toString().replace('.',',');};
   /* Un texto que empieza con = + - @ Excel lo toma como fórmula: se le antepone ' para que quede como texto. */
   var q=function(v){v=String(v==null?'':v);if(/^[=+\-@\t\r]/.test(v)&&!/^-?\d+(,\d+)?$/.test(v))v="'"+v;return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
-  var rows=[['Fecha','Tipo','Qué','Categoría','Pagó','Estado','Forma de pago','Monto','Moneda','Monto en '+base(),'Reparto'].concat(d.ppl.map(function(p){return 'Le toca a '+p.name;}))];
+  var one=d.ppl.length<2,rows=[['Fecha','Tipo','Qué','Categoría','Pagó','Estado','Forma de pago','Monto','Moneda','Monto en '+base(),'Reparto'].concat(one?[]:d.ppl.map(function(p){return 'Le toca a '+p.name;}))];
   var tipos={expenses:'Gasto',transports:'Transporte',lodging:'Alojamiento'};
   d.cs.forEach(function(c){
     var v=toBase(c.amount,c.cur),sm=v==null?{}:shareMap(c,v);
-    rows.push([c.date,tipos[c.src],c.title,c.cat,nameOf(c.paidBy),c.status==='pagado'?'Pagado':'Por pagar',c.method,num(c.amount),c.cur,num(v),splitLabel(c)||'Todos por igual'].concat(d.ppl.map(function(p){return num(sm[p.id]||0);})));
+    rows.push([c.date,tipos[c.src],c.title,c.cat,nameOf(c.paidBy),c.status==='pagado'?'Pagado':'Por pagar',c.method,num(c.amount),c.cur,num(v),splitLabel(c)||'Todos por igual'].concat(one?[]:d.ppl.map(function(p){return num(sm[p.id]||0);})));
   });
-  rows.push([]);rows.push(['Persona','Pagó','Le toca','Devolvió','Recibió','Saldo']);
-  d.ppl.forEach(function(p){rows.push([p.name,num(d.paid[p.id]),num(d.parts[p.id]),num(d.sent[p.id]),num(d.recv[p.id]),num(d.net[p.id]||0)]);});
+  if(!one){rows.push([]);rows.push(['Persona','Pagó','Le toca','Devolvió','Recibió','Saldo']);}
+  if(!one)d.ppl.forEach(function(p){rows.push([p.name,num(d.paid[p.id]),num(d.parts[p.id]),num(d.sent[p.id]),num(d.recv[p.id]),num(d.net[p.id]||0)]);});
   if(d.payments.length){rows.push([]);rows.push(['Pagos entre ustedes','De','A','Monto','Moneda']);d.payments.forEach(function(x){rows.push([x.date,nameOf(x.from),nameOf(x.to),num(parseFloat(x.amount)||0),x.cur]);});}
   if(d.transfers.length){rows.push([]);rows.push(['Para quedar a mano','De','A','Monto en '+base()]);d.transfers.forEach(function(x){rows.push(['',x.from,x.to,num(x.amt)]);});}
   return '﻿'+rows.map(function(r){return r.map(q).join(';');}).join('\r\n');
@@ -57,12 +57,12 @@ function finalHtml(){
     h+='<h2>Para quedar a mano</h2>'+(d.transfers.length?'<ul>'+d.transfers.map(function(x){var c=cobroOf(x.toId);return '<li><b>'+esc(x.from)+'</b> le transfiere <b>'+money(x.amt)+'</b> a <b>'+esc(x.to)+'</b>'+(c.length?' (alias '+esc(c.map(function(y){return y.a;}).join(' / '))+')':'')+'</li>';}).join('')+'</ul>':'<p>Están a mano.</p>');
   }
   if(d.payments.length)h+='<h2>Pagos entre ustedes</h2><ul>'+d.payments.map(function(x){return '<li>'+esc(fShort(x.date)||'')+' · '+esc(nameOf(x.from))+' le pagó '+money(parseFloat(x.amount)||0,x.cur)+' a '+esc(nameOf(x.to))+'</li>';}).join('')+'</ul>';
-  h+='<h2>Todos los gastos</h2><table><thead><tr><th>Fecha</th><th>Qué</th><th>Pagó</th><th>Reparto</th><th class="r">Monto</th></tr></thead><tbody>'+d.cs.map(function(c){return '<tr><td>'+esc(fShort(c.date)||'—')+'</td><td>'+esc(c.title)+'<br><small>'+esc(c.cat)+(c.status!=='pagado'?' · por pagar':'')+'</small></td><td>'+esc(nameOf(c.paidBy)||'—')+'</td><td>'+esc(splitLabel(c)||'Todos')+'</td><td class="r">'+money(c.amount,c.cur)+'</td></tr>';}).join('')+'</tbody></table>';
+  h+='<h2>Todos los gastos</h2><table><thead><tr><th>Fecha</th><th>Qué</th>'+(d.ppl.length>1?'<th>Pagó</th><th>Reparto</th>':'')+'<th class="r">Monto</th></tr></thead><tbody>'+d.cs.map(function(c){return '<tr><td>'+esc(fShort(c.date)||'—')+'</td><td>'+esc(c.title)+'<br><small>'+esc(c.cat)+(c.status!=='pagado'?' · por pagar':'')+'</small></td>'+(d.ppl.length>1?'<td>'+esc(nameOf(c.paidBy)||'—')+'</td><td>'+esc(splitLabel(c)||'Todos')+'</td>':'')+'<td class="r">'+money(c.amount,c.cur)+'</td></tr>';}).join('')+'</tbody></table>';
   if(d.total.miss.size)h+='<p>Ojo: falta el tipo de cambio de '+esc(Array.from(d.total.miss).join(', '))+'.</p>';
   return h;
 }
 function openFinal(){
-  var panel=openSheet('Resumen final','<p class="hint">Todo el viaje en un lugar: cuánto puso y cuánto le toca a cada uno, las transferencias para quedar a mano, los pagos entre ustedes y la lista de gastos.</p>'
+  var panel=openSheet('Resumen final','<p class="hint">'+pl('Todo el viaje en un lugar: cuánto puso y cuánto le toca a cada uno, las transferencias para quedar a mano, los pagos entre ustedes y la lista de gastos.','Todo el viaje en un lugar: el total y la lista de gastos.')+'</p>'
    +'<div class="stack"><button type="button" class="primary" id="fprint">📄 Ver / guardar como PDF</button><button type="button" class="ghost" id="fcsv">📊 Descargar Excel (CSV)</button><button type="button" class="ghost" id="ftext">💬 Copiar resumen para WhatsApp</button>'
    +(navigator.share?'<button type="button" class="ghost" id="fshare">📤 Compartir…</button>':'')+'</div><p class="msg" id="fmsg" role="status"></p>'
    +'<label class="mt10 fld"><span>Vista previa del texto</span><textarea class="box" id="ftxt" rows="8" readonly></textarea></label>');

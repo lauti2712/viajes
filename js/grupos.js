@@ -16,6 +16,7 @@ function splitGroups(){
   return g.sort(function(a,b){return (b.mine-a.mine);});
 }
 function groupChipsHtml(){
+  if(solo())return '';   /* modo solo: nada que repartir */
   var g=splitGroups();if(!g.length)return '';
   return '<div class="grps"><span class="m0 hint">Rápido:</span>'+g.map(function(x){return '<button type="button" class="ghost sm" data-grp="'+esc(x.key)+'" title="'+esc(x.ids.map(nameOf).join(', '))+'">'+x.ic+' '+esc(x.name)+' · '+x.ids.length+(x.mine?' (vos)':'')+'</button>';}).join('')+'</div>';
 }
@@ -29,6 +30,7 @@ function toggleGuest(lid){
   upsert('lodging',lid,{guests:ids.join(',')});render();
 }
 function guestsLine(l){
+  if(solo())return '';   /* modo solo: nada que repartir */
   var ids=livingIds(l.guests),me=myPersonId(),inIt=ids.indexOf(me)>=0;
   return '<div class="guests"><span>👥 '+(ids.length?esc(ids.map(nameOf).join(', ')):'Todavía nadie marcó que se queda acá')+'</span>'
    +(me?'<button type="button" class="ghost sm" data-act="lodgejoin" data-id="'+l.id+'">'+(inIt?'Ya no me quedo':'Me quedo acá')+'</button>':'')+'</div>';
@@ -45,6 +47,7 @@ function rentals(){return live('transports').filter(function(t){return t.type===
 function rentalName(t){return 'Alquiler'+(t.company?' '+t.company:'')+(t.from?' ('+t.from+')':'');}
 function vehName(v){return v.name||(v.detail?v.detail:'Auto')+(v.owner&&nameOf(v.owner)?' de '+nameOf(v.owner):'');}
 function vehiclesHtml(){
+  if(solo())return '';   /* modo solo: nada que repartir */
   var L=live('vehicles'),R=rentals(),me=myPersonId();
   var h='<section class="vehs"><div class="mb8 bar"><h3>🚗 Autos del viaje</h3><button type="button" class="ghost sm" data-act="vehadd">+ Sumar un auto</button></div>';
   if(!L.length&&!R.length)return h+'<p class="nada" style="padding:0 0 6px">Si van en auto, sumalo acá y cada uno marca en cuál va. Después, al cargar la nafta o los peajes, lo repartís entre los de ese auto con un toque.</p></section>';
