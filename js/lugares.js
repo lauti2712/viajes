@@ -54,3 +54,62 @@ function bindCityField(panel){
   });
   list.addEventListener('click',function(e){var b=e.target.closest('[data-ci]');if(b)pick(results[+b.getAttribute('data-ci')]);});
 }
+
+/* ---------- Dirección del alojamiento ----------
+   Se busca en Photon (OpenStreetMap, gratis y sin clave), cerca de la ciudad del viaje. Lo elegido guarda
+   también las coordenadas (addrLat/addrLng); si no aparece, se puede dejar escrita a mano igual. */
+function addrLabel(p){
+  var st=[p.street,p.housenumber].filter(Boolean).join(' '),place=p.city||p.town||p.village||p.locality||p.district||'';
+  var first=p.name&&p.name!==p.street&&p.name!==place?p.name:'';
+  return [first,st,place,p.state&&p.state!==place?p.state:'',p.country].filter(Boolean).join(', ');
+}
+async function searchAddress(q){
+  var c=cleanCity(S.trip.city),bias=c?'&lat='+c.lat+'&lon='+c.lng:'&lat=-34&lon=-60';
+  var j=await fetch('https://photon.komoot.io/api/?limit=8'+bias+'&q='+encodeURIComponent(q)).then(function(r){return r.json();});
+  return (j.features||[]).map(function(f){var p=f.properties||{},g=(f.geometry||{}).coordinates||[];return {label:addrLabel(p),lat:+g[1],lng:+g[0]};})
+    .filter(function(a){return a.label&&isFinite(a.lat)&&isFinite(a.lng);})
+    .map(function(a){if(c)a._d=Math.pow(a.lat-c.lat,2)+Math.pow((a.lng-c.lng)*Math.cos(c.lat*Math.PI/180),2);return a;})
+    /* con ciudad del viaje, primero lo más cerca (sin descartar lo lejano: un viaje puede pasar por varias ciudades) */
+    .sort(function(x,y){return c?x._d-y._d:0;}).slice(0,6);
+}
+function mapsUrl(x){
+  if(!x)return '';
+  var la=parseFloat(x.addrLat),ln=parseFloat(x.addrLng);
+  if(isFinite(la)&&isFinite(ln)&&Math.abs(la)<=90&&Math.abs(ln)<=180)return 'https://www.google.com/maps/search/?api=1&query='+la.toFixed(6)+','+ln.toFixed(6);
+  return x.address?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(x.address):'';
+}
+function addrFieldHtml(v){
+  var ok=isFinite(parseFloat(v.addrLat))&&v.address;
+  return '<div class="fld" id="addrFld"><span>Dirección</span><input type="text" name="address" value="'+esc(v.address||'')+'" placeholder="Calle y número, o nombre del lugar" autocomplete="off">'
+   +'<div class="cityList" id="addrList" role="listbox"></div>'
+   +'<small class="m0 hint" id="addrMsg">'+(ok?'📍 Ubicación encontrada en el mapa.':'Escribí y elegí de la lista para que quede ubicada en el mapa.')+'</small>'
+   +'<input type="hidden" name="addrLat" value="'+esc(v.addrLat||'')+'"><input type="hidden" name="addrLng" value="'+esc(v.addrLng||'')+'"></div>';
+}
+function bindAddrField(panel){
+  var q=panel.querySelector('[name=address]'),list=$('#addrList',panel),msg=$('#addrMsg',panel),la=panel.querySelector('[name=addrLat]'),ln=panel.querySelector('[name=addrLng]'),tmr=null,res=[],seq=0;
+  if(!q)return;
+  q.addEventListener('input',function(){
+    la.value='';ln.value='';clearTimeout(tmr);
+    var v=q.value.trim();
+    if(v.length<4){list.innerHTML='';msg.textContent='Escribí y elegí de la lista para que quede ubicada en el mapa.';return;}
+    tmr=setTimeout(function(){
+      var my=++seq;msg.textContent='Buscando…';
+      searchAddress(v).then(function(r){if(my!==seq)return;res=r;
+        list.innerHTML=r.length?r.map(function(a,i){return '<button type="button" class="cityOpt" data-ai="'+i+'">📍 '+esc(a.label)+'</button>';}).join(''):'';
+        msg.textContent=r.length?'Elegí de la lista (o dejala así, sin ubicar en el mapa).':'No la encontré. Podés dejarla escrita igual: se busca por el texto al abrir el mapa.';
+      }).catch(function(){if(my===seq)msg.textContent='No se pudo buscar (¿sin señal?). Podés dejarla escrita igual.';});
+    },400);
+  });
+  list.addEventListener('click',function(e){
+    var b=e.target.closest('[data-ai]');if(!b)return;
+    var a=res[+b.getAttribute('data-ai')];q.value=a.label;la.value=a.lat.toFixed(6);ln.value=a.lng.toFixed(6);list.innerHTML='';msg.textContent='📍 Ubicación encontrada en el mapa.';
+  });
+}
+/* Link de la reserva: se muestra con el nombre de la plataforma. */
+var BOOK_SITES=[['airbnb','Airbnb'],['booking.com','Booking'],['despegar','Despegar'],['expedia','Expedia'],['hotels.com','Hotels.com'],['vrbo','Vrbo'],['agoda','Agoda'],['hostelworld','Hostelworld'],['trivago','Trivago'],['tripadvisor','Tripadvisor'],['almundo','Almundo'],['turismocity','Turismocity'],['decolar','Decolar']];
+function bookSite(u){
+  u=safeUrl(u);if(!u)return '';
+  var h='';try{h=new URL(u).hostname.replace(/^www\./,'');}catch(e){return '';}
+  var s=BOOK_SITES.find(function(x){return h.indexOf(x[0])>=0;});
+  return s?s[1]:h;
+}

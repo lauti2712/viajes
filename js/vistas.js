@@ -99,14 +99,16 @@ function vTransportes(){
   return h+totLine(costs().filter(function(c){return c.src==='transports'}))+L.map(ticket).join('');
 }
 
+/* Botón 📍 que abre la dirección en el mapa del celular. */
+function mapBtn(x){var u=mapsUrl(x);return u?'<a class="mapbtn" href="'+esc(u)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" aria-label="Abrir en el mapa" title="Abrir en el mapa">📍</a>':'';}
 function vAlojamiento(){
   var L=live('lodging').sort(function(a,b){return (a.in||'9999').localeCompare(b.in||'9999')});
   var h='<div class="bar"><h2>Alojamiento</h2><button class="primary" data-act="add" data-k="lodging">+ Agregar</button></div>';
   if(!L.length)return h+empty(pl('Todavía no cargaron dónde van a dormir','Todavía no cargaste dónde vas a dormir'),'Hotel, departamento o hostel: fechas, dirección, reserva y costo.'+pl(' Pueden ser varios: cada uno marca en cuál se queda y el costo se reparte entre los de ese alojamiento.',' Pueden ser varios, uno después del otro.'));
   return h+totLine(costs().filter(function(c){return c.src==='lodging'}))+L.map(function(l){
     var n=(l.in&&l.out)?dayDiff(pd(l.in),pd(l.out)):0;
-    return '<div class="stay" role="button" tabindex="0" data-act="edit" data-k="lodging" data-id="'+l.id+'"><div class="nm">'+esc(l.name||'Alojamiento')+(safeUrl(l.airbnb)?' <a class="abnb" href="'+esc(safeUrl(l.airbnb))+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Airbnb ↗</a>':'')+'</div>'
-     +(l.address?'<div class="mt2 sub">'+esc(l.address)+'</div>':'')
+    return '<div class="stay" role="button" tabindex="0" data-act="edit" data-k="lodging" data-id="'+l.id+'"><div class="nm">'+esc(l.name||'Alojamiento')+(bookSite(l.airbnb)?' <a class="abnb" href="'+esc(safeUrl(l.airbnb))+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">'+esc(bookSite(l.airbnb))+' ↗</a>':'')+'</div>'
+     +(l.address?'<div class="mt2 sub addr">'+mapBtn(l)+'<span>'+esc(l.address)+'</span></div>':'')
      +'<div class="dates"><span>Entrada <b>'+(l.in?esc(fShort(l.in)):'—')+'</b></span><span>Salida <b>'+(l.out?esc(fShort(l.out)):'—')+'</b></span>'+(n>0?'<span><b>'+n+(n===1?' noche':' noches')+'</b></span>':'')+attLinkChips(l)+'</div>'
      +(l.ref?'<div class="meta"><span class="ref">Reserva '+esc(l.ref)+'</span></div>':'')
      +(l.notes?'<p class="note">'+esc(l.notes)+'</p>':'')+guestsLine(l)+costBlock(l)+'</div>';
@@ -224,7 +226,7 @@ function hoyHtml(wxOn){
     rows.push(row(ty[0],'Próximo, '+when(nx.dep),car?'Retiro del auto en '+(nx.from||'?'):(nx.from||'?')+' → '+(nx.to||'?'),[nx.company,pax.length&&!solo()?(car?'Van ':'Viajan ')+joinNames(pax):''].filter(Boolean).join(' · ')));}
   /* Dónde duermen esta noche */
   var L=mineOr(live('lodging').filter(function(l){return l.in&&l.out&&l.in<=t&&t<l.out;}),'guests');
-  L.forEach(function(l){rows.push(row('🛏️','Esta noche',l.name||'Alojamiento',[l.address,l.out===tmw?'Check-out mañana':''].filter(Boolean).join(' · ')));});
+  L.forEach(function(l){var r0=row('🛏️','Esta noche',l.name||'Alojamiento',[l.address,l.out===tmw?'Check-out mañana':''].filter(Boolean).join(' · '));rows.push(mapsUrl(l)?r0.replace('</div></div>','</div>'+mapBtn(l)+'</div>'):r0);});
   var dn=dayDiff(pd(s),pd(t))+1,tot=dayDiff(pd(s),pd(e))+1;
   return '<section class="hoy"><div class="hh"><b>Hoy</b><span>Día '+dn+' de '+tot+'</span>'+(wxOn?wxChip(t):'')+'</div>'
    +(rows.length?rows.join(''):'<p class="nada">Nada cargado para hoy. Día libre.</p>')+'</section>';

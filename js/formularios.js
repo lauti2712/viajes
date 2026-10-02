@@ -117,8 +117,8 @@ var SPECS={
   ].concat(costF().map(function(f){return f.k==='split'?Object.assign({},f,{opts:[['riders','Los que viajan con este pasaje']].concat(f.opts)}):f;}))}},
   lodging:function(){return {title:['Nuevo alojamiento','Editar alojamiento'],fields:[
     {k:'name',l:'Nombre',t:'text',req:true,ph:'Hotel, depto, hostel…'},
-    {k:'airbnb',l:'Link de Airbnb (opcional)',t:'text',ph:'https://www.airbnb.com.ar/rooms/…'},
-    {k:'address',l:'Dirección',t:'text'},
+    {k:'airbnb',l:'Link de la reserva (Airbnb, Booking, Despegar…)',t:'url',ph:'https://…'},
+    {k:'_addr',t:'html',html:''},   /* se completa en openItem: buscador de dirección */
     {k:'in',l:'Entrada',t:'date',half:true},
     {k:'out',l:'Salida',t:'date',half:true},
     {k:'ref',l:'Código de reserva',t:'text'},
@@ -201,13 +201,14 @@ function openItem(k,id,pre){
   if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
-  if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');});
+  if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);});
   if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes viajan con este pasaje')+'<p class="full mtn6 hint" id="rdHint">Cada uno carga sus pasajes. Si viajás junto con alguien en la misma reserva, tildalo también.</p>';});
   var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="full m0 msg err" id="formmsg" role="status"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
    +'<details class="sideSec fgrp"'+(ex&&((ex.attachments||[]).length||(ex.links||[]).length)?' open':'')+'><summary><span>📎 Archivos y links</span><small>'+(ex?attLinkChips(ex):'')+'</small></summary>'+attsBlock(ex)+linksBlock(ex)+'</details>'+(ex?itemLogHtml():'');
   var panel=openSheet(sp.title[ex?1:0],body);
   var f=$('#sf',panel);
   bindItemLog(panel,ex?ex.id:'');
+  if(k==='lodging')bindAddrField(panel);
   var el=function(nm){return f.querySelector('[name='+nm+']');};
   function showFld(input,on){if(!input)return;var w=input.closest('.fld');if(w)w.hidden=!on;input.disabled=!on;}
 
@@ -344,7 +345,7 @@ function openItem(k,id,pre){
   if(k==='transports'||k==='lodging')groupFields(panel,f,[
     {l:'💲 Costo y quién paga',names:COSTN,open:!!(ex&&parseFloat(ex.amount)>0),sum:costSum},
     k==='transports'?{l:'🎫 Empresa, reserva y notas',names:['company','ref','notes'],open:!!ex&&has(['company','ref','notes'])}
-                    :{l:'📍 Dirección, reserva y notas',names:['airbnb','address','ref','notes'],open:!!ex&&has(['airbnb','address','ref','notes'])}
+                    :{l:'📍 Dirección, link y notas',names:['#addrFld','airbnb','ref','notes'],open:!!ex&&has(['airbnb','address','ref','notes'])}
   ]);
   if(k==='plans')groupFields(panel,f,[{l:'📍 Lugar y notas',names:['place','notes'],open:!!ex&&has(['place','notes'])}]);
   /* Modo solo: quién pagó (vos) y para quién es no hace falta elegirlos. */
@@ -361,6 +362,7 @@ function openItem(k,id,pre){
     var d=readForm(),fm=$('#formmsg',panel);
     var req=sp.fields.filter(function(x){return x.req&&!d[x.k]})[0];
     if(req){var r=$('#f_'+req.k,panel);if(r)r.focus();return;}
+    if(k==='lodging'&&d.airbnb&&!safeUrl(d.airbnb)){fm.textContent='El link de la reserva tiene que empezar con https:// (copialo entero desde la app o la página).';return;}
     if(k==='transports'&&d.type==='auto'&&d.kmOut&&d.kmIn&&+d.kmIn<+d.kmOut){fm.textContent='Los km al devolver son menos que al retirar. Revisá los números.';return;}
     if(k==='transports'&&d.dep&&d.arr&&d.arr<d.dep){fm.textContent=d.type==='auto'?'La devolución es antes del retiro. Revisá las fechas.':'La llegada es antes de la salida. Revisá las fechas.';return;}
     var prob='amount' in d?splitProblem(d):'';
