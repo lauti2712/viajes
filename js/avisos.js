@@ -46,7 +46,7 @@ function dueSoon(){
 function avisosCount(){return avisosList().length+dueSoon().filter(function(d){return !dueAck[d.key];}).length;}
 function openAvisos(){
   var list=avisosList(),due=dueSoon(),h='';
-  if(due.length)h+='<h class="mb6"3>Vencimientos de tus tarjetas</h3>'+due.map(function(d){
+  if(due.length)h+='<h3 class="mb6">Vencimientos de tus tarjetas</h3>'+due.map(function(d){
     var dd=dayDiff(pd(today()),pd(d.v));
     return '<div class="exp" role="button" tabindex="0" data-act="gopagos"><span class="ec" aria-hidden="true">💳</span><div class="et"><b>'+esc(d.m.name)+' vence '+(dd===0?'hoy':dd===1?'mañana':'el '+esc(fShort(d.v)))+'</b><small><span>Gastos de tus viajes en ese resumen</span></small></div><div class="ea"><b>'+d.total+'</b></div></div>';
   }).join('')+'<hr>';

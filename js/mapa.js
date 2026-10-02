@@ -17,7 +17,7 @@ function tripsWithCity(){
   if(CODE&&cleanCity(S.trip.city)){var cur=list.find(function(t){return t.code===CODE;});var mine={code:CODE,name:S.trip.name,start:S.trip.start,end:S.trip.end,city:cleanCity(S.trip.city)};if(cur)Object.assign(cur,mine);else list.push(mine);}
   return list.filter(function(t){return t.city;});
 }
-function mapSectionHtml(){return '<section class="psec"><h class="mb8"3>Mapa de mis viajes</h3><div id="tripmap" class="tripmap"><p class="nada" style="padding:12px">Cargando mapa…</p></div><small class="hint" id="mapmsg" style="margin:6px 0 0;display:block"></small></section>';}
+function mapSectionHtml(){return '<section class="psec"><h3 class="mb8">Mapa de mis viajes</h3><div id="tripmap" class="tripmap"><p class="nada" style="padding:12px">Cargando mapa…</p></div><small class="hint" id="mapmsg" style="margin:6px 0 0;display:block"></small></section>';}
 function drawTripMap(panel){
   var box=$('#tripmap',panel),msg=$('#mapmsg',panel);if(!box)return;
   var trips=tripsWithCity();

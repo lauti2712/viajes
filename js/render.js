@@ -42,18 +42,20 @@ function openProfile(){
   if(!ME)return;
   var h='<div class="prof"><span class="avatar lg">'+initialOf(ME.name)+'</span><div><b>'+esc(ME.name||'Tu cuenta')+'</b><small>'+esc(ME.email||'')+'</small></div></div>';
   if(!homeMode())h+='<section class="psec"><div class="bar"><h3>Mis viajes</h3><button type="button" class="ghost sm" data-act="newtrip">+ Nuevo</button></div><div id="tripsl">'+tripsListHtml()+'</div></section>';
+  if(cloudMode()||homeMode())h+=calHtml();
   h+=mapSectionHtml();
   h+=myVehiclesHtml();
   h+='<section class="psec"><div class="bar"><h3>Formas de pago</h3><button type="button" class="ghost sm" data-act="addmethod">+ Agregar</button></div>'
    +(METHODS.length?METHODS.map(function(m){var ty=mtype(m);return '<div class="exp" role="button" tabindex="0" data-act="editmethod" data-id="'+esc(m.id)+'" style="grid-template-columns:34px 1fr"><span class="ec" aria-hidden="true">'+ty[0]+'</span><div class="et"><b>'+esc(methodLabel(m))+'</b><small><span>'+esc(ty[1])+'</span>'+(m.alias&&m.share?'<span>Alias visible: '+esc(m.alias)+'</span>':'')+'</small></div></div>';}).join('')
      :'<p class="nada">Todavía no cargaste ninguna. Sirven para elegir con qué pagaste cada gasto y para que te paguen a tu alias.</p>')
    +(cloudMode()?'<div class="mt10 row"><button type="button" class="ghost" data-act="gopagos">💳 Ver mis pagos y resúmenes de tarjeta</button></div>':'')+'</section>';
-  h+='<section class="psec"><h class="mb8"3>Preferencias</h3><label class="pkchk"><input type="checkbox" data-pref="showWeather"'+(PREFS.showWeather!==false?' checked':'')+'><span>Mostrar el clima en el itinerario</span></label></section>';
+  h+='<section class="psec"><h3 class="mb8">Preferencias</h3><label class="pkchk"><input type="checkbox" data-pref="showWeather"'+(PREFS.showWeather!==false?' checked':'')+'><span>Mostrar el clima en el itinerario</span></label></section>';
   if(typeof isStandalone==='function'&&!isStandalone()&&(installEvt||isIOS()))h+='<section class="psec"><button type="button" class="ghost" data-act="install">📲 Instalar la app en este dispositivo</button></section>';
   h+='<section class="psec"><button type="button" class="danger" data-act="logout">Salir de la cuenta</button></section>';
   var panel=openSheet('Mi perfil',h);
   drawTripMap(panel);
-  formRefresh=function(){var w=$('#tripsl',panel);if(w)w.innerHTML=tripsListHtml();};
+  var calRedraw=bindCal(panel);
+  formRefresh=function(){var w=$('#tripsl',panel);if(w)w.innerHTML=tripsListHtml();calRedraw();};
 }
 /* Con nube hay que iniciar sesión con Google antes de ver el viaje. Si Firebase ni siquiera cargó
    (sin señal), AUTH queda 'offline' y se muestra lo guardado en el dispositivo. */

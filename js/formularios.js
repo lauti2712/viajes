@@ -637,8 +637,8 @@ function bindCats(panel,list){
   });
 }
 function openSettings(){
-  var t=S.trip,first=!t.setup,cats=tripCats().filter(function(c){return c&&c.name;}).map(function(c){return {name:String(c.name).slice(0,30),icon:String(c.icon||'🏷️').slice(0,4)};});
-  sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:t.name,start:t.start,end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
+  var t=S.trip,first=!t.setup,nd=first?newDates():null,cats=tripCats().filter(function(c){return c&&c.name;}).map(function(c){return {name:String(c.name).slice(0,30),icon:String(c.icon||'🏷️').slice(0,4)};});
+  sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:t.name,start:nd?nd.start:t.start,end:nd?nd.end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
     fields:[
       {k:'name',l:'Nombre del viaje',t:'text',ph:'Ej: Bariloche 2026'},
       {k:'_city',t:'html',html:cityFieldHtml(t.city)},
@@ -658,6 +658,7 @@ function openSettings(){
       return '';
     },
     onSave:function(d){
+      clearNewDates();
       var nb=curCode(d.base,'ARS'),newBase=nb!==base();
       if(newBase)S.trip.rates={};
       var patch={name:d.name||'Nuestro viaje',start:d.start||'',end:d.end||'',base:nb,daily:parseFloat(d.daily)||0,budget:parseFloat(d.budget)||0,info:d.info||'',setup:true};
