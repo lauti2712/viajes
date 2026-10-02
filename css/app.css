@@ -407,3 +407,4 @@ a.tel{color:var(--sea);font-weight:700;text-decoration:none}
 .calist{display:flex;flex-direction:column;gap:6px}
 .calist .ghost{text-align:left;display:flex;align-items:center;gap:6px;padding:8px 12px}
 .calist small{color:var(--muted)}
+.stmt .est{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 6px;margin-left:4px}

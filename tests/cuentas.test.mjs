@@ -15,7 +15,7 @@ function app(people, extra) {
     history: { replaceState() {} },
     localStorage: store, sessionStorage: store,
   });
-  for (const f of ['config', 'core', 'plata']) vm.runInContext(readFileSync(new URL(`../js/${f}.js`, import.meta.url), 'utf8'), ctx, { filename: f + '.js' });
+  for (const f of ['config', 'core', 'plata', 'mispagos']) vm.runInContext(readFileSync(new URL(`../js/${f}.js`, import.meta.url), 'utf8'), ctx, { filename: f + '.js' });
   vm.runInContext(`
     var CLAIMS={};
     function pushItem(){} function myPersonId(){return '';} function render(){}
@@ -160,4 +160,16 @@ test('monedas raras no se cuelan como HTML', () => {
   const c = app(P3);
   assert.equal(c.curCode('<img>', 'ARS'), 'ARS');
   assert.equal(c.curCode(' usd ', 'ARS'), 'USD');
+});
+
+test('tarjeta: cuotas en los resúmenes armados solos (cierra 25, vence 5) y un mes corrido a mano', () => {
+  const c = app(P3);
+  const m = { id: 'visa', type: 'credito', closeDay: '25', dueDay: '5', statements: [{ c: '2026-11-20', v: '2026-12-02' }] };
+  const sc = c.cardSchedule(m, [{ id: 'x', title: 'Pasaje', amount: 90000, cur: 'ARS', payDate: '2026-10-02', cuotas: '3' }]);
+  const con = Array.from(sc.buckets.filter((b) => b.lines.length), (b) => `${b.s.c}>${b.s.v}:${b.lines.map((l) => l.k + '/' + l.n + '=' + l.amt).join()}${b.s.auto ? '' : ' (a mano)'}`);
+  assert.deepEqual(con, ['2026-10-25>2026-11-05:1/3=30000', '2026-11-20>2026-12-02:2/3=30000 (a mano)', '2026-12-25>2027-01-05:3/3=30000']);
+  assert.equal(sc.none.length, 0);
+  // Cierre 31 en un mes de 30 días: cae el último día.
+  const s2 = Array.from(c.cardStatements({ closeDay: '31', dueDay: '10' }), (x) => x.c).filter((x) => x.startsWith('2026-11'));
+  assert.deepEqual(s2, ['2026-11-30']);
 });

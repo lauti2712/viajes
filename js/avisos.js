@@ -38,7 +38,7 @@ function dueSoon(){
   var t=today(),lim=iso(new Date(Date.now()+7*864e5)),charges=costs().concat(OTHER_CHARGES.filter(function(c){return c.trip!==CODE;})),res=[];
   METHODS.filter(function(m){return m.type==='credito';}).forEach(function(m){
     cardSchedule(m,charges.filter(function(c){return c.methodId===m.id;})).buckets.forEach(function(b){
-      if(b.s.v&&b.s.v>=t&&b.s.v<=lim&&b.lines.length)res.push({key:m.id+'|'+b.s.v,m:m,v:b.s.v,total:totalsText(b.lines)});
+      if(b.s.v&&b.s.v>=t&&b.s.v<=lim&&b.lines.length)res.push({key:m.id+'|'+b.s.v,m:m,v:b.s.v,total:totalsText(b.lines),lines:b.lines});
     });
   });
   return res;
@@ -48,7 +48,7 @@ function openAvisos(){
   var list=avisosList(),due=dueSoon(),h='';
   if(due.length)h+='<h3 class="mb6">Vencimientos de tus tarjetas</h3>'+due.map(function(d){
     var dd=dayDiff(pd(today()),pd(d.v));
-    return '<div class="exp" role="button" tabindex="0" data-act="gopagos"><span class="ec" aria-hidden="true">💳</span><div class="et"><b>'+esc(d.m.name)+' vence '+(dd===0?'hoy':dd===1?'mañana':'el '+esc(fShort(d.v)))+'</b><small><span>Gastos de tus viajes en ese resumen</span></small></div><div class="ea"><b>'+d.total+'</b></div></div>';
+    return '<div class="exp" role="button" tabindex="0" data-act="gopagos"><span class="ec" aria-hidden="true">💳</span><div class="et"><b>'+esc(d.m.name)+' vence '+(dd===0?'hoy':dd===1?'mañana':'el '+esc(fShort(d.v)))+'</b><small>'+d.lines.slice(0,6).map(function(l){return '<span>'+(l.n>1?'Cuota '+l.k+'/'+l.n+' ':'')+esc(l.ch.title)+' · '+money(l.amt,l.cur)+'</span>';}).join('')+(d.lines.length>6?'<span>y '+(d.lines.length-6)+' más</span>':'')+'</small></div><div class="ea"><b>'+d.total+'</b></div></div>';
   }).join('')+'<hr>';
   h+=list.length?list.map(function(a){
     var act=a.k==='packing'?'data-act="gomochila"':a.k==='payments'?'data-act="editpay" data-id="'+esc(a.id)+'"':a.del?'':'data-act="edit" data-k="'+a.k+'" data-id="'+esc(a.id)+'"';

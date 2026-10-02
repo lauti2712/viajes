@@ -8,8 +8,25 @@ var methodLabel=function(m){return (m.name||'Sin nombre')+(m.last4?' ••'+m.l
 function totalsText(lines){var t={};lines.forEach(function(l){t[l.cur]=(t[l.cur]||0)+l.amt;});var ks=Object.keys(t);return ks.length?ks.map(function(c){return money(t[c],c);}).join(' + '):money(0);}
 /* Reparte los cargos de una tarjeta en sus resúmenes: cada compra (o cuota) cae en el primer resumen
    que cierra el día de la compra o después; la cuota 2 en el siguiente, etc. */
+/* Resúmenes de una tarjeta: los cargados a mano + los de cada mes armados con "cierra el día X, vence el
+   día Y" (auto). Un resumen cargado a mano manda sobre el automático del mismo mes de cierre. */
+function dayIn(y,mo,d){var last=new Date(y,mo+1,0).getDate();return iso(new Date(y,mo,Math.min(d,last)));}
+function cardStatements(m){
+  var man=(m.statements||[]).filter(function(x){return x&&x.c;}),out=man.slice(),cd=parseInt(m.closeDay,10),vd=parseInt(m.dueDay,10);
+  if(cd>=1&&cd<=31){
+    var months={};man.forEach(function(x){months[x.c.slice(0,7)]=1;});
+    var n=new Date();
+    for(var k=-24;k<=24;k++){
+      var y=n.getFullYear(),mo=n.getMonth()+k,c=dayIn(y,mo,cd);
+      if(months[c.slice(0,7)])continue;
+      var v='';if(vd>=1&&vd<=31){v=dayIn(y,mo,vd);if(v<=c)v=dayIn(y,mo+1,vd);}
+      out.push({c:c,v:v,auto:true});
+    }
+  }
+  return out.sort(function(a,b){return a.c.localeCompare(b.c);});
+}
 function cardSchedule(m,charges){
-  var st=(m.statements||[]).filter(function(x){return x&&x.c;}).slice().sort(function(a,b){return a.c.localeCompare(b.c);});
+  var st=cardStatements(m);
   var buckets=st.map(function(x){return {s:x,lines:[]};}),none=[];
   charges.forEach(function(ch){
     var d=ch.payDate||ch.date,n=Math.max(1,Math.min(60,parseInt(ch.cuotas,10)||1));
@@ -69,11 +86,12 @@ function vPagos(){
     var ty=mtype(m),charges=cs.filter(function(c){return c.methodId===m.id;});
     var out='<section class="sec"><div class="mhead"><h3>'+ty[0]+' '+esc(m.name||'Sin nombre')+'</h3><small>'+esc([ty[1],m.bank,m.last4?'••'+m.last4:'',m.alias?'Alias '+m.alias+(m.share?' (visible para tus viajes)':''):''].filter(Boolean).join(' · '))+'</small><span class="sp"></span><button type="button" class="ghost" data-act="editmethod" data-id="'+esc(m.id)+'">Editar</button></div>';
     if(m.type==='credito'){
-      var sc=cardSchedule(m,charges),shown=sc.buckets.filter(function(b){return b.lines.length||b.s.v>=t||b.s.c>=t;});
+      /* Se muestran los resúmenes con cargos y el próximo a vencer (aunque esté vacío). */
+      var sc=cardSchedule(m,charges),nx=sc.buckets.find(function(b){return (b.s.v||b.s.c)>=t;}),shown=sc.buckets.filter(function(b){return b.lines.length||b===nx;});
       var nextIdx=shown.findIndex(function(b){return (b.s.v||b.s.c)>=t;});
-      if(!(m.statements||[]).length)out+='<p class="warn">Cargá las fechas de cierre y vencimiento de los próximos resúmenes (tocá Editar).</p>';
+      if(!cardStatements(m).length)out+='<p class="warn">Poné qué día cierra y qué día vence el resumen de la tarjeta (tocá Editar).</p>';
       out+=shown.map(function(b,i){
-        return '<div class="stmt'+(i===nextIdx?' next':'')+'"><div class="dh"><span>Cierra <b>'+esc(fShort(b.s.c))+'</b>'+(b.s.v?' · vence <b>'+esc(fShort(b.s.v))+'</b>':'')+'</span><b>'+(b.lines.length?totalsText(b.lines):'—')+'</b></div>'
+        return '<div class="stmt'+(i===nextIdx?' next':'')+'"><div class="dh"><span>Cierra <b>'+esc(fShort(b.s.c))+'</b>'+(b.s.v?' · vence <b>'+esc(fShort(b.s.v))+'</b>':'')+(b.s.auto?' <small class="est">estimado</small>':'')+'</span><b>'+(b.lines.length?totalsText(b.lines):'—')+'</b></div>'
          +(b.lines.length?b.lines.map(chargeRow).join(''):'<p class="nada">Sin gastos '+donde+' en este resumen.</p>')+'</div>';
       }).join('');
       if(sc.none.length)out+='<div class="stmt"><div class="dh"><span><b>Sin resumen cargado</b></span><b>'+totalsText(sc.none)+'</b></div><p class="mb4 hint">Estos cargos caen en resúmenes que todavía no cargaste (o no tienen fecha de compra).</p>'+sc.none.map(chargeRow).join('')+'</div>';
@@ -99,7 +117,9 @@ function openMethod(id){
     {k:'_share',t:'html',html:'<label class="chk fld pksug" id="shareWrap"><input type="checkbox" name="share"'+(v.share?' checked':'')+'> Mostrarlo a los demás de mis viajes, para que vean a dónde pagarme cuando me deban</label>'}
   ];
   var panel=openSheet(m?'Editar forma de pago':'Nueva forma de pago','<form id="mf" class="grid" novalidate>'+fields.map(function(f){return fieldHtml(f,v);}).join('')
-    +'<div class="fld" id="stWrap"><span>Resúmenes de la tarjeta</span><p class="mb6 hint">Fecha de cierre y de vencimiento (cuándo hay que pagarlo) de cada resumen, como las publica el banco.</p><div id="stRows">'+stRows()+'</div><div><button type="button" class="sm ghost" id="staddrow">+ Agregar resumen</button></div></div>'
+    +'<div class="fld" id="stWrap"><span>Resumen de la tarjeta</span><p class="mb6 hint">Con el día de cierre y el de vencimiento, la app arma sola el resumen de cada mes y te avisa antes de que venza.</p>'
+    +'<div class="grid"><label class="fld half"><span>Cierra el día</span><input type="number" name="closeDay" min="1" max="31" inputmode="numeric" placeholder="Ej: 25" value="'+esc(v.closeDay||'')+'"></label><label class="fld half"><span>Vence el día</span><input type="number" name="dueDay" min="1" max="31" inputmode="numeric" placeholder="Ej: 5" value="'+esc(v.dueDay||'')+'"></label></div>'
+    +'<details class="fgrp mt10"'+(st.length?' open':'')+'><summary><span>Meses con fechas distintas</span><small>'+(st.length?st.length:'')+'</small></summary><p class="mb6 hint">Si el banco corre el cierre o el vencimiento de algún mes, cargalo acá: ese mes manda sobre el automático.</p><div id="stRows">'+stRows()+'</div><div class="mb10"><button type="button" class="sm ghost" id="staddrow">+ Agregar mes</button></div></details></div>'
     +'<p class="full m0 msg err" id="mmsg"></p><div class="acts">'+(m?'<button type="button" class="danger" id="mdel">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>');
   var f=$('#mf',panel),l4=$('#f_last4',panel);
   l4.setAttribute('inputmode','numeric');l4.setAttribute('maxlength','4');
@@ -128,8 +148,11 @@ function openMethod(id){
     if(d.last4&&digits.length!==4){msg.textContent='En "últimos 4 dígitos" poné solo 4 números, nunca el número completo.';return;}
     var stc=d.type==='credito'?st.filter(function(x){return x.c;}).sort(function(a,b){return a.c.localeCompare(b.c);}):[];
     if(stc.some(function(x){return x.v&&x.v<x.c;})){msg.textContent='Hay un resumen que vence antes de cerrar. Revisá las fechas.';return;}
+    var cd=parseInt(d.closeDay,10)||0,vd=parseInt(d.dueDay,10)||0;
+    if(d.type==='credito'&&((d.closeDay&&(cd<1||cd>31))||(d.dueDay&&(vd<1||vd>31)))){msg.textContent='Los días de cierre y vencimiento van del 1 al 31.';return;}
+    if(d.type==='credito'&&vd&&!cd){msg.textContent='Poné también el día de cierre.';return;}
     var cobra=d.type==='banco'||d.type==='billetera';
-    saveMethod(Object.assign({},m||{},{id:m?m.id:uid(),type:d.type,name:d.name,bank:d.bank||'',last4:digits,statements:stc,alias:cobra?(d.alias||''):'',share:cobra&&d.alias&&d.share?'1':'',u:Date.now()}));
+    saveMethod(Object.assign({},m||{},{id:m?m.id:uid(),type:d.type,name:d.name,bank:d.bank||'',last4:digits,statements:stc,closeDay:d.type==='credito'&&cd?String(cd):'',dueDay:d.type==='credito'&&vd?String(vd):'',alias:cobra?(d.alias||''):'',share:cobra&&d.alias&&d.share?'1':'',u:Date.now()}));
     closeSheet();
   });
   var del=$('#mdel',panel);
