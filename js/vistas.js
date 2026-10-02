@@ -76,6 +76,9 @@ function attLinkChips(item){
 }
 function fileIcon(type){return type&&type.indexOf('pdf')>=0?'📄':(type&&type.indexOf('image')>=0?'🖼️':'📎')}
 function humanSize(n){n=n||0;if(n<1024)return n+' B';if(n<1048576)return Math.round(n/1024)+' KB';return (n/1048576).toFixed(1)+' MB';}
+/* Teléfono para un link tel: (solo dígitos y +), así un dato cargado por otro no mete otra cosa en el href. */
+function telHref(s){var d=String(s||'').replace(/[^\d+]/g,'');return d.length>=6?'tel:'+d:'';}
+function fmtKm(n){return (parseInt(n,10)||0).toLocaleString('es-AR');}
 function ticket(t){
   var ty=TYPES[t.type]||TYPES.otro,dd=(t.dep||'').slice(0,10),ad=(t.arr||'').slice(0,10),dday=pd(dd),car=t.type==='auto',same=car&&(t.same==='1'||t.from===t.to);
   return '<div class="ticket" role="button" tabindex="0" data-act="edit" data-k="transports" data-id="'+t.id+'">'
@@ -83,6 +86,8 @@ function ticket(t){
    +'<div class="tb"><div class="route">'+(car?(same?'Retiro y devolución en '+esc(t.from||'?'):esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?')):esc(t.from||'?')+'<span class="ar">→</span>'+esc(t.to||'?'))+'</div>'
    +((t.dep||t.arr)?'<div class="times"><div><span>'+(car?'Retiro':'Sale')+'</span><b>'+(t.dep?esc(fShort(dd))+' '+tm(t.dep):'—')+'</b></div><div><span>'+(car?'Devolución':'Llega')+'</span><b>'+(t.arr?esc(fShort(ad))+' '+tm(t.arr):'—')+'</b></div></div>':'')
    +((t.company||t.ref||(t.attachments&&t.attachments.length)||(t.links&&t.links.length))?'<div class="meta"><span>'+esc(ty[1])+(t.company?' de '+esc(t.company):'')+'</span>'+(t.ref?'<span class="ref">Reserva '+esc(t.ref)+'</span>':'')+attLinkChips(t)+'</div>':'')
+   +(car&&(t.kmOut||t.kmIn)?'<div class="meta"><span>🛣️ Km '+(t.kmOut?esc(fmtKm(t.kmOut)):'—')+' → '+(t.kmIn?esc(fmtKm(t.kmIn)):'—')+'</span>'+(t.kmOut&&t.kmIn&&+t.kmIn>=+t.kmOut?'<span><b>'+esc(fmtKm(t.kmIn-t.kmOut))+' km recorridos</b></span>':'')+'</div>':'')
+   +(car&&telHref(t.mech)?'<div class="meta"><a class="tel" href="'+telHref(t.mech)+'" onclick="event.stopPropagation()">🔧 Mecánico / asistencia: '+esc(t.mech)+'</a></div>':'')
    +(!car&&paxNames(t.riders).length?'<div class="meta"><span>👥 '+esc(joinNames(paxNames(t.riders)))+'</span></div>':'')
    +(t.notes?'<p class="note">'+esc(t.notes)+'</p>':'')
    +costBlock(t)+'</div></div>';

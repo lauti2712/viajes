@@ -390,3 +390,4 @@ details.sideSec.fgrp .sideSec{margin-top:4px}
 .g6{gap:6px}.fnone{flex:none}.full{grid-column:1/-1}.sp14{height:14px}
 .chk{flex-direction:row!important;white-space:normal}
 .fgrp,.fgrp *{box-sizing:border-box}
+a.tel{color:var(--sea);font-weight:700;text-decoration:none}

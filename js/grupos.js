@@ -59,6 +59,7 @@ function vehiclesHtml(){
     var f=t.dep?fShort(t.dep.slice(0,10))+(t.arr?' al '+fShort(t.arr.slice(0,10)):''):'';
     return '<div class="stay veh rent" role="button" tabindex="0" data-act="edit" data-k="transports" data-id="'+t.id+'"><div class="nm">🚙 '+esc(rentalName(t))+'</div>'
      +'<div class="mt2 sub">'+esc(['Alquilado',f,t.split==='riders'?'el costo se divide entre los que van':''].filter(Boolean).join(' · '))+'</div>'
+     +(telHref(t.mech)?'<div class="mt2"><a class="tel" href="'+telHref(t.mech)+'" onclick="event.stopPropagation()">🔧 Mecánico: '+esc(t.mech)+'</a></div>':'')
      +'<div class="guests"><span>👥 '+(ids.length?esc(ids.map(nameOf).join(', ')):'Nadie todavía')+(seats?' <b>· '+ids.length+'/'+seats+' lugares</b>':'')+'</span>'
      +(me?'<button type="button" class="ghost sm" data-act="ride" data-k="transports" data-id="'+t.id+'"'+(!inIt&&full?' disabled':'')+'>'+(inIt?'Me bajo':full?'Lleno':'Me subo')+'</button>':'')+'</div></div>';
   }).join('')+'</section>';

@@ -107,6 +107,9 @@ var SPECS={
     {k:'arr',l:'Llega',t:'datetime-local'},
     {k:'_same',t:'html',html:'<label class="chk fld pksug" id="sameWrap" hidden><input type="checkbox" name="same"> Se devuelve en el mismo lugar donde se retira</label>'},
     {k:'seats',l:'Asientos',t:'number',half:true,ph:'5'},
+    {k:'kmOut',l:'Km al retirar',t:'number',half:true,ph:'Ej: 45200'},
+    {k:'kmIn',l:'Km al devolver',t:'number',half:true,ph:'Ej: 45890'},
+    {k:'mech',l:'Mecánico / asistencia (emergencias)',t:'tel',ph:'Ej: +54 9 3757 123456'},
     {k:'_riders',t:'html',html:''},   /* se completa en openItem: quiénes viajan con este pasaje / van en el auto */
     {k:'company',l:'Empresa',t:'text',half:true,ph:'Aerolínea, bus…'},
     {k:'ref',l:'Código de reserva',t:'text',half:true},
@@ -212,8 +215,8 @@ function openItem(k,id,pre){
     if(k==='transports'){
       var rd=takeChecks(d,'rd');
       d.riders=rd;   /* pasajeros: en un alquiler son los que van en el auto */
-      if(d.type==='auto'){d.seats=String(parseInt(d.seats,10)||'');if(d.same){d.to=d.from;d.same='1';}else d.same='';}
-      else{d.seats='';d.same='';}
+      if(d.type==='auto'){d.seats=String(parseInt(d.seats,10)||'');d.kmOut=String(parseInt(d.kmOut,10)||'');d.kmIn=String(parseInt(d.kmIn,10)||'');d.mech=String(d.mech||'').replace(/[^\d+()\s-]/g,'').slice(0,30).trim();if(d.same){d.to=d.from;d.same='1';}else d.same='';}
+      else{d.seats='';d.same='';d.kmOut='';d.kmIn='';d.mech='';}
     }
     return d;}
   /* Alquiler de auto: los mismos campos del transporte, con nombres de retiro y devolución. */
@@ -224,7 +227,7 @@ function openItem(k,id,pre){
     Object.keys(TLBL).forEach(function(n){var i=el(n);if(i)i.closest('.fld').querySelector('span').textContent=TLBL[n][car?1:0];});
     el('from').placeholder=car?'Ej: Aeropuerto de Iguazú':'Ej: Rosario';el('to').placeholder=car?'Ej: Centro de Puerto Iguazú':'Ej: Bariloche';el('company').placeholder=car?'Localiza, Hertz…':'Aerolínea, bus…';
     $('#sameWrap',panel).hidden=!car;
-    showFld(el('seats'),car);
+    showFld(el('seats'),car);showFld(el('kmOut'),car);showFld(el('kmIn'),car);showFld(el('mech'),car);
     var rb=$('#rdBox',panel);if(rb)rb.querySelector('span').textContent=car?'Quiénes van en este auto':'Quiénes viajan con este pasaje';
     var rh=$('#rdHint',panel);if(rh)rh.hidden=car;
     var so=el('split').querySelector('option[value=riders]');if(so)so.textContent=car?'Los que van en este auto':'Los que viajan con este pasaje';
@@ -352,6 +355,7 @@ function openItem(k,id,pre){
     var d=readForm(),fm=$('#formmsg',panel);
     var req=sp.fields.filter(function(x){return x.req&&!d[x.k]})[0];
     if(req){var r=$('#f_'+req.k,panel);if(r)r.focus();return;}
+    if(k==='transports'&&d.type==='auto'&&d.kmOut&&d.kmIn&&+d.kmIn<+d.kmOut){fm.textContent='Los km al devolver son menos que al retirar. Revisá los números.';return;}
     if(k==='transports'&&d.dep&&d.arr&&d.arr<d.dep){fm.textContent=d.type==='auto'?'La devolución es antes del retiro. Revisá las fechas.':'La llegada es antes de la salida. Revisá las fechas.';return;}
     var prob='amount' in d?splitProblem(d):'';
     if(prob){fm.textContent=prob;return;}
