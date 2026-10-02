@@ -97,6 +97,18 @@ test('historial: los miembros agregan, nadie edita ni borra', async () => {
   await assertFails(getDocs(collection(as('carla'), 'trips', T, 'log')));
 });
 
+test('gastos propios: solo los ve su dueño', async () => {
+  const ana = as('ana'), beto = as('beto');
+  await assertSucceeds(setDoc(doc(ana, 'trips', T, 'private', 'p1'), { k: 'expenses', id: 'p1', ouid: 'ana', desc: 'Regalo', amount: 10 }));
+  await assertFails(setDoc(doc(beto, 'trips', T, 'private', 'p2'), { k: 'expenses', id: 'p2', ouid: 'ana' }));   // no a nombre de otro
+  await assertSucceeds(getDocs(query(collection(ana, 'trips', T, 'private'), where('ouid', '==', 'ana'))));
+  await assertFails(getDocs(query(collection(beto, 'trips', T, 'private'), where('ouid', '==', 'ana'))));
+  await assertFails(getDoc(doc(beto, 'trips', T, 'private', 'p1')));
+  await assertFails(updateDoc(doc(beto, 'trips', T, 'private', 'p1'), { amount: 1 }));
+  await assertFails(deleteDoc(doc(beto, 'trips', T, 'private', 'p1')));
+  await assertSucceeds(deleteDoc(doc(ana, 'trips', T, 'private', 'p1')));
+});
+
 test('con sesión y código se usa el viaje, pero no se borra nada', async () => {
   const db = as('ana', 'ana@x.com');
   await assertSucceeds(getDoc(doc(db, 'trips', T)));

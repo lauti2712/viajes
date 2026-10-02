@@ -55,6 +55,7 @@ function logDiff(prev,cur){
 /* Lo llaman upsert/remove (core.js). Los cambios "de sistema" (ra) no se anotan. */
 function logChange(k,prev,cur){
   if(!FB||!CODE||AUTH!=='in'||LOG_KEYS.indexOf(k)<0||!cur||cur.ra===cur.u)return;
+  if(isPriv(k,cur)||(prev&&isPriv(k,prev)))return;   /* lo privado no deja rastro compartido */
   var act=!prev?'new':(prev.del&&!cur.del?'restore':(!prev.del&&cur.del?'del':'edit'));
   var ch=act==='edit'?logDiff(prev,cur):[];
   if(act==='edit'&&!ch.length)return;
@@ -101,7 +102,7 @@ function openHistory(){
 var TRASH_DAYS=30;
 function trashItems(){
   var lim=Date.now()-TRASH_DAYS*864e5,o=[];
-  LOG_KEYS.forEach(function(k){S[k].forEach(function(x){if(x.del&&(x.u||0)>=lim)o.push({k:k,x:x});});});
+  LOG_KEYS.forEach(function(k){S[k].forEach(function(x){if(x.del&&!x.gone&&(x.u||0)>=lim)o.push({k:k,x:x});});});
   return o.sort(function(a,b){return (b.x.u||0)-(a.x.u||0);});
 }
 function trashHtml(){

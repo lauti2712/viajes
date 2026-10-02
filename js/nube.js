@@ -15,6 +15,7 @@ var fdoc=function(){return FB.fs.doc.apply(null,[FB.db,'trips',CODE].concat([].s
 function pushItem(k,it){
   if(!FB||!CODE||AUTH!=='in')return;
   if(k==='packing'){pushPacking(it);return;}
+  if(isPriv(k,it)){pushPriv(k,it);return;}
   try{FB.fs.setDoc(fdoc('items',it.id),clean(Object.assign({k:k},it))).catch(fbErr);}catch(e){}
 }
 function pushPacking(it){
@@ -253,6 +254,7 @@ function listen(){
     if(!snap.metadata.fromCache&&snap.exists())recordTrip();
   },function(err){if(err&&err.code==='permission-denied'){deniedTrip();return;}fbErr(err);setSync('err');});
   listenMembers();
+  listenPrivate();
 
   fs.onSnapshot(fs.collection(db,'trips',CODE,'items'),{includeMetadataChanges:true},function(snap){
     var changed=false;
@@ -261,13 +263,14 @@ function listen(){
       var d=ch.doc.data();
       if(!d)return;
       if(d.k==='packing'){if(d.del||!d.owner)delete LEGACY_PACK[ch.doc.id];else LEGACY_PACK[ch.doc.id]=d;return;}
+      if(d.gone){var loc=S[d.k]&&S[d.k].find(function(x){return x.id===d.id;});if(loc&&isPriv(d.k,loc))return;}
       if(CLOUD_KEYS.indexOf(d.k)>=0&&applyItem(d.k,d,!snap.metadata.fromCache&&!ch.doc.metadata.hasPendingWrites))changed=true;
     });
     if(!itemsReady&&!snap.metadata.fromCache){
       itemsReady=true;
       var rem={};snap.docs.forEach(function(x){rem[x.id]=x.data().u||0});
-      CLOUD_KEYS.forEach(function(k){S[k].forEach(function(it){if(rem[it.id]===undefined||(it.u||0)>rem[it.id])pushItem(k,it);});});
-      maybeMigratePeople();
+      CLOUD_KEYS.forEach(function(k){S[k].forEach(function(it){if(isPriv(k,it))return;if(rem[it.id]===undefined||(it.u||0)>rem[it.id])pushItem(k,it);});});
+      maybeMigratePeople();migratePrivate();
     }
     migrateLegacyPacking();
     if(changed){save();render();checkNewAvisos();}
@@ -289,7 +292,7 @@ function listen(){
     snap.docs.forEach(function(x){var d=x.data()||{};c[x.id]={uid:d.uid||'',name:d.name||'',cobro:Array.isArray(d.cobro)?d.cobro.filter(function(y){return y&&typeof y.a==='string'&&y.a;}).map(function(y){return {n:String(y.n||''),a:y.a};}):[],
       methods:Array.isArray(d.methods)?d.methods.filter(function(y){return y&&typeof y.id==='string'&&/^[a-z0-9]{1,24}$/i.test(y.id);}).map(function(y){return {id:y.id,n:String(y.n||''),t:String(y.t||'otro')};}):[]};if(d.uid===ME.uid&&!x.metadata.hasPendingWrites&&(!mine||x.id<mine))mine=x.id;});
     CLAIMS=c;
-    if(mine!==myClaim||!claimsSeen){claimsSeen=true;myClaim=mine;subscribePacking();}
+    if(mine!==myClaim||!claimsSeen){claimsSeen=true;myClaim=mine;subscribePacking();migratePrivate();}
     if(!snap.metadata.hasPendingWrites)syncCobro();
     claimsLoaded=true;
     if(!snap.metadata.fromCache)maybeAdoptOwner();
@@ -392,3 +395,48 @@ function kickMember(uid){
 }
 function unbanMember(uid){if(!isOrganizer())return;FB.fs.deleteDoc(fdoc('banned',uid)).catch(fbErr);}
 function setLocked(on){if(!isOrganizer())return;S.trip.locked=!!on;S.trip.u=nextU(S.trip.u);save();pushTrip({locked:!!on});}
+
+/* ---------- Gastos propios privados ----------
+   Un gasto "Para mí" pagado por uno mismo se guarda en trips/{code}/private/{id} (ouid = la cuenta):
+   solo esa cuenta lo lee, como la mochila. Si antes estaba compartido, en `items` queda una lápida
+   sin texto ni monto (gone), así los demás lo dejan de ver. */
+var PRIV_KEYS=['transports','lodging','expenses'],privUnsub=null;
+function isPriv(k,x){
+  if(!x||PRIV_KEYS.indexOf(k)<0||x.split!=='self'||!cloudMode())return false;
+  if(x.ouid)return !!ME&&x.ouid===ME.uid;
+  return !!(ME&&x.paidBy&&x.paidBy===myPersonId());
+}
+function pushPriv(k,it){
+  if(!it.ouid){it.ouid=ME.uid;save();}
+  try{FB.fs.setDoc(fdoc('private',it.id),clean(Object.assign({k:k},it))).catch(fbErr);}catch(e){}
+}
+function tombstone(k,it){try{FB.fs.setDoc(fdoc('items',it.id),{k:k,id:it.id,u:it.u,del:true,gone:true}).catch(fbErr);}catch(e){}}
+/* Lo llama upsert (core.js): un gasto que pasa de compartido a propio, o al revés. */
+function privMove(k,prev,it){
+  if(!FB||!CODE||AUTH!=='in'||!prev||PRIV_KEYS.indexOf(k)<0)return;
+  var was=isPriv(k,prev)||(prev.split==='self'&&prev.ouid===ME.uid),now=isPriv(k,it);
+  if(!was&&now)tombstone(k,it);
+  if(was&&!now){if(it.ouid){delete it.ouid;save();pushItem(k,it);}try{FB.fs.deleteDoc(fdoc('private',it.id)).catch(fbErr);}catch(e){}}
+}
+/* Gastos "Para mí" cargados antes de que fueran privados: se mudan apenas se sabe quién es uno. */
+function migratePrivate(){
+  if(!myClaim||!itemsReady)return;
+  PRIV_KEYS.forEach(function(k){S[k].forEach(function(it){
+    if(it.ouid||it.del||!isPriv(k,it))return;
+    it.ouid=ME.uid;it.u=nextU(it.u);save();pushPriv(k,it);tombstone(k,it);
+  });});
+}
+function listenPrivate(){
+  if(privUnsub)return;
+  var fs=FB.fs,first=true;
+  privUnsub=fs.onSnapshot(fs.query(fs.collection(FB.db,'trips',CODE,'private'),fs.where('ouid','==',ME.uid)),{includeMetadataChanges:true},function(snap){
+    if(first&&!snap.metadata.fromCache){
+      first=false;
+      var rem={};snap.docs.forEach(function(x){rem[x.id]=x.data().u||0;});
+      PRIV_KEYS.forEach(function(k){S[k].forEach(function(it){if(it.ouid===ME.uid&&(rem[it.id]===undefined||(it.u||0)>rem[it.id]))pushPriv(k,it);});});
+    }
+    var changed=false;
+    snap.docChanges().forEach(function(ch){if(ch.type==='removed')return;var d=ch.doc.data();if(d&&PRIV_KEYS.indexOf(d.k)>=0&&applyItem(d.k,d,!snap.metadata.fromCache&&!ch.doc.metadata.hasPendingWrites))changed=true;});
+    if(changed){save();render();}
+  },function(err){fbErr(err);});
+}

@@ -40,9 +40,13 @@ async function loadOtherCharges(quiet){
     for(var j=0;j<ids.length;j+=30){
       try{
         var snap=await fs.getDocs(fs.query(fs.collection(FB.db,'trips',trips[i].code,'items'),fs.where('methodId','in',ids.slice(j,j+30))));
-        snap.forEach(function(d){var x=d.data();var c=itemCost(x.k,x,'ARS');if(c){c.trip=trips[i].code;c.tripName=trips[i].name||'Viaje';out.push(c);}});
+        snap.forEach(function(d){var x=d.data();if(x.gone)return;var c=itemCost(x.k,x,'ARS');if(c){c.trip=trips[i].code;c.tripName=trips[i].name||'Viaje';out.push(c);}});
       }catch(e){failed++;}
     }
+    try{   /* gastos propios (privados) de ese viaje */
+      var ps=await fs.getDocs(fs.query(fs.collection(FB.db,'trips',trips[i].code,'private'),fs.where('ouid','==',ME.uid)));
+      ps.forEach(function(d){var x=d.data();if(ids.indexOf(x.methodId)<0)return;var c=itemCost(x.k,x,'ARS');if(c){c.trip=trips[i].code;c.tripName=trips[i].name||'Viaje';out.push(c);}});
+    }catch(e){}
   }
   OTHER_CHARGES=out;otherState=failed?'partial':'ok';render();
 }

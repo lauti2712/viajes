@@ -86,6 +86,13 @@ service cloud.firestore {
         allow create: if isMember() && request.resource.data.uid == request.auth.uid;
       }
 
+      // Gastos propios ("Para mí" pagados por uno): solo los ve y edita la cuenta dueña (ouid).
+      match /private/{itemId} {
+        allow read, delete: if signedIn() && resource.data.ouid == request.auth.uid;
+        allow create: if isMember() && request.resource.data.ouid == request.auth.uid;
+        allow update: if isMember() && resource.data.ouid == request.auth.uid && request.resource.data.ouid == request.auth.uid;
+      }
+
       // Vínculo persona del viaje -> cuenta de Google. Cada persona la puede tomar una sola cuenta.
       // El organizador puede soltar el vínculo de alguien que sacó del viaje.
       match /claims/{personId} {
