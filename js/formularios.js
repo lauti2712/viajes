@@ -139,8 +139,10 @@ var SPECS={
     {k:'title',l:'Qué van a hacer',t:'text',req:true,ph:'Ej: Cena en el puerto'},
     {k:'date',l:'Fecha',t:'date',half:true,req:true},
     {k:'time',l:'Hora',t:'time',half:true},
+    {k:'_end',t:'html',html:''},   /* se completa en openItem: "tiene hora de finalización" */
+    {k:'endTime',l:'Termina a las',t:'time',half:true},
     {k:'type',l:'Tipo',t:'select',opts:Object.keys(ITYPES).map(function(k){return [k,ITYPES[k][0]+' '+ITYPES[k][1]]})},
-    {k:'place',l:'Lugar',t:'text'},
+    {k:'_place',t:'html',html:''},   /* se completa en openItem: buscador de dirección */
     {k:'notes',l:'Notas',t:'textarea',ph:'Reserva, cómo llegar, qué llevar…'}
   ]}}
 };
@@ -208,6 +210,7 @@ function openItem(k,id,pre){
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="showItin"'+(vals.hideItin==='1'?'':' checked')+'> Mostrar el check-in y el check-out en el itinerario</label>';});
+  if(k==='plans')sp.fields.forEach(function(f){if(f.k==='_place')f.html=addrFieldHtml(vals,'place','Lugar','Nombre del lugar o dirección');if(f.k==='_end')f.html='<label class="fld pksug chk"><input type="checkbox" name="hasEnd"'+(vals.endTime?' checked':'')+'> Tiene hora de finalización</label>';});
   if(k==='expenses')sp.fields.forEach(function(f){if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="inItin"'+(vals.inItin==='1'?' checked':'')+'> Mostrarlo en el itinerario</label>';});
   if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes viajan con este pasaje')+'<p class="full mtn6 hint" id="rdHint">Cada uno carga sus pasajes. Si viajás junto con alguien en la misma reserva, tildalo también.</p>';});
   var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="full m0 msg err" id="formmsg" role="status"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
@@ -216,11 +219,13 @@ function openItem(k,id,pre){
   var f=$('#sf',panel);
   bindItemLog(panel,ex?ex.id:'');
   if(k==='lodging')bindAddrField(panel);
+  if(k==='plans')bindAddrField(panel,'place');
   var el=function(nm){return f.querySelector('[name='+nm+']');};
   function showFld(input,on){if(!input)return;var w=input.closest('.fld');if(w)w.hidden=!on;input.disabled=!on;}
 
   function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging'){d.guests=takeChecks(d,'g');d.hideItin=d.showItin?'':'1';delete d.showItin;}
     if(k==='expenses')d.inItin=d.inItin?'1':'';
+    if(k==='plans'){if(!d.hasEnd)d.endTime='';delete d.hasEnd;}
     if(k==='transports'){
       var rd=takeChecks(d,'rd');
       d.riders=rd;   /* pasajeros: en un alquiler son los que van en el auto */
@@ -355,7 +360,11 @@ function openItem(k,id,pre){
     k==='transports'?{l:'🎫 Empresa, reserva y notas',names:['company','ref','notes'],open:!!ex&&has(['company','ref','notes'])}
                     :{l:'📍 Dirección, link y notas',names:['#addrFld','airbnb','ref','notes'],open:!!ex&&has(['airbnb','address','ref','notes'])}
   ]);
-  if(k==='plans')groupFields(panel,f,[{l:'📍 Lugar y notas',names:['place','notes'],open:!!ex&&has(['place','notes'])}]);
+  if(k==='plans')groupFields(panel,f,[{l:'📍 Lugar y notas',names:['#addrFld','notes'],open:!!ex&&has(['place','notes'])}]);
+  if(k==='plans'){   /* la hora de fin aparece solo al tildar "Tiene hora de finalización" */
+    var syncEnd=function(){var on=f.querySelector('[name=hasEnd]').checked,et=el('endTime');et.closest('.fld').hidden=!on;if(on&&!et.value&&el('time').value){var m=/^(\d{2}):(\d{2})/.exec(el('time').value);if(m)et.value=String((+m[1]+1)%24).padStart(2,'0')+':'+m[2];}};
+    syncEnd();f.addEventListener('change',function(e){if(e.target.name==='hasEnd')syncEnd();});
+  }
   /* Modo solo: quién pagó (vos) y para quién es no hace falta elegirlos. */
   if(solo()&&(k==='transports'||k==='lodging'||k==='expenses')){
     var me1=myPersonId(),pb1=el('paidBy');if(pb1&&!pb1.value&&me1){pb1.value=me1;syncPay();}

@@ -107,7 +107,7 @@ function vTransportes(){
 }
 
 /* Botón 📍 que abre la dirección en el mapa del celular. */
-function mapBtn(x){var u=mapsUrl(x);return u?'<a class="mapbtn" href="'+esc(u)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" aria-label="Abrir en el mapa" title="Abrir en el mapa">📍</a>':'';}
+function mapBtn(x,key){var u=mapsUrl(x,key);return u?'<a class="mapbtn" href="'+esc(u)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" aria-label="Abrir en el mapa" title="Abrir en el mapa">📍</a>':'';}
 function vAlojamiento(){
   var L=live('lodging').sort(function(a,b){return (a.in||'9999').localeCompare(b.in||'9999')});
   var h='<div class="bar"><h2>Alojamiento</h2><button class="primary" data-act="add" data-k="lodging">+ Agregar</button></div>';
@@ -185,7 +185,7 @@ function daysList(){
   return Array.from(set).filter(function(d){return pd(d);}).sort();   /* fechas mal cargadas no rompen el itinerario */
 }
 function autoRow(ic,time,title,sub){return '<div class="pl auto"><span class="t">'+esc(time)+'</span><div><b>'+ic+' '+esc(title)+'<span class="tag">Reserva</span></b>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div></div>';}
-function planRow(p){var ty=ITYPES[p.type]||ITYPES.otro;return '<div class="pl" role="button" tabindex="0" data-act="edit" data-k="plans" data-id="'+p.id+'"><span class="t">'+esc(hh(p.time))+'</span><div><b>'+ty[0]+' '+esc(p.title||'Plan')+attLinkChips(p)+'</b>'+(p.place?'<small>'+esc(p.place)+'</small>':'')+(p.notes?'<small>'+esc(p.notes)+'</small>':'')+'</div></div>';}
+function planRow(p){var ty=ITYPES[p.type]||ITYPES.otro;return '<div class="pl" role="button" tabindex="0" data-act="edit" data-k="plans" data-id="'+p.id+'"><span class="t">'+esc(hh(p.time))+(p.endTime?'<small class="tend">a '+esc(hh(p.endTime))+'</small>':'')+'</span><div><b>'+ty[0]+' '+esc(p.title||'Plan')+attLinkChips(p)+'</b>'+(p.place?'<small class="addr">'+mapBtn(p,'place')+'<span>'+esc(p.place)+'</span></small>':'')+(p.notes?'<small>'+esc(p.notes)+'</small>':'')+'</div></div>';}
 function paxNames(r){return livingIds(r).map(nameOf).filter(Boolean);}
 function joinNames(a){return a.length<2?a.join(''):a.slice(0,-1).join(', ')+' y '+a[a.length-1];}
 /* Pasajes del día: cada uno carga el suyo, así que los que salen y llegan igual (mismo horario y tramo) se juntan
@@ -223,8 +223,10 @@ function hoyHtml(wxOn){
   var mineOr=function(list,f){var m=me?list.filter(function(x){return idsOf(x[f]).indexOf(me)>=0;}):[];return m.length?m:list;};
   /* Plan que sigue hoy */
   var P=live('plans').filter(function(p){return p.date===t;}).sort(function(a,b){return (a.time||'99').localeCompare(b.time||'99');});
-  var up=P.filter(function(p){return !p.time||p.time>=hm;});
-  if(up.length){var p0=up[0];rows.push(row((ITYPES[p0.type]||ITYPES.otro)[0],p0.time?'Hoy a las '+hh(p0.time):'Hoy',p0.title||'Plan',[p0.place,up.length>1?'y '+(up.length-1)+' más hoy':''].filter(Boolean).join(' · ')));}
+  /* un plan con hora de fin sigue "en curso" hasta que termina */
+  var up=P.filter(function(p){return !p.time||p.time>=hm||(p.endTime&&p.endTime>=hm);});
+  if(up.length){var p0=up[0],now0=p0.time&&p0.time<hm;rows.push(row((ITYPES[p0.type]||ITYPES.otro)[0],now0?'Ahora, hasta las '+hh(p0.endTime):p0.time?'Hoy a las '+hh(p0.time)+(p0.endTime?' a '+hh(p0.endTime):''):'Hoy',p0.title||'Plan',[p0.place,up.length>1?'y '+(up.length-1)+' más hoy':''].filter(Boolean).join(' · ')));}
+  if(up.length&&mapsUrl(up[0],'place'))rows[rows.length-1]=rows[rows.length-1].replace('</div></div>','</div>'+mapBtn(up[0],'place')+'</div>');
   else if(P.length)rows.push(row('✅','Hoy','Ya pasaron los planes de hoy',''));
   /* Próximo transporte */
   var T=live('transports').filter(function(x){return x.dep&&x.dep>=now;}).sort(function(a,b){return a.dep.localeCompare(b.dep);});

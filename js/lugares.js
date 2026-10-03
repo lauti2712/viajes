@@ -72,21 +72,22 @@ async function searchAddress(q){
     /* con ciudad del viaje, primero lo más cerca (sin descartar lo lejano: un viaje puede pasar por varias ciudades) */
     .sort(function(x,y){return c?x._d-y._d:0;}).slice(0,6);
 }
-function mapsUrl(x){
-  if(!x)return '';
+function mapsUrl(x,key){
+  if(!x)return '';var txt=x[key||'address'];
   var la=parseFloat(x.addrLat),ln=parseFloat(x.addrLng);
   if(isFinite(la)&&isFinite(ln)&&Math.abs(la)<=90&&Math.abs(ln)<=180)return 'https://www.google.com/maps/search/?api=1&query='+la.toFixed(6)+','+ln.toFixed(6);
-  return x.address?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(x.address):'';
+  return txt?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(txt):'';
 }
-function addrFieldHtml(v){
-  var ok=isFinite(parseFloat(v.addrLat))&&v.address;
-  return '<div class="fld" id="addrFld"><span>Dirección</span><input type="text" name="address" value="'+esc(v.address||'')+'" placeholder="Calle y número, o nombre del lugar" autocomplete="off">'
+function addrFieldHtml(v,key,label,ph){
+  key=key||'address';
+  var ok=isFinite(parseFloat(v.addrLat))&&v[key];
+  return '<div class="fld" id="addrFld"><span>'+esc(label||'Dirección')+'</span><input type="text" name="'+key+'" value="'+esc(v[key]||'')+'" placeholder="'+esc(ph||'Calle y número, o nombre del lugar')+'" autocomplete="off">'
    +'<div class="cityList" id="addrList" role="listbox"></div>'
    +'<small class="m0 hint" id="addrMsg">'+(ok?'📍 Ubicación encontrada en el mapa.':'Escribí y elegí de la lista para que quede ubicada en el mapa.')+'</small>'
    +'<input type="hidden" name="addrLat" value="'+esc(v.addrLat||'')+'"><input type="hidden" name="addrLng" value="'+esc(v.addrLng||'')+'"></div>';
 }
-function bindAddrField(panel){
-  var q=panel.querySelector('[name=address]'),list=$('#addrList',panel),msg=$('#addrMsg',panel),la=panel.querySelector('[name=addrLat]'),ln=panel.querySelector('[name=addrLng]'),tmr=null,res=[],seq=0;
+function bindAddrField(panel,key){
+  var q=panel.querySelector('[name='+(key||'address')+']'),list=$('#addrList',panel),msg=$('#addrMsg',panel),la=panel.querySelector('[name=addrLat]'),ln=panel.querySelector('[name=addrLng]'),tmr=null,res=[],seq=0;
   if(!q)return;
   q.addEventListener('input',function(){
     la.value='';ln.value='';clearTimeout(tmr);
