@@ -305,7 +305,7 @@ function listen(){
 function listenPrefs(){
   FB.fs.onSnapshot(FB.fs.doc(FB.db,'users',ME.uid,'prefs','app'),function(snap){
     if(!snap.exists())return;var d=snap.data()||{};
-    var ch=false;['showWeather','wxShort'].forEach(function(k){if(typeof d[k]==='boolean'&&d[k]!==!!PREFS[k]){PREFS[k]=d[k];ch=true;}});
+    var ch=false;['showWeather','wxShort','h12'].forEach(function(k){if(typeof d[k]==='boolean'&&d[k]!==!!PREFS[k]){PREFS[k]=d[k];ch=true;}});
     if(ch){try{localStorage.setItem('viaje-de-a-dos:prefs',JSON.stringify(PREFS));}catch(e){}render();}
   },function(){});
 }

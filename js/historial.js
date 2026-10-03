@@ -36,7 +36,8 @@ function logVal(f,v){
   if(f==='status')return v==='pagado'?'Pagado':v==='comprar'?'Por comprar':'Por pagar';
   if(f==='split')return {equal:'Todos por igual',self:'Gasto propio',some:'Algunos',amounts:'Por montos',guests:'Los que se quedan',riders:'Los que viajan'}[v]||('Solo '+nameOf(v));
   if(f==='type')return (TYPES[v]||ITYPES[v]||['',v])[1];
-  if(f==='dep'||f==='arr')return fShort(v)+(tm(v)?' '+tm(v):'');
+  if(f==='dep'||f==='arr')return fShort(v)+(tm(v)?' '+hh(tm(v)):'');
+  if(/^(time|inTime|outTime)$/.test(f))return hh(v);
   if(/^(date|in|out|payDate)$/.test(f))return fShort(v)||v;
   return v.length>60?v.slice(0,57)+'…':v;
 }

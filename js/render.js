@@ -49,7 +49,8 @@ function openProfile(){
    +(METHODS.length?METHODS.map(function(m){var ty=mtype(m);return '<div class="exp" role="button" tabindex="0" data-act="editmethod" data-id="'+esc(m.id)+'" style="grid-template-columns:34px 1fr"><span class="ec" aria-hidden="true">'+ty[0]+'</span><div class="et"><b>'+esc(methodLabel(m))+'</b><small><span>'+esc(ty[1])+'</span>'+(m.alias&&m.share?'<span>Alias visible: '+esc(m.alias)+'</span>':'')+'</small></div></div>';}).join('')
      :'<p class="nada">Todavía no cargaste ninguna. Sirven para elegir con qué pagaste cada gasto y para que te paguen a tu alias.</p>')
    +(cloudMode()?'<div class="mt10 row"><button type="button" class="ghost" data-act="gopagos">💳 Ver mis pagos y resúmenes de tarjeta</button></div>':'')+'</section>';
-  h+='<section class="psec"><h3 class="mb8">Preferencias</h3><label class="pkchk"><input type="checkbox" data-pref="showWeather"'+(PREFS.showWeather!==false?' checked':'')+'><span>Mostrar el clima en el itinerario</span></label></section>';
+  h+='<section class="psec"><h3 class="mb8">Preferencias</h3><label class="pkchk"><input type="checkbox" data-pref="showWeather"'+(PREFS.showWeather!==false?' checked':'')+'><span>Mostrar el clima en el itinerario</span></label>'
+   +'<div class="mt10 row g6"><span class="hint m0">Formato de hora:</span><button type="button" class="sm ghost'+(PREFS.h12?'':' active')+'" data-act="h12" data-v="">24 h (18:30)</button><button type="button" class="sm ghost'+(PREFS.h12?' active':'')+'" data-act="h12" data-v="1">12 h (6:30 p. m.)</button></div></section>';
   if(typeof isStandalone==='function'&&!isStandalone()&&(installEvt||isIOS()))h+='<section class="psec"><button type="button" class="ghost" data-act="install">📲 Instalar la app en este dispositivo</button></section>';
   h+='<section class="psec"><button type="button" class="danger" data-act="logout">Salir de la cuenta</button></section>';
   var panel=openSheet('Mi perfil',h);

@@ -9,6 +9,8 @@ var fLong=function(s){var d=pd(s);return d?cap(d.toLocaleDateString('es-AR',{wee
 var fShort=function(s){var d=pd(s);return d?d.toLocaleDateString('es-AR',{day:'numeric',month:'short'}).replace('.',''):''};
 var mon=function(s){var d=pd(s);return d?d.toLocaleDateString('es-AR',{month:'short'}).replace('.',''):''};
 var tm=function(s){var m=/T(\d{2}:\d{2})/.exec(s||'');return m?m[1]:''};
+/* Hora para mostrar ("HH:MM" guardada siempre en 24 h): en 12 h si la persona lo eligió en su perfil. */
+var hh=function(s){var m=/^(\d{1,2}):(\d{2})/.exec(s||'');if(!m)return '';if(!(typeof PREFS!=='undefined'&&PREFS.h12))return m[1].padStart(2,'0')+':'+m[2];var h=+m[1];return (h%12||12)+':'+m[2]+(h<12?' a. m.':' p. m.');};
 var dayDiff=function(a,b){return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/864e5)};
 var base=function(){return curCode(S.trip.base,'ARS')};
 var fmtC={};

@@ -34,6 +34,7 @@ document.addEventListener('click',function(e){
   else if(a==='itinpast'){itinPast=!itinPast;render();}
   else if(a==='wxoff')setPref('showWeather',false);
   else if(a==='wxon')setPref('showWeather',true);
+  else if(a==='h12'){setPref('h12',!!t.dataset.v);closeSheet();openProfile();}
   else if(a==='wxless')setPref('wxShort',!PREFS.wxShort);
   else if(a==='rates')openRates();
   else if(a==='trash')openTrash();

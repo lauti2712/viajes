@@ -186,3 +186,10 @@ test('alojamiento sin nombre: se muestra por la dirección', () => {
   assert.equal(c.lodgeName({ address: 'Av. Córdoba 148, Puerto Iguazú' }), 'Av. Córdoba 148');
   assert.equal(c.lodgeName({}), 'Alojamiento');
 });
+
+test('formato de hora 24 h / 12 h', () => {
+  const c = app(P3);
+  assert.equal(c.hh('09:30'), '09:30');
+  c.PREFS.h12 = true;
+  assert.deepEqual(['00:15', '09:30', '12:00', '18:45', ''].map(c.hh), ['12:15 a. m.', '9:30 a. m.', '12:00 p. m.', '6:45 p. m.', '']);
+});
