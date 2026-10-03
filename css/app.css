@@ -417,3 +417,24 @@ a.tel{color:var(--sea);font-weight:700;text-decoration:none}
 .pill.buy{background:color-mix(in srgb,var(--sea) 30%,transparent);color:var(--ink)}
 .tag.gasto{background:color-mix(in srgb,var(--sea) 35%,transparent)}
 .pl .t .tend{display:block;font-size:11px;color:var(--muted);font-weight:600}
+/* Clima de ahora (renglón del itinerario) y su detalle */
+.bar .wxnow{margin-left:auto;margin-right:8px}
+.wxnow{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:15px;cursor:pointer}
+.wxnow b{font-weight:800}
+.wxcur{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:0 0 16px}
+.wxcur .big{font-size:44px;line-height:1}
+.wxcur>div b{display:block;font-size:30px;line-height:1.1}
+.wxcur>div span{color:var(--muted)}
+.wxcur ul{list-style:none;margin:0;padding:0;font-size:13px;color:var(--muted);flex:1 1 100%;display:flex;flex-wrap:wrap;gap:4px 14px}
+.wxcur ul b{color:var(--ink)}
+.wxhours{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.wxhours>div{flex:none;min-width:54px;display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:7px 4px}
+.wxhours small{font-size:11px;color:var(--muted)}
+.wxhours span{font-size:20px}
+.wxhours .pp{min-height:13px}
+.wxdays>div{display:grid;grid-template-columns:1fr 30px 56px 38px 34px;align-items:center;gap:6px;padding:7px 0;border-top:1px solid var(--line)}
+.wxdays>div:first-child{border-top:0}
+.wxdays .dn{font-weight:600}
+.wxdays .pp{font-size:12px;color:var(--muted);text-align:right}
+.wxdays b{text-align:right}
+.wxdays small{color:var(--muted);text-align:right}
