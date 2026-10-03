@@ -131,7 +131,9 @@ var SPECS={
   expenses:function(){return {title:['Anotar gasto','Editar gasto'],fields:[
     {k:'desc',l:'Qué fue',t:'text',req:true,ph:'Almuerzo, taxi, entradas…'},
     {k:'date',l:'Fecha',t:'date',half:true},
-    {k:'cat',l:'Categoría',t:'select',half:true,opts:Object.keys(catAll()).map(function(k){return [k,catAll()[k]+' '+k]})}
+    {k:'time',l:'Hora (opcional)',t:'time',half:true},
+    {k:'cat',l:'Categoría',t:'select',opts:Object.keys(catAll()).map(function(k){return [k,catAll()[k]+' '+k]})},
+    {k:'_itin',t:'html',html:''}   /* se completa en openItem: mostrarlo en el itinerario */
   ].concat(costF())}},
   plans:function(){return {title:['Nuevo plan','Editar plan'],fields:[
     {k:'title',l:'Qué van a hacer',t:'text',req:true,ph:'Ej: Cena en el puerto'},
@@ -206,6 +208,7 @@ function openItem(k,id,pre){
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="showItin"'+(vals.hideItin==='1'?'':' checked')+'> Mostrar el check-in y el check-out en el itinerario</label>';});
+  if(k==='expenses')sp.fields.forEach(function(f){if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="inItin"'+(vals.inItin==='1'?' checked':'')+'> Mostrarlo en el itinerario</label>';});
   if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes viajan con este pasaje')+'<p class="full mtn6 hint" id="rdHint">Cada uno carga sus pasajes. Si viajás junto con alguien en la misma reserva, tildalo también.</p>';});
   var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="full m0 msg err" id="formmsg" role="status"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
    +'<details class="sideSec fgrp"'+(ex&&((ex.attachments||[]).length||(ex.links||[]).length)?' open':'')+'><summary><span>📎 Archivos y links</span><small>'+(ex?attLinkChips(ex):'')+'</small></summary>'+attsBlock(ex)+linksBlock(ex)+'</details>'+(ex?itemLogHtml():'');
@@ -217,6 +220,7 @@ function openItem(k,id,pre){
   function showFld(input,on){if(!input)return;var w=input.closest('.fld');if(w)w.hidden=!on;input.disabled=!on;}
 
   function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging'){d.guests=takeChecks(d,'g');d.hideItin=d.showItin?'':'1';delete d.showItin;}
+    if(k==='expenses')d.inItin=d.inItin?'1':'';
     if(k==='transports'){
       var rd=takeChecks(d,'rd');
       d.riders=rd;   /* pasajeros: en un alquiler son los que van en el auto */

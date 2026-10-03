@@ -415,3 +415,4 @@ a.tel{color:var(--sea);font-weight:700;text-decoration:none}
 .hrow .mapbtn{margin-left:auto;align-self:center}
 #addrList:empty{display:none}
 .pill.buy{background:color-mix(in srgb,var(--sea) 30%,transparent);color:var(--ink)}
+.tag.gasto{background:color-mix(in srgb,var(--sea) 35%,transparent)}

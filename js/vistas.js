@@ -126,7 +126,7 @@ function costRow(k,item,desc,icon,catLabel,extra){
   var a=parseFloat(item.amount)||0,cur=curCode(item.cur,base()),b=toBase(a,cur);
   return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="'+k+'" data-id="'+item.id+'"><span class="ec" aria-hidden="true">'+icon+'</span><div class="et"><b>'+esc(desc)+'</b><small><span>'+esc(catLabel)+'</span>'+(item.paidBy&&!solo()?'<span class="who">'+dot(item.paidBy)+esc(pn(item.paidBy))+'</span>':'')+(item.method?'<span>'+esc(item.method)+'</span>':'')+attLinkChips(item)+(extra||'')+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(item.status==='pendiente'||item.status==='comprar'?statusPill(item.status):'')+'</div></div>';
 }
-function expRow(e,extra){return costRow('expenses',e,e.desc||'Gasto',catIcon(e.cat),e.cat||'Otros',extra);}
+function expRow(e,extra){return costRow('expenses',e,e.desc||'Gasto',catIcon(e.cat),(e.time?e.time+' · ':'')+(e.cat||'Otros'),extra);}
 /* Filtro "Ver gastos de": muestra solo lo que esa persona pagó o donde le toca una parte, y suma su parte. */
 var gastosWho='';
 function vGastos(){
@@ -141,7 +141,7 @@ function vGastos(){
       extra='<span><b>'+(part>0?'Le toca '+esc(money(part,cur)):'No le toca parte')+'</b></span>';
       amt=part;
     }
-    (g[dateKey]=g[dateKey]||[]).push({row:rowFn(extra),amount:amt,cur:item.cur,u:u||0});
+    (g[dateKey]=g[dateKey]||[]).push({row:rowFn(extra),amount:amt,cur:item.cur,u:u||0,t:item.time||''});
   }
   live('expenses').forEach(function(e){add(e.date||'0',e,function(x){return expRow(e,x);},e.u);});
   live('transports').filter(function(t){return (parseFloat(t.amount)||0)>0}).forEach(function(t){
@@ -168,7 +168,7 @@ function vGastos(){
   }else
   h+='<dl class="mt12 stats"><div><dt>Gastos anotados</dt><dd>'+money(all.t)+'</dd></div>'+(nd?'<div><dt>Promedio por día</dt><dd>'+money(all.t/nd)+'</dd></div>':'')+(dl>0?'<div><dt>Presupuesto diario</dt><dd>'+money(dl)+'</dd></div>':'')+'</dl>'+(all.miss.size&&!bal?warnMiss(all.miss):'')+'<div class="sp14"></div>';
   h+=keys.map(function(k){
-    var items=g[k].slice().sort(function(a,b){return (b.u||0)-(a.u||0)});
+    var items=g[k].slice().sort(function(a,b){return (b.t||'').localeCompare(a.t||'')||(b.u||0)-(a.u||0)});
     var s=sumBase(items.map(function(x){return {amount:x.amount,cur:x.cur}})),over=dl>0&&s.t>dl;
     return '<section class="day"><div class="dh"><h3>'+(k==='0'?'Sin fecha':esc(fLong(k)))+'</h3><b class="'+(over?'over':'')+'">'+money(s.t)+'</b></div>'+(dl>0?'<div class="prog"><span class="'+(over?'over':'')+'" style="width:'+Math.min(100,s.t/dl*100)+'%"></span></div>':'')+items.map(function(x){return x.row}).join('')+'</section>';
   }).join('');
@@ -254,6 +254,11 @@ function vItinerario(){
     var items=[];
     live('plans').filter(function(p){return p.date===d}).forEach(function(p){items.push({k:p.time||'99:98',h:planRow(p)})});
     items=items.concat(paxRows(d));
+    /* Gastos marcados "Mostrarlo en el itinerario" */
+    live('expenses').filter(function(x){return x.inItin==='1'&&x.date===d;}).forEach(function(x){
+      var a=parseFloat(x.amount)||0;
+      items.push({k:x.time||'99:97',h:'<div class="pl" role="button" tabindex="0" data-act="edit" data-k="expenses" data-id="'+x.id+'"><span class="t">'+esc(x.time||'')+'</span><div><b>'+catIcon(x.cat)+' '+esc(x.desc||'Gasto')+'<span class="tag gasto">Gasto</span></b>'+(a>0?'<small>'+money(a,curCode(x.cur,base()))+(x.status==='comprar'?' · por comprar':'')+'</small>':'')+'</div></div>'});
+    });
     live('lodging').forEach(function(l){
       if(l.hideItin==='1')return;
       if(l.out===d)items.push({k:l.outTime||'10:00',h:autoRow('🛏️',l.outTime||'','Check-out: '+lodgeName(l),'')});

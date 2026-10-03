@@ -7,7 +7,7 @@ var LOG_KEYS=['transports','lodging','expenses','plans','payments','people','veh
 var LOG_SKIP={u:1,eb:1,ct:1,ra:1,id:1,del:1,k:1};
 var LOG_LBL={amount:'Monto',cur:'Moneda',desc:'Qué fue',date:'Fecha',cat:'Categoría',paidBy:'Pagó',status:'Estado',split:'Reparto',splitWith:'Entre',shares:'Montos por persona',guests:'Se quedan',riders:'Viajan',method:'Cómo se pagó',methodId:'Forma de pago',cuotas:'Cuotas',payDate:'Fecha de pago',
   from:'Origen',to:'Destino',dep:'Sale',arr:'Llega',type:'Tipo',company:'Empresa',ref:'Reserva',notes:'Notas',seats:'Asientos',kmOut:'Km al retirar',kmIn:'Km al devolver',mech:'Mecánico',same:'Mismo lugar',
-  name:'Nombre',address:'Dirección',in:'Entrada',out:'Salida',inTime:'Check-in',outTime:'Check-out',hideItin:'Oculto en el itinerario',airbnb:'Link de la reserva',title:'Qué',time:'Hora',place:'Lugar',note:'Nota',
+  name:'Nombre',address:'Dirección',in:'Entrada',out:'Salida',inTime:'Check-in',inItin:'En el itinerario',outTime:'Check-out',hideItin:'Oculto en el itinerario',airbnb:'Link de la reserva',title:'Qué',time:'Hora',place:'Lugar',note:'Nota',
   attachments:'Archivos',links:'Links',plate:'Patente',detail:'Detalle',owner:'Dueño',c:'Orden'};
 var LOG_PEOPLE={paidBy:1,from:1,to:1,owner:1},LOG_PLIST={splitWith:1,guests:1,riders:1};
 var LOG_ACT={new:'agregó',edit:'cambió',del:'borró',restore:'restauró'};
@@ -32,6 +32,7 @@ function logVal(f,v){
   v=String(v);
   if(LOG_PEOPLE[f])return nameOf(v)||'?';
   if(LOG_PLIST[f])return idsOf(v).map(nameOf).filter(Boolean).join(', ');
+  if(f==='inItin'||f==='hideItin')return v==='1'?'Sí':'No';
   if(f==='status')return v==='pagado'?'Pagado':v==='comprar'?'Por comprar':'Por pagar';
   if(f==='split')return {equal:'Todos por igual',self:'Gasto propio',some:'Algunos',amounts:'Por montos',guests:'Los que se quedan',riders:'Los que viajan'}[v]||('Solo '+nameOf(v));
   if(f==='type')return (TYPES[v]||ITYPES[v]||['',v])[1];
