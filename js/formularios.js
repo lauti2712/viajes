@@ -208,7 +208,7 @@ function openItem(k,id,pre){
   if(!vals.methodId&&vals.method&&cloudMode()&&ex)vals.methodId='__other';
   if('cur' in vals||k!=='plans')vals.cur=curCode(vals.cur,base());   /* para que la lista de monedas la marque bien */
   var curId=id||null;
-  var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" capture="environment" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
+  var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="showItin"'+(vals.hideItin==='1'?'':' checked')+'> Mostrar el check-in y el check-out en el itinerario</label>';});
   if(k==='plans')sp.fields.forEach(function(f){if(f.k==='_place')f.html=addrFieldHtml(vals,'place','Lugar','Nombre del lugar o dirección');if(f.k==='_end')f.html='<label class="fld pksug chk"><input type="checkbox" name="hasEnd"'+(vals.endTime?' checked':'')+'> Tiene hora de finalización</label>';});
   if(k==='expenses')sp.fields.forEach(function(f){if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="inItin"'+(vals.inItin==='1'?' checked':'')+'> Mostrarlo en el itinerario</label>';});
