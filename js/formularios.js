@@ -149,7 +149,7 @@ var SPECS={
 var DEFAULTS={
   transports:function(){var me=myPersonId();return {type:'vuelo',cur:base(),status:'pendiente',split:me?'riders':'equal',riders:me,paidBy:me,payDate:today()}},   /* cada uno carga su pasaje */
   lodging:function(){return {cur:base(),status:'pendiente',split:'guests',guests:myPersonId(),paidBy:myPersonId(),payDate:today()}},
-  expenses:function(){return {date:today(),cat:'Comida',cur:base(),status:'pagado',split:'equal',paidBy:myPersonId(),payDate:today()}},
+  expenses:function(){var n=new Date();return {time:String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'),date:today(),cat:'Comida',cur:base(),status:'pagado',split:'equal',paidBy:myPersonId(),payDate:today()}},
   plans:function(){var s=S.trip.start;return {type:'paseo',date:s&&s>today()?s:today()}}
 };
 function attRow(a){

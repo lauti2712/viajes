@@ -1,6 +1,7 @@
 /* Eventos globales y arranque */
 'use strict';
 /* ---------- Eventos ---------- */
+var lastTab={k:'',t:0};
 document.addEventListener('click',function(e){
   var cp=e.target.closest&&e.target.closest('[data-copy]');
   if(cp){var txt=cp.getAttribute('data-copy'),done=function(){cp.textContent='¡Copiado!';setTimeout(function(){cp.textContent='Copiar';},1500);};
@@ -12,7 +13,14 @@ document.addEventListener('click',function(e){
   if(fg){e.stopPropagation();if(!fg.classList.contains('armed')){fg.classList.add('armed');fg.textContent='¿Quitar?';return;}forgetTrip(fg.getAttribute('data-forget'));if(NOACCESS){setCode('');location.href=location.pathname;return;}render();if(formRefresh)formRefresh();return;}
   var t=e.target.closest('[data-tab],[data-act],[data-close]');if(!t)return;
   if(t.hasAttribute('data-close')){closeSheet();return;}
-  if(t.dataset.tab){tab=t.dataset.tab;render();window.scrollTo(0,0);return;}
+  if(t.dataset.tab){
+    /* doble toque en la pestaña Gastos: anotar un gasto nuevo */
+    var now0=Date.now(),dbl=t.dataset.tab==='gastos'&&lastTab.k==='gastos'&&now0-lastTab.t<400;
+    lastTab={k:t.dataset.tab,t:dbl?0:now0};
+    tab=t.dataset.tab;render();window.scrollTo(0,0);
+    if(dbl)openItem('expenses');
+    return;
+  }
   var a=t.dataset.act;
   if(a==='add')openItem(t.dataset.k,null,t.dataset.date?{date:t.dataset.date}:null);
   else if(a==='edit')openItem(t.dataset.k,t.dataset.id);
