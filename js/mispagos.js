@@ -33,7 +33,7 @@ function cardSchedule(m,charges){
     var d=ch.payDate||ch.date,n=Math.max(1,Math.min(60,parseInt(ch.cuotas,10)||1));
     var i0=d?st.findIndex(function(x){return d<=x.c;}):-1;
     for(var k=0;k<n;k++){
-      var line={ch:ch,k:k+1,n:n,amt:ch.amount/n,cur:ch.cur},idx=i0<0?-1:i0+k;
+      var line={ch:ch,k:k+1,n:n,amt:(ch.card!=null?ch.card:ch.amount)/n,cur:ch.cur},idx=i0<0?-1:i0+k;
       if(idx>=0&&idx<buckets.length)buckets[idx].lines.push(line);else none.push(line);
     }
   });

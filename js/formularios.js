@@ -89,7 +89,7 @@ function normalizeCost(d,ex){
   return d;
 }
 function splitProblem(d){
-  var amt=parseFloat(d.amount)||0,keys=Object.keys(d);
+  var amt=(parseFloat(d.amount)||0)-(+d.extN>0?parseFloat(d.extAmt)||0:0),keys=Object.keys(d);
   if(d.split==='self'&&!d.paidBy)return 'Para un gasto propio, elegí quién lo pagó.';
   if(d.split==='some'&&!keys.some(function(k){return k.indexOf('sw_')===0;}))return 'Tildá al menos a una persona.';
   if(d.split==='amounts'){
@@ -134,7 +134,7 @@ var SPECS={
     {k:'time',l:'Hora (opcional)',t:'time',half:true},
     {k:'cat',l:'Categoría',t:'select',opts:Object.keys(catAll()).map(function(k){return [k,catAll()[k]+' '+k]})},
     {k:'_itin',t:'html',html:''}   /* se completa en openItem: mostrarlo en el itinerario */
-  ].concat(costF())}},
+  ].concat(costF().reduce(function(o,f){o.push(f);if(f.k==='cur')o.push({k:'_ext',t:'html',html:''});return o;},[]))}},   /* _ext: gente de afuera del viaje */
   plans:function(){return {title:['Nuevo plan','Editar plan'],fields:[
     {k:'title',l:'Qué van a hacer',t:'text',req:true,ph:'Ej: Cena en el puerto'},
     {k:'date',l:'Fecha',t:'date',half:true,req:true},
@@ -211,6 +211,7 @@ function openItem(k,id,pre){
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="showItin"'+(vals.hideItin==='1'?'':' checked')+'> Mostrar el check-in y el check-out en el itinerario</label>';});
   if(k==='plans')sp.fields.forEach(function(f){if(f.k==='_place')f.html=addrFieldHtml(vals,'place','Lugar','Nombre del lugar o dirección');if(f.k==='_end')f.html='<label class="fld pksug chk"><input type="checkbox" name="hasEnd"'+(vals.endTime?' checked':'')+'> Tiene hora de finalización</label>';});
+  if(k==='expenses')sp.fields.forEach(function(f){if(f.k==='_ext')f.html=extFieldHtml(vals);});
   if(k==='expenses')sp.fields.forEach(function(f){if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="inItin"'+(vals.inItin==='1'?' checked':'')+'> Mostrarlo en el itinerario</label>';});
   if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_riders')f.html=peopleChecksHtml('rd',vals.riders,'Quiénes viajan con este pasaje')+'<p class="full mtn6 hint" id="rdHint">Cada uno carga sus pasajes. Si viajás junto con alguien en la misma reserva, tildalo también.</p>';});
   var body=tk+'<form id="sf" class="grid" novalidate>'+sp.fields.map(function(f){return fieldHtml(f,vals)}).join('')+'<p class="full m0 msg err" id="formmsg" role="status"></p><div class="acts">'+(ex?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'
@@ -226,6 +227,12 @@ function openItem(k,id,pre){
   function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging'){d.guests=takeChecks(d,'g');d.hideItin=d.showItin?'':'1';delete d.showItin;}
     if(k==='expenses')d.inItin=d.inItin?'1':'';
     if(k==='plans'){if(!d.hasEnd)d.endTime='';delete d.hasEnd;}
+    if(k==='expenses'){
+      var xc=d.hasExt?extCalc():null;
+      if(xc&&xc.n>=1){d.extN=String(xc.n);d.extAmt=String(xc.ext);d.tripPart=d.extMode==='amt'?String(xc.trip):'';d.extNames=(d.extNames||'').slice(0,80);}
+      else{d.extN='';d.extAmt='';d.tripPart='';d.extNames='';d.extMode='';d.extPaid='';}
+      delete d.hasExt;
+    }
     if(k==='transports'){
       var rd=takeChecks(d,'rd');
       d.riders=rd;   /* pasajeros: en un alquiler son los que van en el auto */
@@ -302,9 +309,11 @@ function openItem(k,id,pre){
     if(mode==='amounts'&&lastEdited<0)spread(-1);
     updSum();
   }
+  /* Lo que se reparte entre los del viaje: el total, o solo su parte si hubo gente de afuera. */
+  function splitBase(){var h=f.querySelector('[name=hasExt]');return h&&h.checked?extCalc().trip:(parseFloat(el('amount').value)||0);}
   function updSum(){
     var out=$('#shsum',panel);if(!out)return;
-    var amt=parseFloat(el('amount').value)||0,cur=(el('cur').value||base()).toUpperCase(),sum=0;
+    var amt=splitBase(),cur=(el('cur').value||base()).toUpperCase(),sum=0;
     Array.prototype.forEach.call(box.querySelectorAll('[name^=sh_]'),function(c){sum+=parseFloat(c.value)||0;});
     var rest=Math.round((amt-sum)*100)/100;
     out.textContent='Suman '+money(sum,cur)+' de '+money(amt,cur)+(rest>0?' · falta '+money(rest,cur):rest<0?' · sobran '+money(-rest,cur):' ✓');
@@ -313,7 +322,7 @@ function openItem(k,id,pre){
      iguales entre las que siguen; la última absorbe los centavos. */
   var lastEdited=-1;
   function spread(upto){
-    var amt=parseFloat(el('amount').value)||0,ins=Array.prototype.slice.call(box.querySelectorAll('[name^=sh_]'));
+    var amt=splitBase(),ins=Array.prototype.slice.call(box.querySelectorAll('[name^=sh_]'));
     var rest=ins.slice(0,upto+1).reduce(function(t,c){return t+(parseFloat(c.value)||0);},amt*0);
     rest=Math.round((amt-rest)*100)/100;
     var next=ins.slice(upto+1);if(!next.length)return;
@@ -365,6 +374,29 @@ function openItem(k,id,pre){
     var syncEnd=function(){var on=f.querySelector('[name=hasEnd]').checked,et=el('endTime');et.closest('.fld').hidden=!on;if(on&&!et.value&&el('time').value){var m=/^(\d{2}):(\d{2})/.exec(el('time').value);if(m)et.value=String((+m[1]+1)%24).padStart(2,'0')+':'+m[2];}};
     syncEnd();f.addEventListener('change',function(e){if(e.target.name==='hasEnd')syncEnd();});
   }
+  /* Gente de afuera del viaje: la parte del viaje sale en partes iguales (los del viaje que entran en el
+     reparto + los de afuera) o escrita a mano. */
+  function extCalc(){
+    var tot=parseFloat((el('amount')||{}).value)||0,n=Math.max(0,Math.min(99,parseInt((el('extN')||{}).value,10)||0)),sp=(el('split')||{}).value;
+    var kk=sp==='self'?1:sp==='some'?f.querySelectorAll('[name^=sw_]:checked').length:sp==='equal'?((ex&&(ex.split||'equal')==='equal'&&ex.splitWith)?splitIds(ex).length:allPeople().length):1;
+    kk=Math.max(1,kk);
+    var trip=(el('extMode')||{}).value==='amt'?(parseFloat((el('tripPart')||{}).value)||0):Math.round(tot*kk/(kk+n)*100)/100;
+    return {n:n,k:kk,tot:tot,trip:trip,ext:Math.round((tot-trip)*100)/100};
+  }
+  function syncExt(){
+    var on=f.querySelector('[name=hasExt]');if(!on)return;
+    $('#extBox',panel).hidden=!on.checked;
+    var amt=el('extMode').value==='amt';el('tripPart').closest('.fld').hidden=!amt;
+    var c=extCalc(),cur=curCode(el('cur').value,base()),out=$('#extSum',panel);
+    if(on.checked&&!amt&&c.trip)el('tripPart').value=c.trip;
+    out.textContent=!c.tot?'Poné el total de la cuenta en Monto.':c.trip<=0||c.trip>=c.tot?'La parte del viaje tiene que ser más que cero y menos que el total.'
+      :'Total '+money(c.tot,cur)+' · parte del viaje '+money(c.trip,cur)+(amt?'':' ('+c.k+' de '+(c.k+c.n)+')')+' · de afuera '+money(c.ext,cur)+'.';
+  }
+  if(f.querySelector('[name=hasExt]')){
+    syncExt();
+    f.addEventListener('input',function(e){if(/^(amount|extN|tripPart)$/.test(e.target.name))syncExt();});
+    f.addEventListener('change',function(e){if(/^(hasExt|extMode|split|cur)$/.test(e.target.name)||/^sw_/.test(e.target.name))syncExt();});
+  }
   /* Modo solo: quién pagó (vos) y para quién es no hace falta elegirlos. */
   if(solo()&&(k==='transports'||k==='lodging'||k==='expenses')){
     var me1=myPersonId(),pb1=el('paidBy');if(pb1&&!pb1.value&&me1){pb1.value=me1;syncPay();}
@@ -382,6 +414,7 @@ function openItem(k,id,pre){
     if(k==='lodging'&&d.airbnb&&!safeUrl(d.airbnb)){fm.textContent='El link de la reserva tiene que empezar con https:// (copialo entero desde la app o la página).';return;}
     if(k==='transports'&&d.type==='auto'&&d.kmOut&&d.kmIn&&+d.kmIn<+d.kmOut){fm.textContent='Los km al devolver son menos que al retirar. Revisá los números.';return;}
     if(k==='transports'&&d.dep&&d.arr&&d.arr<d.dep){fm.textContent=d.type==='auto'?'La devolución es antes del retiro. Revisá las fechas.':'La llegada es antes de la salida. Revisá las fechas.';return;}
+    if(k==='expenses'&&+d.extN>0&&(parseFloat(d.extAmt)<=0||parseFloat(d.extAmt)>=parseFloat(d.amount))){fm.textContent='La parte del viaje tiene que ser más que cero y menos que el total de la cuenta.';return;}
     var prob='amount' in d?splitProblem(d):'';
     if(prob){fm.textContent=prob;return;}
     upsert(k,curId,normalizeCost(d,ex));
@@ -602,6 +635,17 @@ function bindPeople(panel){
     addPerson(nm);
     redraw();var n=$('[data-pnew]',panel);if(n)n.focus();
   });
+}
+function extFieldHtml(v){
+  var on=+v.extN>0;
+  return '<div class="fld" id="extFld"><label class="pksug chk"><input type="checkbox" name="hasExt"'+(on?' checked':'')+'> Participaron personas de afuera del viaje</label>'
+   +'<div class="grid mt8" id="extBox"'+(on?'':' hidden')+'>'
+   +'<label class="fld half"><span>¿Cuántas de afuera?</span><input type="number" name="extN" min="1" max="99" inputmode="numeric" value="'+esc(v.extN||'1')+'"></label>'
+   +'<label class="fld half"><span>Quiénes (opcional)</span><input type="text" name="extNames" maxlength="80" value="'+esc(v.extNames||'')+'" placeholder="Ej: Juan y Pedro" autocomplete="off"></label>'
+   +'<label class="fld"><span>Cómo se divide</span><select name="extMode"><option value="eq"'+(v.extMode!=='amt'?' selected':'')+'>Partes iguales entre todos</option><option value="amt"'+(v.extMode==='amt'?' selected':'')+'>Pongo cuánto nos toca</option></select></label>'
+   +'<label class="fld half"><span>Parte del viaje</span><input type="number" name="tripPart" step="any" min="0" inputmode="decimal" value="'+esc(v.tripPart||'')+'" placeholder="0"></label>'
+   +'<label class="fld"><span>Cómo se pagó la cuenta</span><select name="extPaid"><option value="all"'+(v.extPaid!=='own'?' selected':'')+'>Todo junto (después devuelven)</option><option value="own"'+(v.extPaid==='own'?' selected':'')+'>Cada uno pagó lo suyo</option></select></label>'
+   +'<p class="full m0 hint" id="extSum"></p></div></div>';
 }
 /* Mueve campos del formulario a secciones plegables (<details>). names: nombres de campos o '#id' de bloques. */
 function groupFields(panel,f,groups){

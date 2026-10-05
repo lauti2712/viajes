@@ -22,14 +22,22 @@ var dot=function(p){var v=personColorVar(p);return v?'<i class="dot" style="back
 
 /* Un ítem con costo (transporte, alojamiento o gasto) llevado a una forma común. `cur0` = moneda base
    del viaje (para ítems de otros viajes, en Mis pagos de todos los viajes). */
+/* Gastos con gente de afuera del viaje: `amount` es el total de la cuenta y `extAmt` lo que les tocó a
+   los de afuera. Al viaje (totales, repartos, deudas) solo le cuenta su parte; a la tarjeta, lo que se
+   cobró de verdad: el total, o solo la parte del viaje si cada uno pagó lo suyo (extPaid 'own'). */
+function extPart(x){
+  var a=parseFloat(x.amount)||0,e=(+x.extN>0)?Math.min(a,Math.max(0,parseFloat(x.extAmt)||0)):0,t=Math.round((a-e)*100)/100;
+  return {total:a,trip:t,ext:e,card:x.extPaid==='own'?t:a};
+}
+function tripAmt(x){return extPart(x).trip;}
 function itemCost(src,x,cur0){
-  var a=parseFloat(x.amount)||0;if(a<=0||x.del)return null;
+  var ep=extPart(x),a=ep.trip;if(a<=0||x.del)return null;
   var title,date,cat;
   if(src==='transports'){title=(x.from||'?')+' → '+(x.to||'?');date=(x.dep||'').slice(0,10);cat='Transporte';}
   else if(src==='lodging'){title=lodgeName(x);date=x.in||'';cat='Alojamiento';}
   else if(src==='expenses'){title=x.desc||'Gasto';date=x.date||'';cat=x.cat||'Otros';}
   else return null;
-  return {id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:curCode(x.cur,cur0||base()),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',guests:src==='lodging'?(x.guests||''):'',riders:src==='transports'?(x.riders||''):'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||''};
+  return {id:x.id,src:src,title:title,date:date,cat:cat,amount:a,cur:curCode(x.cur,cur0||base()),status:x.status||'pendiente',paidBy:x.paidBy||'',method:(x.method||'').trim(),split:x.split||'equal',splitWith:x.splitWith||'',guests:src==='lodging'?(x.guests||''):'',riders:src==='transports'?(x.riders||''):'',shares:Array.isArray(x.shares)?x.shares:[],methodId:x.methodId||'',cuotas:x.cuotas||'',payDate:x.payDate||'',total:ep.total,ext:ep.ext,card:ep.card,extN:+x.extN||0};
 }
 function costs(){
   var o=[];

@@ -193,3 +193,17 @@ test('formato de hora 24 h / 12 h', () => {
   c.PREFS.h12 = true;
   assert.deepEqual(['00:15', '09:30', '12:00', '18:45', ''].map(c.hh), ['12:15 a. m.', '9:30 a. m.', '12:00 p. m.', '6:45 p. m.', '']);
 });
+
+test('gente de afuera: al viaje le cuenta su parte; a la tarjeta, lo que se cobró', () => {
+  // Cervezas entre 4 (yo + 3 de afuera): 16.700, pagué todo yo → mi parte 4.175.
+  const c = app([['ana', 'Ana']], (c) => c.add('expenses', gasto({ amount: 16700, paidBy: 'ana', extN: '3', extAmt: '12525', methodId: 'visa', payDate: '2026-10-02' })));
+  const cs = c.costs();
+  assert.equal(cs[0].amount, 4175);
+  assert.equal(cs[0].card, 16700);
+  // Cena con 2 amigos: 104.000, mi parte 34.000, cada uno pagó lo suyo → a la tarjeta van 34.000.
+  const d = c.extPart({ amount: 104000, extN: '2', extAmt: '70000', extPaid: 'own' });
+  assert.deepEqual([d.trip, d.card], [34000, 34000]);
+  // Con varias del viaje: Ana pagó 20.000, entran Ana y Beto + 2 de afuera → Beto le debe 5.000.
+  const e = app(P3, (c) => c.add('expenses', gasto({ amount: 20000, paidBy: 'ana', splitWith: 'ana,beto', extN: '2', extAmt: '10000' })));
+  assert.deepEqual(net(e), { ana: 5000, beto: -5000, caro: 0 });
+});

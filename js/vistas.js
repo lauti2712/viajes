@@ -4,7 +4,7 @@
 var empty=function(t,p){return '<div class="empty"><b>'+t+'</b><p>'+p+'</p></div>'};
 function bars(rows){if(!rows.length)return '<p class="sub">Sin datos todavía.</p>';var mx=Math.max.apply(null,rows.map(function(r){return r.v}).concat([1]));return '<ul class="bars">'+rows.map(function(r){return '<li><span class="bl" title="'+esc(r.l)+'">'+esc(r.l)+'</span><span class="bt"><span class="bf" style="width:'+(r.v/mx*100).toFixed(1)+'%;background:'+(r.c||'var(--sea)')+'"></span></span><span class="bv">'+money(r.v)+'</span></li>'}).join('')+'</ul>';}
 function costBlock(x){
-  var a=parseFloat(x.amount)||0;
+  var a=tripAmt(x);
   if(a<=0)return '<div class="cost"><span class="pill pend">Sin costo cargado</span></div>';
   var cur=curCode(x.cur,base()),b=toBase(a,cur);
   return '<div class="cost"><b class="amt">'+(x.status==='comprar'?'~ ':'')+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+statusPill(x.status)+(x.paidBy&&!solo()?'<small class="who">'+dot(x.paidBy)+esc(pn(x.paidBy))+'</small>':'')+(x.method?'<small>'+esc(x.method)+'</small>':'')+(splitLabel(x)?'<small>'+esc(splitLabel(x))+'</small>':'')+'</div>';
@@ -123,8 +123,8 @@ function vAlojamiento(){
 }
 
 function costRow(k,item,desc,icon,catLabel,extra){
-  var a=parseFloat(item.amount)||0,cur=curCode(item.cur,base()),b=toBase(a,cur);
-  return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="'+k+'" data-id="'+item.id+'"><span class="ec" aria-hidden="true">'+icon+'</span><div class="et"><b>'+esc(desc)+'</b><small><span>'+esc(catLabel)+'</span>'+(item.paidBy&&!solo()?'<span class="who">'+dot(item.paidBy)+esc(pn(item.paidBy))+'</span>':'')+(item.method?'<span>'+esc(item.method)+'</span>':'')+attLinkChips(item)+(extra||'')+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(item.status==='pendiente'||item.status==='comprar'?statusPill(item.status):'')+'</div></div>';
+  var a=tripAmt(item),ep=extPart(item),cur=curCode(item.cur,base()),b=toBase(a,cur);
+  return '<div class="exp" role="button" tabindex="0" data-act="edit" data-k="'+k+'" data-id="'+item.id+'"><span class="ec" aria-hidden="true">'+icon+'</span><div class="et"><b>'+esc(desc)+'</b><small><span>'+esc(catLabel)+'</span>'+(item.paidBy&&!solo()?'<span class="who">'+dot(item.paidBy)+esc(pn(item.paidBy))+'</span>':'')+(item.method?'<span>'+esc(item.method)+'</span>':'')+attLinkChips(item)+(ep.ext>0?'<span>👥 de '+esc(money(ep.total,cur))+' con '+(+item.extN)+' de afuera'+(item.extNames?' ('+esc(item.extNames)+')':'')+(item.extPaid!=='own'&&item.status==='pagado'?' · te devuelven '+esc(money(ep.ext,cur)):'')+'</span>':'')+(extra||'')+'</small></div><div class="ea"><b>'+money(a,cur)+'</b>'+(cur!==base()?'<small>'+(b==null?'sin tipo de cambio':'≈ '+money(b))+'</small>':'')+(item.status==='pendiente'||item.status==='comprar'?statusPill(item.status):'')+'</div></div>';
 }
 function expRow(e,extra){return costRow('expenses',e,e.desc||'Gasto',catIcon(e.cat),(e.time?hh(e.time)+' · ':'')+(e.cat||'Otros'),extra);}
 /* Filtro "Ver gastos de": muestra solo lo que esa persona pagó o donde le toca una parte, y suma su parte. */
@@ -134,7 +134,7 @@ function vGastos(){
   if(gastosWho&&!ppl.some(function(p){return p.id===gastosWho;}))gastosWho='';
   var who=gastosWho;
   function add(dateKey,item,rowFn,u){
-    var amt=parseFloat(item.amount)||0,extra='';
+    var amt=tripAmt(item),extra='';
     if(who){
       var part=shareMap(item,amt)[who]||0,cur=curCode(item.cur,base());
       if(part<=0&&item.paidBy!==who)return;
@@ -258,7 +258,7 @@ function vItinerario(){
     items=items.concat(paxRows(d));
     /* Gastos marcados "Mostrarlo en el itinerario" */
     live('expenses').filter(function(x){return x.inItin==='1'&&x.date===d;}).forEach(function(x){
-      var a=parseFloat(x.amount)||0;
+      var a=tripAmt(x);
       items.push({k:x.time||'99:97',h:'<div class="pl" role="button" tabindex="0" data-act="edit" data-k="expenses" data-id="'+x.id+'"><span class="t">'+esc(hh(x.time))+'</span><div><b>'+catIcon(x.cat)+' '+esc(x.desc||'Gasto')+'<span class="tag gasto">Gasto</span></b>'+(a>0?'<small>'+money(a,curCode(x.cur,base()))+(x.status==='comprar'?' · por comprar':'')+'</small>':'')+'</div></div>'});
     });
     live('lodging').forEach(function(l){
