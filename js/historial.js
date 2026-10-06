@@ -1,7 +1,7 @@
 /* Historial de cambios y papelera.
    Cada alta, cambio, borrado o restauración de algo compartido deja una línea en trips/{code}/log
    (las reglas solo dejan agregar: nadie la edita ni la borra). Lo borrado nunca se borra de verdad
-   (queda con del:true), así que la papelera lo muestra 30 días y se puede restaurar. */
+   (queda con del:true), así que la papelera lo muestra 10 días y se puede restaurar; después se elimina (purgeOld). */
 'use strict';
 var LOG_KEYS=['transports','lodging','expenses','plans','payments','people','vehicles'];
 var LOG_SKIP={u:1,eb:1,ct:1,ra:1,id:1,del:1,k:1};
@@ -101,7 +101,7 @@ function openHistory(){
 }
 
 /* ---------- Papelera ---------- */
-var TRASH_DAYS=30;
+var TRASH_DAYS=10;
 function trashItems(){
   var lim=Date.now()-TRASH_DAYS*864e5,o=[];
   LOG_KEYS.forEach(function(k){S[k].forEach(function(x){if(x.del&&!x.gone&&(x.u||0)>=lim)o.push({k:k,x:x});});});

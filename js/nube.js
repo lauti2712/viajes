@@ -10,7 +10,7 @@ function fbErr(e){if(e&&e.code==='permission-denied')setSync('denied');}
 var AUTH='',ME=null,loggingOut=false;
 /* CLAIMS: personId -> {uid,name}. Cada persona del viaje la puede "reclamar" una sola cuenta de Google;
    las reglas usan ese vínculo para que la mochila de cada uno sea privada. */
-var claimsLoaded=false,CLAIMS={},myClaim='',packUnsub=null,LEGACY_PACK={},itemsReady=false;
+var claimsLoaded=false,CLAIMS={},myClaim='',packUnsub=null,itemsReady=false;
 var fdoc=function(){return FB.fs.doc.apply(null,[FB.db,'trips',CODE].concat([].slice.call(arguments)))};
 function pushItem(k,it){
   if(!FB||!CODE||AUTH!=='in')return;
@@ -109,21 +109,6 @@ function subscribePacking(){
     snap.docChanges().forEach(function(ch){if(ch.type!=='removed'&&applyItem('packing',ch.doc.data(),!snap.metadata.fromCache&&!ch.doc.metadata.hasPendingWrites))changed=true;});
     if(changed){save();render();checkNewAvisos();}
   },function(err){fbErr(err);});
-  migrateLegacyPacking();
-}
-/* Antes la mochila se guardaba en `items`, visible para todos. Cuando su dueño entra, se copia a
-   `packing` (privada) y en `items` queda solo una lápida sin texto. */
-function migrateLegacyPacking(){
-  if(!myClaim||!itemsReady)return;
-  Object.keys(LEGACY_PACK).forEach(function(id){
-    var it=LEGACY_PACK[id];
-    if(it.owner!==myClaim)return;
-    delete LEGACY_PACK[id];
-    var copy=Object.assign({},it);delete copy.k;
-    FB.fs.setDoc(fdoc('packing',id),clean(copy)).then(function(){
-      return FB.fs.setDoc(fdoc('items',id),{k:'packing',id:id,del:true,u:Date.now()});
-    }).catch(fbErr);
-  });
 }
 async function startCloud(){
   setSync('connecting');
@@ -231,13 +216,12 @@ function logout(){
   if(!FB)return;
   loggingOut=true;
   FB.au.signOut(FB.auth).catch(function(){}).then(function(){
-    try{Object.keys(localStorage).forEach(function(k){if(k.indexOf(LS_BASE+':')===0)localStorage.removeItem(k);});localStorage.removeItem(WHOAMI_KEY);localStorage.removeItem('viaje-de-a-dos:dueAck');}catch(e){}
+    try{Object.keys(localStorage).forEach(function(k){if(k.indexOf(LS_BASE+':')===0)localStorage.removeItem(k);});localStorage.removeItem('viaje-de-a-dos:dueAck');}catch(e){}
     return FB.fs.terminate(FB.db).then(function(){return FB.fs.clearIndexedDbPersistence(FB.db);}).catch(function(){});
   }).then(function(){location.reload();});
 }
 function listen(){
-  var fs=FB.fs,db=FB.db,tripReady=false;
-  function maybeMigratePeople(){if(tripReady&&itemsReady)migratePeople();}
+  var fs=FB.fs,db=FB.db;
 
   fs.onSnapshot(fdoc(),{includeMetadataChanges:true},function(snap){
     if(snap.exists()){
@@ -249,7 +233,6 @@ function listen(){
     }else if(!snap.metadata.fromCache){
       if(S.trip.setup)pushTrip();else if($('#sheet').hidden)openSettings();
     }
-    if(!snap.metadata.fromCache&&!tripReady){tripReady=true;maybeMigratePeople();}
     if(!snap.metadata.fromCache&&snap.exists())recordTrip();
   },function(err){if(err&&err.code==='permission-denied'){deniedTrip();return;}fbErr(err);setSync('err');});
   listenMembers();
@@ -261,19 +244,26 @@ function listen(){
       if(ch.type==='removed')return;
       var d=ch.doc.data();
       if(!d)return;
-      if(d.k==='packing'){if(d.del||!d.owner)delete LEGACY_PACK[ch.doc.id];else LEGACY_PACK[ch.doc.id]=d;return;}
+      if(d.k==='packing')return;   /* restos de cuando la mochila vivía acá */
       if(d.gone){var loc=S[d.k]&&S[d.k].find(function(x){return x.id===d.id;});if(loc&&isPriv(d.k,loc))return;}
       if(CLOUD_KEYS.indexOf(d.k)>=0&&applyItem(d.k,d,!snap.metadata.fromCache&&!ch.doc.metadata.hasPendingWrites))changed=true;
     });
     if(!itemsReady&&!snap.metadata.fromCache){
       itemsReady=true;
       var rem={};snap.docs.forEach(function(x){rem[x.id]=x.data().u||0});
-      CLOUD_KEYS.forEach(function(k){S[k].forEach(function(it){if(isPriv(k,it))return;if(rem[it.id]===undefined||(it.u||0)>rem[it.id])pushItem(k,it);});});
-      maybeMigratePeople();migratePrivate();
+      /* Lo que este celular tiene y el servidor no: si es de antes de la última vez que estuvo al día,
+         es algo borrado de verdad (papelera vencida) y se descarta; si es más nuevo, se cargó sin señal y se sube. */
+      var lastSync=0;try{lastSync=+localStorage.getItem(SYNCAT_KEY())||0;}catch(e){}
+      CLOUD_KEYS.forEach(function(k){
+        S[k]=S[k].filter(function(it){return isPriv(k,it)||rem[it.id]!==undefined||!lastSync||(it.u||0)>lastSync;});
+        S[k].forEach(function(it){if(isPriv(k,it))return;if(rem[it.id]===undefined||(it.u||0)>rem[it.id])pushItem(k,it);});
+      });
+      save();
+      migratePrivate();purgeOld();
     }
-    migrateLegacyPacking();
     if(changed){save();render();checkNewAvisos();}
     if(itemsReady&&(changed||!snap.metadata.fromCache))syncFriendEntries();
+    if(!snap.metadata.fromCache&&!snap.metadata.hasPendingWrites)try{localStorage.setItem(SYNCAT_KEY(),String(Date.now()));}catch(e){}
     setSync(snap.metadata.fromCache?(navigator.onLine?'connecting':'offline'):(snap.metadata.hasPendingWrites?'saving':'ok'));
   },function(err){fbErr(err);if(!err||err.code!=='permission-denied')setSync('err');});
 
@@ -325,19 +315,7 @@ function listenMeta(){
 }
 function parseCode(v){v=String(v||'').trim();try{var t=new URL(v).searchParams.get('t');if(t)v=t;}catch(e){}v=v.toLowerCase();return /^[a-z0-9]{12,40}$/.test(v)?v:'';}
 function genCode(){var a='abcdefghjkmnpqrstuvwxyz23456789',b=new Uint8Array(20),c='';window.crypto.getRandomValues(b);for(var i=0;i<20;i++)c+=a[b[i]%a.length];return c;}
-/* keep: conservar los datos locales (pasar un viaje "solo en este dispositivo" a la nube). */
-function connectTo(code,keep){try{if(keep&&LS===LS_BASE){var d=localStorage.getItem(LS_BASE);if(d)localStorage.setItem(LS_BASE+':'+code,d);}setCode(code);localStorage.removeItem(MODE_KEY);}catch(e){}location.href=location.pathname;}
-function openConnect(){
-  var panel=openSheet('Conectar el viaje',
-   '<p class="hint">Para que todos vean lo mismo en tiempo real, el viaje se guarda en la nube con un código secreto. Cada uno entra con su cuenta de Google.</p><div class="stack">'
-   +'<button type="button" class="primary" id="newtrip">Crear un viaje nuevo</button><hr>'
-   +'<label class="fld"><span>¿Te pasaron un link o un código?</span><input class="box" id="joinc" placeholder="Pegá el link o el código" autocomplete="off"></label>'
-   +'<button type="button" class="ghost" id="join">Unirme a ese viaje</button><p class="msg err" id="msg" role="status"></p><hr>'
-   +'<button type="button" class="ghost" id="localonly">Usar solo en este dispositivo</button></div>');
-  $('#newtrip',panel).addEventListener('click',function(){connectTo(genCode(),true)});
-  $('#join',panel).addEventListener('click',function(){var c=parseCode($('#joinc',panel).value);if(!c){$('#msg',panel).textContent='Ese código no es válido. Pegá el link completo tal cual te lo pasaron.';return;}connectTo(c);});
-  $('#localonly',panel).addEventListener('click',function(){try{localStorage.setItem(MODE_KEY,'local');}catch(e){}location.href=location.pathname;});
-}
+function connectTo(code){setCode(code);location.href=location.pathname;}
 
 /* ---------- Miembros: quiénes entraron al viaje con el link ----------
    Las reglas solo dejan ver y editar el viaje a sus miembros (trips/{code}/members/{uid}). Abrir el link
@@ -439,4 +417,22 @@ function listenPrivate(){
     snap.docChanges().forEach(function(ch){if(ch.type==='removed')return;var d=ch.doc.data();if(d&&PRIV_KEYS.indexOf(d.k)>=0&&applyItem(d.k,d,!snap.metadata.fromCache&&!ch.doc.metadata.hasPendingWrites))changed=true;});
     if(changed){save();render();}
   },function(err){fbErr(err);});
+}
+
+/* ---------- Papelera vencida ----------
+   Lo borrado queda TRASH_DAYS días en la papelera; después se elimina de verdad (las reglas solo dejan
+   borrar lápidas así de viejas), así no se vuelve a leer cada vez que se abre el viaje. */
+var SYNCAT_KEY=function(){return 'viaje-de-a-dos:syncat:'+CODE;};
+function purgeOld(){
+  if(!FB||!CODE||AUTH!=='in')return;
+  var lim=Date.now()-TRASH_DAYS*864e5-36e5,gone=false;   /* 1 h de margen por relojes atrasados */
+  CLOUD_KEYS.forEach(function(k){
+    S[k]=S[k].filter(function(it){
+      if(!it.del||(it.u||0)>=lim)return true;
+      var col=isPriv(k,it)||it.ouid?'private':'items';
+      FB.fs.deleteDoc(fdoc(col,it.id)).catch(function(){});gone=true;return false;
+    });
+  });
+  S.packing=S.packing.filter(function(it){if(!it.del||(it.u||0)>=lim)return true;FB.fs.deleteDoc(fdoc('packing',it.id)).catch(function(){});gone=true;return false;});
+  if(gone)save();
 }

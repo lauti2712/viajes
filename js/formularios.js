@@ -600,16 +600,11 @@ function unlinkPerson(oldId){
   S.transports.slice().forEach(function(x){if(idsOf(x.riders).indexOf(oldId)>=0)sysUpdate('transports',x.id,{riders:idsOf(x.riders).map(rep).join(',')});});
   S.vehicles.slice().forEach(function(x){var ch={};if(idsOf(x.riders).indexOf(oldId)>=0)ch.riders=idsOf(x.riders).map(rep).join(',');if(x.owner===oldId)ch.owner=nid;if(Object.keys(ch).length)sysUpdate('vehicles',x.id,ch);});
   S.payments.slice().forEach(function(x){var ch={};if(x.from===oldId)ch.from=nid;if(x.to===oldId)ch.to=nid;if(Object.keys(ch).length)sysUpdate('payments',x.id,ch);});
-  savePerson(oldId,{});remove('people',oldId);
+  savePerson(oldId,{});remove('people',oldId,true);
   return nid;
 }
 function peopleUsed(id){if(live('payments').some(function(x){return x.from===id||x.to===id;}))return true;return costs().some(function(c){return c.paidBy===id||c.split===id||(c.split==='guests'&&idsOf(c.guests).indexOf(id)>=0)||(c.split==='riders'&&idsOf(c.riders).indexOf(id)>=0)||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
-/* Los p1/p2 de viajes viejos pueden no estar todavía en `people`: se crean con su mismo id. */
-function savePerson(id,data){
-  if(S.people.some(function(x){return x.id===id}))return upsert('people',id,data);
-  var lp=legacyPeople().find(function(x){return x.id===id});
-  return upsert('people',null,Object.assign({id:id,name:lp?lp.name:'',c:lp?lp.c:Date.now()},data));
-}
+function savePerson(id,data){return upsert('people',id,data);}
 function pplBlock(){
   var ppl=allPeople(),org=isOrganizer();
   return '<div class="sideSec" id="pplWrap"><h3>Personas del viaje</h3><p class="hint">Pueden ser una o varias. Para cambiar un nombre, tocalo y escribí.'
@@ -647,7 +642,6 @@ function bindPeople(panel){
     if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='¿Quitar?';return;}
     savePerson(id,{});remove('people',id);
     if(cloudMode()&&myClaim===id)releaseClaim();
-    if(!cloudMode()&&getWhoAmI()===id)setWhoAmI('');
     redraw();
   });
   panel.addEventListener('submit',function(e){
@@ -735,6 +729,16 @@ function bindCats(panel,list){
     list.push({name:nm,icon:ic});redraw();
   });
 }
+/* Ajustes: lo básico arriba; personas, accesos y categorías en secciones plegables. */
+function setSec(title,count,inner,open){return '<details class="sideSec fgrp setsec"'+(open?' open':'')+'><summary><span>'+title+'</span><small>'+(count||'')+'</small></summary>'+inner+'</details>';}
+function settingsSections(cats){
+  var np=allPeople().length,nm=Object.keys(MEMBERS).length,h='';
+  if(solo())h+=setSec('👥 ¿Viaja alguien más?','',shareBlockHtml()+pplBlock(),false);
+  else h+=setSec('👥 Personas del viaje',np,pplBlock(),false);
+  if(cloudMode()&&AUTH==='in'&&(!solo()||nm>1))h+=setSec('🔐 Quiénes tienen acceso',nm||'',membersBlockHtml(),false);
+  h+=setSec('🏷️ Categorías propias',cats.length||'',catsBlockHtml(cats),false);
+  return h+'<div class="row mt14"><button type="button" class="ghost" data-act="rates">💱 Tipos de cambio</button><button type="button" class="ghost" data-act="trash">🗑️ Papelera'+(trashItems().length?' ('+trashItems().length+')':'')+'</button>'+(cloudMode()&&AUTH==='in'?'<button type="button" class="ghost" data-act="history">🕘 Últimos cambios</button>':'')+'</div>';
+}
 function openSettings(){
   var t=S.trip,first=!t.setup,nd=first?newDates():null,cats=tripCats().filter(function(c){return c&&c.name;}).map(function(c){return {name:String(c.name).slice(0,30),icon:String(c.icon||'🏷️').slice(0,4)};});
   sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:first&&t.name==='Nuestro viaje'?'':t.name,start:nd?nd.start:t.start,end:nd?nd.end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
@@ -749,8 +753,9 @@ function openSettings(){
       {k:'info',l:'Info útil (seguro de viaje, contacto de emergencia, dirección del alojamiento…)',t:'textarea',ph:'Lo que quieran tener a mano aunque no haya señal'}
     ],
     intro:solo()?'':shareBlockHtml(),
-    extra:(solo()?'<hr>'+catsBlockHtml(cats)+'<hr><details class="sideSec fgrp"><summary><span>👥 ¿Viaja alguien más?</span></summary>'+shareBlockHtml()+pplBlock()+'</details>':'<hr>'+pplBlock()+'<hr>'+catsBlockHtml(cats))+(cloudMode()&&AUTH==='in'&&(!solo()||Object.keys(MEMBERS).length>1)?'<hr>'+membersBlockHtml():'')+'<hr><div class="row"><button type="button" class="ghost" data-act="rates">💱 Tipos de cambio</button><button type="button" class="ghost" data-act="trash">🗑️ Papelera'+(trashItems().length?' ('+trashItems().length+')':'')+'</button>'+(cloudMode()&&AUTH==='in'?'<button type="button" class="ghost" data-act="history">🕘 Últimos cambios</button>':'')+'</div>',
-    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);bindMembers(panel);bindCityField(panel);bindCats(panel,cats);},
+    extra:settingsSections(cats),
+    onReady:function(panel){bindShareBlock(panel);bindPeople(panel);bindMembers(panel);bindCityField(panel);bindCats(panel,cats);
+      groupFields(panel,$('#sf',panel),[{l:'💰 Presupuesto e info útil',names:['daily','budget','info'],open:!!(t.daily||t.budget||t.info)}]);},
     validate:function(d){
       if(d.start&&d.end&&d.end<d.start)return 'La fecha "Hasta" es anterior a "Desde". Revisá las fechas del viaje.';
       var q=$('#cityQ');if(!d.cityJson&&q&&q.value.trim()&&!q.closest('[hidden]'))return 'Elegí la ciudad principal de la lista (o dejala vacía).';

@@ -13,13 +13,16 @@ var ICON={
 };
 function initialOf(n){n=String(n||'').trim();return n?esc(n.charAt(0).toUpperCase()):'';}
 /* El estado de sincronización solo se muestra si hay algo que avisar. */
-var SYNC_SHOW=['offline','err','denied','local'];
+var SYNC_SHOW=['offline','err','denied'];
 function renderHead(){
   var logged=!!(ME&&AUTH==='in'),home=homeMode(),t=getTheme();
   var tb=$('#themeBtn');tb.innerHTML=ICON[t==='light'?'sun':t==='dark'?'moon':'auto'];tb.setAttribute('aria-label','Tema: '+themeLabel().replace(/^\S+\s/,''));tb.title=tb.getAttribute('aria-label');
   var sb=$('#setBtn');sb.innerHTML=ICON.gear;sb.hidden=home||gated();
   var bb=$('#bellBtn'),n=cloudMode()&&logged?avisosCount():0;bb.hidden=!(cloudMode()&&logged);bb.innerHTML=ICON.bell+(n?'<b class="badge">'+n+'</b>':'');bb.setAttribute('aria-label',n?n+' avisos nuevos':'Avisos');
   var pb=$('#profileBtn');pb.hidden=!((cloudMode()||home)&&logged);pb.innerHTML=logged&&ME.name?'<span class="avatar">'+initialOf(ME.name)+'</span>':ICON.user;
+  /* Puntito en el avatar: amarillo = guardando, gris = sin señal (queda guardado en el celular), rojo = error. */
+  var st=syncState==='connecting'&&navigator.onLine===false?'offline':syncState,dot=st==='saving'?'saving':(st==='offline'||st==='connecting')?'offline':(st==='err'||st==='denied')?'err':'';
+  pb.setAttribute('data-sync',dot);pb.title=dot==='saving'?'Mi perfil · guardando cambios…':dot==='offline'?'Mi perfil · sin conexión: lo que cargues se sube cuando vuelva la señal':dot==='err'?'Mi perfil · no se pudo guardar':'Mi perfil';
   $('#who2').innerHTML=SYNC_SHOW.indexOf(syncState==='connecting'&&navigator.onLine===false?'offline':syncState)>=0?syncChip():'';
   if(home){$('#title').textContent='Mis viajes';$('#when').innerHTML='';document.title='Mis viajes';return;}
   $('#title').textContent=S.trip.name||'Nuestro viaje';
@@ -78,7 +81,7 @@ function vGate(){
    +'<button type="button" class="primary" data-act="login">Continuar con Google</button>'
    +(loginMsg?'<p class="msg err">'+esc(loginMsg)+'</p>':'')
    +'<p class="hint">Si abriste el link desde Instagram o Facebook y no te deja entrar, abrilo en Chrome o Safari.</p>'
-   +(homeMode()?'<p class="hint"><button type="button" class="sm ghost" data-act="golocal">Usar sin cuenta, solo en este dispositivo</button></p>':'')+'</div>';
+   +'</div>';
 }
 function render(){
   var g=gated();
@@ -92,4 +95,15 @@ function render(){
   if(tab==='pagos'&&!canPay)tab='itinerario';   /* Mis pagos se abre desde el perfil */
   $('#main').innerHTML=whoBanner()+VIEWS[tab]();
   Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+}
+
+/* Aviso abajo de la pantalla, con un botón opcional (ej: Deshacer). Se va solo a los 6 segundos. */
+var toastTmr=null;
+function showToast(text,label,fn){
+  var t=document.getElementById('toast');
+  if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');document.body.appendChild(t);}
+  t.innerHTML='<span>'+esc(text)+'</span>'+(label?'<button type="button">'+esc(label)+'</button>':'');
+  t.className='show';
+  var b=t.querySelector('button');if(b)b.onclick=function(){t.className='';clearTimeout(toastTmr);fn();};
+  clearTimeout(toastTmr);toastTmr=setTimeout(function(){t.className='';},6000);
 }

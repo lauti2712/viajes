@@ -272,17 +272,10 @@ function vItinerario(){
   }).join('');
 }
 
-var WHOAMI_KEY='viaje-de-a-dos:whoami';
-function getWhoAmI(){try{return localStorage.getItem(WHOAMI_KEY)||'';}catch(e){return '';}}
-function setWhoAmI(v){try{if(v)localStorage.setItem(WHOAMI_KEY,v);else localStorage.removeItem(WHOAMI_KEY);}catch(e){}}
 var packSuggestMsg='',claimMsg='';
-/* Personas: todas viven en la lista `people` (1, 2 o las que sean). Los viajes viejos tenían p1/p2 fijos
-   en el trip: se muestran igual hasta que migratePeople() los pasa a `people` con esos mismos ids,
-   así los gastos (paidBy/split) y las mochilas (owner) siguen apuntando bien. */
-function legacyPeople(){return ['p1','p2'].filter(function(k){return S.trip[k]&&!S.people.some(function(x){return x.id===k});}).map(function(k){return {id:k,name:String(S.trip[k]),c:k==='p1'?1:2};});}
-function migratePeople(){['p1','p2'].forEach(function(k,i){if(S.trip[k]&&!S.people.some(function(x){return x.id===k}))upsert('people',null,{id:k,name:S.trip[k],c:i+1});});}
+/* Personas del viaje: la lista `people` (1, 2 o las que sean). */
 function allPeople(){
-  return legacyPeople().concat(live('people').map(function(p){return {id:p.id,name:String(p.name||'Sin nombre'),c:+p.c||1e15};}))
+  return (live('people').map(function(p){return {id:p.id,name:String(p.name||'Sin nombre'),c:+p.c||1e15};}))
     .sort(function(a,b){return (a.c-b.c)||a.id.localeCompare(b.id);});
 }
 /* Modo solo: con una persona (o ninguna todavía) se esconde todo lo de repartir y los textos van en singular.
@@ -297,7 +290,7 @@ function suggesterName(it){
 }
 /* Quién soy: en la nube sale de la cuenta de Google (claims), sin nube es una preferencia del dispositivo. */
 function myPersonId(){
-  var id=cloudMode()?(AUTH==='in'?myClaim:''):getWhoAmI();
+  var id=AUTH==='in'?myClaim:'';
   return id&&allPeople().some(function(p){return p.id===id;})?id:'';
 }
 function packRow(it){

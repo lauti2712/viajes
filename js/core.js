@@ -19,9 +19,21 @@ function setTheme(t){
 function cycleTheme(){var t=getTheme();setTheme(t===''?'light':(t==='light'?'dark':''));}
 
 var CODE_KEY='viaje-de-a-dos:code',MODE_KEY='viaje-de-a-dos:mode';
-var CODE='',LOCAL_ONLY=false,FB=null,syncState='';
+var CODE='',FB=null,syncState='';
+/* Ya no existe el modo "solo en este dispositivo": si un celular lo usaba, su viaje pasa a un viaje nuevo
+   en la nube (se sube solo al entrar con la cuenta). */
+try{
+  if(localStorage.getItem(MODE_KEY)==='local'){
+    var oldL=localStorage.getItem(LS_BASE),oj=null;try{oj=JSON.parse(oldL||'null');}catch(e){}
+    if(oj&&oj.trip&&oj.trip.setup){
+      var ab='abcdefghjkmnpqrstuvwxyz23456789',rb=new Uint8Array(20),nc='';crypto.getRandomValues(rb);for(var ri=0;ri<20;ri++)nc+=ab[rb[ri]%ab.length];
+      localStorage.setItem(LS_BASE+':'+nc,oldL);localStorage.setItem(CODE_KEY,nc);sessionStorage.setItem(CODE_KEY,nc);
+    }
+    localStorage.removeItem(MODE_KEY);localStorage.removeItem(LS_BASE);
+  }
+}catch(e){}
 /* Cada pestaña recuerda su viaje (sessionStorage); una pestaña nueva abre el último que se usó. */
-try{CODE=sessionStorage.getItem(CODE_KEY)||localStorage.getItem(CODE_KEY)||'';LOCAL_ONLY=localStorage.getItem(MODE_KEY)==='local';}catch(e){}
+try{CODE=sessionStorage.getItem(CODE_KEY)||localStorage.getItem(CODE_KEY)||'';}catch(e){}
 function setCode(code){try{if(code){localStorage.setItem(CODE_KEY,code);sessionStorage.setItem(CODE_KEY,code);}else{localStorage.removeItem(CODE_KEY);sessionStorage.removeItem(CODE_KEY);}}catch(e){}}
 var ID_RE=/^[a-z0-9]{1,24}$/i;
 /* Monedas: solo códigos de 3 letras (evita que un dato raro termine como HTML al formatear montos). */
@@ -31,9 +43,9 @@ var nextU=function(prev){return Math.max(Date.now(),(+prev||0)+1);};
 var ITEM_KEYS=['transports','lodging','expenses','plans','packing','people','payments','vehicles'];
 /* En la nube la mochila vive en su propia colección (trips/{code}/packing), privada por reglas. */
 var CLOUD_KEYS=ITEM_KEYS.filter(function(k){return k!=='packing'});
-var cloudMode=function(){return !!(FIREBASE_CONFIG.apiKey&&CODE&&!LOCAL_ONLY)};
+var cloudMode=function(){return !!CODE};   /* con un viaje abierto (siempre en la nube) */
 /* Sin viaje abierto (celular nuevo, o salió de un viaje): pantalla de inicio con "Mis viajes". */
-var homeMode=function(){return !!(FIREBASE_CONFIG.apiKey&&!CODE&&!LOCAL_ONLY)};
+var homeMode=function(){return !CODE};
 
 var TYPES={vuelo:['✈️','Vuelo'],bus:['🚌','Micro / bus'],tren:['🚆','Tren'],barco:['⛴️','Barco'],auto:['🚙','Alquiler de auto'],traslado:['🚕','Traslado'],otro:['🧭','Otro']};
 var CATS={'Comida':'🍽️','Café y bebidas':'☕','Supermercado':'🛒','Transporte local':'🚇','Peajes y nafta':'⛽','Actividades':'🎟️','Entradas y tours':'🎫','Compras':'🛍️','Souvenirs':'🎁','Salud':'💊','Conectividad / SIM':'📶','Propinas':'🪙','Otros':'📌'};
@@ -59,33 +71,24 @@ var ITYPES={paseo:['🚶','Paseo'],comida:['🍽️','Comida'],excursion:['🗺�
 function blank(){return {v:1,trip:{name:'Nuestro viaje',start:'',end:'',base:'ARS',rates:{},ratesUpdatedAt:0,dollarType:'blue',daily:0,budget:0,info:'',setup:false,u:0},transports:[],lodging:[],expenses:[],plans:[],packing:[],people:[],payments:[],vehicles:[]};}
 var arr=function(a){return Array.isArray(a)?a.filter(function(x){return x&&typeof x==='object'&&ID_RE.test(x.id||'')}):[]};
 function fix(o){var b=blank();o=o||{};var t=Object.assign(b.trip,o.trip||{});t.rates=Object.assign({},(o.trip&&o.trip.rates)||{});return {v:1,trip:t,transports:arr(o.transports),lodging:arr(o.lodging),expenses:arr(o.expenses),plans:arr(o.plans),packing:arr(o.packing),people:arr(o.people),payments:arr(o.payments),vehicles:arr(o.vehicles)};}
-var S=blank(),PREV_CODE=LOCAL_ONLY?'':CODE;   /* PREV_CODE: el viaje en la nube que estaba abierto antes */
+var S=blank();
 try{
   var qp=(new URLSearchParams(location.search).get('t')||'').toLowerCase();
-  if(qp&&FIREBASE_CONFIG.apiKey&&/^[a-z0-9]{12,40}$/.test(qp)){
-    CODE=qp;LOCAL_ONLY=false;
-    setCode(CODE);localStorage.removeItem(MODE_KEY);
+  if(qp&&/^[a-z0-9]{12,40}$/.test(qp)){
+    CODE=qp;setCode(CODE);
     history.replaceState(null,'',location.pathname);
   }
   if(new URLSearchParams(location.search).has('v'))history.replaceState(null,'',location.pathname);
 }catch(e){}
-function lsKey(code){return code&&!LOCAL_ONLY?LS_BASE+':'+code:LS_BASE;}
-LS=lsKey(CODE);
-try{
-  var raw=localStorage.getItem(LS);
-  /* Versiones anteriores guardaban todo en una sola clave: se pasa al viaje que estaba abierto. */
-  /* (si la clave vieja era de un viaje "solo en este dispositivo", no se toca). */
-  if(PREV_CODE&&LS!==LS_BASE&&localStorage.getItem('viaje-de-a-dos:lsmigrated')!=='1'){
-    if(!raw&&CODE===PREV_CODE)raw=localStorage.getItem(LS_BASE);
-    localStorage.removeItem(LS_BASE);localStorage.setItem('viaje-de-a-dos:lsmigrated','1');
-  }
-  if(raw)S=fix(JSON.parse(raw));
-}catch(e){}
+LS=LS_BASE+':'+CODE;
+try{var raw=CODE&&localStorage.getItem(LS);if(raw)S=fix(JSON.parse(raw));}catch(e){}
 function save(){try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){}}
 var live=function(k){return S[k].filter(function(x){return !x.del})};
 /* eb = persona que hizo el último cambio, ct = cuándo se creó (para los avisos). */
 function upsert(k,id,data){var now=Date.now(),by=editorId(),i=id?S[k].findIndex(function(x){return x.id===id}):-1,it,prev=i>=0?S[k][i]:null;if(i>=0){it=S[k][i]=Object.assign({},S[k][i],data,{u:nextU(S[k][i].u),eb:by});}else{it=Object.assign({id:uid(),u:now,ct:now,eb:by},data);S[k].push(it);}save();pushItem(k,it);if(typeof privMove==='function')try{privMove(k,prev,it);}catch(e){}logIt(k,prev,it);return it.id;}
-function remove(k,id){var x=S[k].find(function(y){return y.id===id});if(x){var prev=Object.assign({},x);x.del=true;x.u=nextU(x.u);x.eb=editorId();save();pushItem(k,x);logIt(k,prev,x);}}
+function remove(k,id,quiet){var x=S[k].find(function(y){return y.id===id});if(x){var prev=Object.assign({},x);x.del=true;x.u=nextU(x.u);x.eb=editorId();save();pushItem(k,x);logIt(k,prev,x);
+  /* Aviso con "Deshacer": vuelve a estar como antes (también queda en la papelera). */
+  if(!quiet&&typeof showToast==='function')showToast(({transports:'Transporte',lodging:'Alojamiento',expenses:'Gasto',plans:'Plan',payments:'Pago',people:'Persona',vehicles:'Auto',packing:'Ítem'}[k]||'Elemento')+' borrado','Deshacer',function(){upsert(k,id,{del:false});render();});}}
 function logIt(k,prev,it){if(typeof logChange==='function')try{logChange(k,prev,it);}catch(e){}if(k==='expenses'&&typeof syncFriendEntries==='function')syncFriendEntries();}
 /* Preferencias de cada persona (users/{uid}/prefs/app en la nube; copia en el dispositivo). */
 var PREFS={showWeather:true};

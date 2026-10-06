@@ -438,3 +438,19 @@ a.tel{color:var(--sea);font-weight:700;text-decoration:none}
 .frhead b{font-size:18px}
 .frhead small{color:var(--muted);font-size:13px}
 #extFr .pksug{margin:0}
+/* Estado de guardado en el avatar */
+#profileBtn{position:relative}
+#profileBtn[data-sync]:not([data-sync=""])::after{content:'';position:absolute;right:1px;bottom:1px;width:10px;height:10px;border-radius:50%;border:2px solid var(--paper)}
+#profileBtn[data-sync=saving]::after{background:var(--sun);animation:pulse 1s ease-in-out infinite}
+#profileBtn[data-sync=offline]::after{background:var(--muted)}
+#profileBtn[data-sync=err]::after{background:var(--rose)}
+@keyframes pulse{50%{opacity:.35}}
+/* Aviso con Deshacer */
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,140%);z-index:40;display:flex;align-items:center;gap:14px;background:var(--ink);color:var(--paper);border-radius:12px;padding:11px 14px;box-shadow:0 6px 24px rgba(0,0,0,.3);font-weight:600;max-width:calc(100vw - 32px);transition:transform .2s ease-out;pointer-events:none}
+#toast.show{transform:translate(-50%,0);pointer-events:auto}
+#toast button{border:0;background:transparent;color:var(--sun);font-weight:800;padding:4px 6px;cursor:pointer}
+/* Ajustes en secciones plegables: el título lo pone la sección */
+.setsec{margin:10px 0}
+.setsec #pplWrap>h3,.setsec #mbrWrap>h3,.setsec #catsWrap>h3{display:none}
+.setsec .sideSec{margin:0 0 12px;border:0;padding:0;background:none}
+.setsec .shareBox+hr{display:none}

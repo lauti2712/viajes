@@ -55,11 +55,10 @@ document.addEventListener('click',function(e){
   else if(a==='newtrip')connectTo(genCode());
   else if(a==='gotrip'){if(t.dataset.code===CODE)closeSheet();else connectTo(t.dataset.code);}
   else if(a==='gohome'){setCode('');location.href=location.pathname;}
-  else if(a==='golocal'){try{localStorage.setItem(MODE_KEY,'local');}catch(e){}location.href=location.pathname;}
   else if(a==='wholater'){whoLater=true;render();}
   else if(a==='gwho'){gastosWho=t.dataset.who||'';render();}
-  else if(a==='whoami'){if(cloudMode())claimPerson(t.dataset.who);else setWhoAmI(t.dataset.who);render();}
-  else if(a==='whoswitch'){claimMsg='';if(cloudMode())releaseClaim();else setWhoAmI('');render();}
+  else if(a==='whoami'){claimPerson(t.dataset.who);render();}
+  else if(a==='whoswitch'){claimMsg='';releaseClaim();render();}
   else if(a==='login')login();
   else if(a==='addmethod')openMethod(null);
   else if(a==='editmethod')openMethod(t.dataset.id);
@@ -99,7 +98,7 @@ document.addEventListener('submit',function(e){
     var nm=pform.querySelector('[data-persontext]').value.trim();
     if(!nm)return;
     var pid=addPerson(nm);
-    if(cloudMode())claimPerson(pid);else setWhoAmI(pid);
+    claimPerson(pid);
     render();askJoin();
     return;
   }
@@ -123,8 +122,5 @@ document.addEventListener('submit',function(e){
   }
 });
 
-if(!cloudMode())migratePeople();
 render();
-if(!FIREBASE_CONFIG.apiKey){if(!S.trip.setup)openSettings();}
-else if(LOCAL_ONLY){syncState='local';renderHead();if(!S.trip.setup)openSettings();}
-else startCloud();   /* con viaje abierto, o la pantalla de inicio con Mis viajes */
+startCloud();   /* con viaje abierto, o la pantalla de inicio con Mis viajes */

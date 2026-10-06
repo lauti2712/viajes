@@ -114,10 +114,16 @@ service cloud.firestore {
       }
 
       // Transportes, alojamiento, gastos, planes y personas: compartidos entre los miembros.
-      // No hay delete: la app borra marcando del:true (así queda en la papelera).
+      // Borrar = marcar del:true (queda en la papelera); recién a los 10 días se elimina de verdad.
+      // Papelera vencida: lo borrado (del) hace más de 10 días se puede eliminar de verdad.
+      function oldTombstone() {
+        return resource.data.get('del', false) == true && resource.data.get('u', 0) is number
+          && resource.data.u < request.time.toMillis() - 864000000;
+      }
       match /items/{itemId} {
         allow read: if isMember() || isAdmin();
         allow create, update: if isMember();
+        allow delete: if isMember() && oldTombstone();
       }
       // Historial de cambios: se agrega, nunca se edita ni se borra.
       match /log/{logId} {
@@ -152,6 +158,7 @@ service cloud.firestore {
         );
         allow update: if isMember() && owns(resource.data.owner)
           && request.resource.data.owner == resource.data.owner;
+        allow delete: if isMember() && owns(resource.data.owner) && oldTombstone();
       }
     }
   }
