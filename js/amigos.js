@@ -29,6 +29,10 @@ function createFriend(name){
   return id;
 }
 var r2=function(n){return Math.round((+n||0)*100)/100;};
+/* Cómo queda un amigo anotado en un gasto (extF): "libro~rol~persona del viaje~nombre". Así cualquiera del
+   viaje sabe a qué libro va, de quién es el amigo y cómo se llama, aunque no pueda leer ese libro. */
+function fTok(L){return L.id+'~'+myRole(L)+'~'+(myPersonId()||'')+'~'+friendName(L).replace(/[~,]/g,' ').slice(0,30);}
+function parseTok(t){var p=String(t||'').split('~');return {lid:p[0],r:p[1]==='a'||p[1]==='b'?p[1]:'',pid:p[2]||'',name:p[3]||''};}
 
 /* Saldo con un amigo, por moneda: positivo = el amigo me debe; negativo = le debo. */
 function friendBalance(entries,role){
@@ -63,25 +67,46 @@ function syncFriendEntries(){
     var changed=false;
     S.expenses.forEach(function(x){
       var key=CODE+'_'+x.id,prev=map[key]||{u:0,l:[]};
-      var lids=x.del?[]:idsOf(x.extF).filter(function(id){return mine[id];});
+      /* amigos propios, y también los de otros del viaje (las reglas dejan escribir a quien está en el viaje) */
+      var toks=x.del?[]:idsOf(x.extF).map(parseTok).filter(function(p){return mine[p.lid]||(p.r&&p.pid);});
+      var lids=toks.map(function(p){return p.lid;});
       if(prev.u===x.u&&prev.l.join()===lids.join())return;
-      lids.forEach(function(id){writeTripEntry(mine[id],x,key);});
-      prev.l.filter(function(id){return lids.indexOf(id)<0&&mine[id];}).forEach(function(id){
-        FB.fs.setDoc(FB.fs.doc(FB.db,'ledgers',id,'entries',key),{del:true,u:Date.now(),by:ME.uid},{merge:true}).catch(fbErr);
+      toks.forEach(function(p){var L=mine[p.lid];writeTripEntry(p.lid,L?myRole(L):p.r,L?(p.pid||myPersonId()):p.pid,x,key);});
+      prev.l.filter(function(id){return lids.indexOf(id)<0;}).forEach(function(id){
+        FB.fs.setDoc(FB.fs.doc(FB.db,'ledgers',id,'entries',key),{del:true,u:Date.now(),by:ME.uid},{merge:true}).catch(function(){});
       });
       map[key]={u:x.u,l:lids};changed=true;
+    });
+    /* Amigos vinculados que también están en este viaje: lo que se deben según las cuentas del viaje. */
+    var me=myPersonId(),tr=null;
+    LEDGERS.forEach(function(L){
+      if(!L.b||!me)return;
+      var r=myRole(L),o=r==='a'?'b':'a',other=r==='a'?L.b:L.a;
+      var his=Object.keys(CLAIMS).find(function(pid){return CLAIMS[pid].uid===other&&allPeople().some(function(p){return p.id===pid;});});
+      if(!his)return;
+      tr=tr||settlements().list;
+      var owesMe=tr.filter(function(t){return t.fromId===his&&t.toId===me;}).reduce(function(a,t){return a+t.amt;},0);
+      var iOwe=tr.filter(function(t){return t.fromId===me&&t.toId===his;}).reduce(function(a,t){return a+t.amt;},0);
+      var key='bal|'+CODE+'|'+L.id,sig=[r2(owesMe),r2(iOwe),base(),S.trip.name].join('|');
+      if(map[key]===sig)return;
+      var e={k:'tripbal',trip:CODE,tripName:S.trip.name||'',desc:'Cuentas del viaje',date:S.trip.start||today(),cur:base(),total:r2(owesMe||iOwe),
+        payer:owesMe?r:iOwe?o:'',by:ME.uid,byName:ME.name||'',u:Date.now(),del:false};
+      e['p'+o]=r2(owesMe);e['p'+r]=r2(iOwe);
+      FB.fs.setDoc(FB.fs.doc(FB.db,'ledgers',L.id,'entries','bal_'+CODE),e).catch(function(){});
+      map[key]=sig;changed=true;
     });
     if(changed)try{localStorage.setItem(FSYNC_KEY(),JSON.stringify(map));}catch(e){}
   },400);
 }
-function writeTripEntry(L,x,eid){
-  var r=myRole(L),o=r==='a'?'b':'a',ep=extPart(x),n=Math.max(1,+x.extN||1),me=myPersonId();
-  var c=itemCost('expenses',x),mine=c&&me?(shareMap(c,c.amount)[me]||0):0;
-  var payer=x.status!=='pagado'?'':x.extPaid==='own'?'own':(me&&x.paidBy===me?r:'x');
+/* r = rol en el libro de quien tiene al amigo; pid = esa persona en el viaje. */
+function writeTripEntry(lid,r,pid,x,eid){
+  var o=r==='a'?'b':'a',ep=extPart(x),n=Math.max(1,+x.extN||1);
+  var c=itemCost('expenses',x),hisShare=c&&pid?(shareMap(c,c.amount)[pid]||0):0;
+  var payer=x.status!=='pagado'?'':x.extPaid==='own'?'own':(pid&&x.paidBy===pid?r:'x');
   var e={k:'trip',trip:CODE,tripName:S.trip.name||'',item:x.id,date:x.date||'',time:x.time||'',desc:x.desc||'Gasto',cat:x.cat||'',cur:curCode(x.cur,base()),
     total:ep.total,payer:payer,payerName:payer==='x'?nameOf(x.paidBy):'',by:ME.uid,byName:ME.name||'',u:Date.now(),del:false};
-  e['p'+r]=r2(mine);e['p'+o]=r2(ep.ext/n);
-  FB.fs.setDoc(FB.fs.doc(FB.db,'ledgers',L.id,'entries',eid),e).catch(fbErr);
+  e['p'+r]=r2(hisShare);e['p'+o]=r2(ep.ext/n);
+  FB.fs.setDoc(FB.fs.doc(FB.db,'ledgers',lid,'entries',eid),e).catch(function(){});
 }
 
 /* ---------- Pantallas ---------- */
@@ -115,6 +140,7 @@ function entryRow(e,L){
   var who=e.payer===r?'Pagaste vos':e.payer===o?'Pagó '+fn:e.payer==='x'?'Pagó '+(e.payerName||'otro'):e.payer==='own'?'Cada uno pagó lo suyo':'Sin pagar todavía';
   var eff=e.k==='pay'?(e.payer===r?'Le pasaste '+money(e['p'+o],e.cur):fn+' te pasó '+money(e['p'+r],e.cur))
     :e.payer===r?fn+' te debe '+money(e['p'+o],e.cur):e.payer===o?'Le debés '+money(e['p'+r],e.cur):'';
+  if(e.k==='tripbal')return '<div class="exp" role="button" tabindex="0" data-fentry="'+esc(e.id)+'"><span class="ec" aria-hidden="true">🧳</span><div class="et"><b>Cuentas del viaje «'+esc(e.tripName||'')+'»</b><small><span>Los dos están en el viaje: es lo que se deben según sus cuentas</span>'+(eff?'<span><b>'+esc(eff)+'</b></span>':'<span><b>A mano en ese viaje</b></span>')+'</small></div></div>';
   var ic=e.k==='pay'?'🤝':e.k==='trip'?'🧳':catIcon(e.cat);
   return '<div class="exp" role="button" tabindex="0" data-fentry="'+esc(e.id)+'"><span class="ec" aria-hidden="true">'+ic+'</span><div class="et"><b>'+esc(e.k==='pay'?'Devolución':e.desc||'Gasto')+'</b><small>'
     +(e.date?'<span>'+esc(fShort(e.date))+'</span>':'')+(e.k==='trip'&&e.tripName?'<span>🧳 '+esc(e.tripName)+'</span>':'')
@@ -135,7 +161,8 @@ function openFriend(id){
       +(mineL?'<button type="button" class="ghost sm" id="frRen">Cambiar nombre</button>':'')+'</div>';
     if(msg)h+='<div class="shareBox mt10">'+msg+'</div>';
     h+='<h3 class="mb6 mt14">Lo compartido</h3>'+(entries===null?'<p class="nada">Cargando…</p>':entries.length?entries.map(function(e){return entryRow(e,L);}).join(''):'<p class="nada">Todavía no compartieron nada. Al cargar un gasto de un viaje, tildá "Participaron personas de afuera" y elegí a '+esc(fn)+'.</p>');
-    if(mineL&&!L.b&&entries&&!entries.length)h+='<p class="mt14"><button type="button" class="danger sm" id="frDel">Borrar a '+esc(fn)+'</button></p>';
+    if(L.b)h+='<p class="mt14"><button type="button" class="ghost sm" id="frUnlink">Dejar de compartir con '+esc(fn)+'</button></p>';
+    else if(mineL)h+='<p class="mt14"><button type="button" class="danger sm" id="frDel">Borrar a '+esc(fn)+'</button></p>';
     return h;
   }
   var panel=openSheet('Amigo','<div id="frd">'+body()+'</div>');
@@ -146,7 +173,7 @@ function openFriend(id){
     var a=e.target.closest('[data-fadd]');if(a){openFriendEntry(id,null,a.getAttribute('data-fadd'),reload);return;}
     var en=e.target.closest('[data-fentry]');
     if(en){var x=(entries||[]).find(function(y){return y.id===en.getAttribute('data-fentry');});
-      if(x&&x.k==='trip'){msg='Este gasto es del viaje «'+esc(x.tripName||'')+'»: se edita desde el viaje, y acá se actualiza solo.';redraw();return;}
+      if(x&&(x.k==='trip'||x.k==='tripbal')){msg=x.k==='trip'?'Este gasto es del viaje «'+esc(x.tripName||'')+'»: se edita desde el viaje, y acá se actualiza solo.':'Sale de las cuentas del viaje «'+esc(x.tripName||'')+'» y se actualiza solo. Para saldarlo, registren el pago adentro del viaje.';redraw();return;}
       if(x)openFriendEntry(id,x,x.k,reload);return;}
     if(e.target.closest('#frRen')){var nm=(window.prompt('Nuevo nombre',L.bName)||'').trim().slice(0,40);if(nm){FB.fs.updateDoc(FB.fs.doc(FB.db,'ledgers',id),{bName:nm,u:Date.now()}).catch(fbErr);L.bName=nm;redraw();}return;}
     if(e.target.closest('#frInv')){
@@ -160,8 +187,14 @@ function openFriend(id){
       }).catch(fbErr);
       return;
     }
+    var un=e.target.closest('#frUnlink');
+    if(un){
+      if(!un.classList.contains('armed')){un.classList.add('armed');un.textContent=L.a===ME.uid?'¿Seguro? '+friendName(L)+' deja de verlo. Tocá de nuevo':'¿Seguro? Dejás de verlo. Tocá de nuevo';return;}
+      FB.fs.updateDoc(FB.fs.doc(FB.db,'ledgers',id),{b:'',bAcct:'',members:[L.a],inv:'',u:Date.now()}).then(function(){if(L.a===ME.uid){L.b='';redraw();}else openFriends();}).catch(fbErr);
+      return;
+    }
     var d=e.target.closest('#frDel');
-    if(d){if(!d.classList.contains('armed')){d.classList.add('armed');d.textContent='¿Seguro? Tocá de nuevo';return;}
+    if(d){if(!d.classList.contains('armed')){d.classList.add('armed');d.textContent=(entries&&entries.length?'Se borra con todo lo compartido. ':'')+'¿Seguro? Tocá de nuevo';return;}
       FB.fs.deleteDoc(FB.fs.doc(FB.db,'ledgers',id)).catch(fbErr);LEDGERS=LEDGERS.filter(function(x){return x.id!==id;});openFriends();}
   });
 }

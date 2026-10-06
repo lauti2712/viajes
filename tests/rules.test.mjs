@@ -129,6 +129,22 @@ test('amigos: el libro lo ven solo sus miembros; vincular con el link de un solo
   await assertSucceeds(getDocs(query(collection(nico, 'ledgers'), where('members', 'array-contains', 'nico'))));
 });
 
+test('amigos: otro del viaje anota el gasto en el libro; desvincular', async () => {
+  const ana = as('ana'), beto = as('beto'), carla = as('carla'), nico = as('nico');
+  await assertSucceeds(setDoc(doc(ana, 'ledgers', 'l3'), { a: 'ana', aName: 'Ana', b: '', bName: 'Nico', bAcct: '', members: ['ana'], inv: 'tk' }));
+  const e = { k: 'trip', trip: T, item: 'g9', total: 100, pa: 25, pb: 25, payer: 'x', by: 'beto' };
+  await assertSucceeds(setDoc(doc(beto, 'ledgers', 'l3', 'entries', T + '_g9'), e));                     // Beto está en el viaje de Ana
+  await assertFails(setDoc(doc(beto, 'ledgers', 'l3', 'entries', 'otro'), e));                           // id que no corresponde
+  await assertFails(setDoc(doc(beto, 'ledgers', 'l3', 'entries', T + '_g8'), { ...e, k: 'direct', item: 'g8' }));
+  await assertFails(getDocs(collection(beto, 'ledgers', 'l3', 'entries')));                               // pero no lo puede leer
+  await assertFails(setDoc(doc(carla, 'ledgers', 'l3', 'entries', T + '_g9'), { ...e, by: 'carla' }));   // Carla no está en el viaje
+  await assertSucceeds(updateDoc(doc(nico, 'ledgers', 'l3'), { b: 'nico', members: ['ana', 'nico'], claim: 'tk', inv: '' }));
+  await assertSucceeds(updateDoc(doc(nico, 'ledgers', 'l3'), { b: '', bAcct: '', members: ['ana'], inv: '' }));   // Nico deja de compartir
+  await assertFails(getDoc(doc(nico, 'ledgers', 'l3')));
+  await assertFails(deleteDoc(doc(nico, 'ledgers', 'l3')));
+  await assertSucceeds(deleteDoc(doc(ana, 'ledgers', 'l3')));
+});
+
 test('con sesión y código se usa el viaje, pero no se borra nada', async () => {
   const db = as('ana', 'ana@x.com');
   await assertSucceeds(getDoc(doc(db, 'trips', T)));

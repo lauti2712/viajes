@@ -35,14 +35,29 @@ service cloud.firestore {
         || (resource.data.b == '' && resource.data.inv != '' && request.auth.uid != resource.data.a
           && request.resource.data.claim == resource.data.inv && request.resource.data.inv == ''
           && request.resource.data.b == request.auth.uid && request.resource.data.a == resource.data.a
-          && request.resource.data.members == [resource.data.a, request.auth.uid]));
+          && request.resource.data.members == [resource.data.a, request.auth.uid])
+        // dejar de compartir: cualquiera de los dos desvincula (queda solo el que lo creó)
+        || (request.auth.uid in resource.data.members && resource.data.b != ''
+          && request.resource.data.a == resource.data.a && request.resource.data.b == ''
+          && request.resource.data.members == [resource.data.a]));
       allow delete: if signedIn() && resource.data.a == request.auth.uid && resource.data.b == '';
       match /entries/{eid} {
         function inLedger() {
           return signedIn() && request.auth.uid in get(/databases/$(database)/documents/ledgers/$(lid)).data.members;
         }
+        // Gasto de un viaje con este amigo: lo puede anotar cualquiera de ese viaje, si el dueño del
+        // amigo también está en el viaje (así se actualiza aunque lo edite otro).
+        function tripWriter() {
+          let L = get(/databases/$(database)/documents/ledgers/$(lid)).data;
+          let t = request.resource.data.trip;
+          return request.resource.data.k == 'trip' && t is string
+            && eid == t + '_' + request.resource.data.item
+            && exists(/databases/$(database)/documents/trips/$(t)/members/$(request.auth.uid))
+            && (exists(/databases/$(database)/documents/trips/$(t)/members/$(L.a))
+              || (L.b != '' && exists(/databases/$(database)/documents/trips/$(t)/members/$(L.b))));
+        }
         allow read: if inLedger();
-        allow create, update: if inLedger() && request.resource.data.by == request.auth.uid;
+        allow create, update: if signedIn() && request.resource.data.by == request.auth.uid && (inLedger() || tripWriter());
       }
     }
 

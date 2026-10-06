@@ -296,7 +296,7 @@ function listen(){
     if(mine!==myClaim||!claimsSeen){claimsSeen=true;myClaim=mine;subscribePacking();migratePrivate();}
     if(!snap.metadata.hasPendingWrites)syncCobro();
     claimsLoaded=true;
-    if(!snap.metadata.fromCache)maybeAdoptOwner();
+    if(!snap.metadata.fromCache){maybeAdoptOwner();syncFriendEntries();}
     render();if(formRefresh)formRefresh();
   },function(err){fbErr(err);});
 

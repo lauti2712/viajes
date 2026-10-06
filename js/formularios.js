@@ -231,8 +231,10 @@ function openItem(k,id,pre){
       var xc=d.hasExt?extCalc():null;
       var xf=takeChecks(d,'xf');
       if(xc&&xc.n>=1){
-        var fnames=idsOf(xf).map(function(id){var L=ledgerById(id);return L?friendName(L):'';}).filter(Boolean);
-        if(!fnames.length&&ex&&ex.extNames&&idsOf(xf).length)fnames=[ex.extNames];   /* amigos de otra cuenta: se deja el nombre que había */
+        /* propios: se arma el token; de otra cuenta del viaje: se conserva el que tenía */
+        var toks=idsOf(xf).map(function(t){if(t.indexOf('~')>=0)return t;var L=ledgerById(t);return L?fTok(L):'';}).filter(Boolean);
+        var fnames=toks.map(function(t){var p=parseTok(t),L=ledgerById(p.lid);return L?friendName(L):p.name;}).filter(Boolean);
+        xf=toks.join(',');
         d.extOther=(d.extOther||'').slice(0,80);d.extF=xf;
         d.extNames=fnames.concat(d.extOther?[d.extOther]:[]).join(', ').slice(0,120);
         d.extN=String(Math.max(xc.n,idsOf(xf).length));d.extAmt=String(xc.ext);d.tripPart=d.extMode==='amt'?String(xc.trip):'';
@@ -658,9 +660,9 @@ function bindPeople(panel){
 }
 /* Chips para elegir amigos guardados (tildados = participaron) + crear uno nuevo. */
 function extFriendChips(sel){
-  var ls=LEDGERS.slice(),have={};ls.forEach(function(L){have[L.id]=1;});
-  return ls.map(function(L){return '<label class="pksug"><input type="checkbox" name="xf_'+esc(L.id)+'"'+(sel.indexOf(L.id)>=0?' checked':'')+'>'+(L.b?'🔗 ':'')+esc(friendName(L))+'</label>';}).join('')
-    +sel.filter(function(id){return !have[id];}).map(function(id){return '<input type="hidden" name="xf_'+esc(id)+'" value="on">';}).join('')   /* amigos de otra cuenta del viaje: se conservan */
+  var ls=LEDGERS.slice(),have={},on={};ls.forEach(function(L){have[L.id]=1;});sel.forEach(function(t){on[parseTok(t).lid]=1;});
+  return ls.map(function(L){return '<label class="pksug"><input type="checkbox" name="xf_'+esc(L.id)+'"'+(on[L.id]?' checked':'')+'>'+(L.b?'🔗 ':'')+esc(friendName(L))+'</label>';}).join('')
+    +sel.filter(function(t){return !have[parseTok(t).lid];}).map(function(t){var p=parseTok(t);return '<input type="hidden" name="xf_'+esc(t)+'" value="on">'+(p.name?'<span class="chipsm">👤 '+esc(p.name)+'</span>':'');}).join('')   /* amigos de otra cuenta del viaje: se conservan */
     +'<button type="button" class="ghost sm" id="extNewFr">+ Amigo nuevo</button>';
 }
 function extFieldHtml(v){
