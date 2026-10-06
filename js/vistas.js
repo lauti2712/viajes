@@ -268,7 +268,7 @@ function vItinerario(){
     });
     items.sort(function(a,b){return a.k.localeCompare(b.k)});
     var dn=s?dayDiff(s,pd(d))+1:0;
-    return '<section class="iday"><div class="ih"><h3>'+esc(fLong(d))+'</h3>'+(dn>=1?'<span class="dn">Día '+dn+'</span>':'')+(d===t?'<span class="hoy">Hoy</span>':'')+(wxOn?wxChip(d):'')+'<span class="sp"></span><button class="ghost" data-act="add" data-k="plans" data-date="'+esc(d)+'">+ Plan</button></div>'+(items.length?items.map(function(i){return i.h}).join(''):'<div class="nada">Nada planeado todavía.</div>')+'</section>';
+    return '<section class="iday"><div class="ih"><h3>'+esc(fLong(d))+'</h3>'+(dn>=1?'<span class="dn">Día '+dn+'</span>':'')+(d===t?'<span class="hoy">Hoy</span>':'')+(wxOn?wxChip(d):'')+'<span class="sp"></span><button class="ghost addp" data-act="add" data-k="plans" data-date="'+esc(d)+'" aria-label="Agregar plan el '+esc(fLong(d))+'" title="Agregar plan">+</button></div>'+(items.length?items.map(function(i){return i.h}).join(''):'<div class="nada">Nada planeado todavía.</div>')+'</section>';
   }).join('');
 }
 

@@ -46,7 +46,7 @@ function catIcon(n){if(!n)return '📌';var o=catAll();if(o[n])return o[n];if(n=
    escribir cualquier código de 3 letras (ver main.js). */
 var CURS={ARS:'🇦🇷 Peso argentino',USD:'🇺🇸 Dólar',EUR:'🇪🇺 Euro',BRL:'🇧🇷 Real'};
 function curOpts(){
-  var o=Object.keys(CURS).map(function(c){return [c,c+' · '+CURS[c]];}),have={};Object.keys(CURS).forEach(function(c){have[c]=1;});
+  var o=Object.keys(CURS).map(function(c){return [c,CURS[c].split(' ')[0]+' '+c];}),have={};Object.keys(CURS).forEach(function(c){have[c]=1;});
   var used=[(typeof S!=='undefined'&&S.trip&&S.trip.base)||''].concat(typeof S!=='undefined'?['transports','lodging','expenses','payments'].reduce(function(a,k){return a.concat((S[k]||[]).map(function(x){return x.cur;}));},[]):[]);
   used.forEach(function(c){c=curCode(c,'');if(c&&!have[c]){have[c]=1;o.push([c,c]);}});
   return o.concat([['__other','Otra moneda…']]);

@@ -34,7 +34,6 @@ function pushTrip(patch){
   else{body=Object.assign({},S.trip);if(TRIP_SRV.owner)body.owner=TRIP_SRV.owner;body.locked=TRIP_SRV.owner===ME.uid?!!S.trip.locked:TRIP_SRV.locked;if(!body.owner)delete body.owner;}
   try{FB.fs.setDoc(fdoc(),clean(body),{merge:!!patch}).catch(fbErr);}catch(e){}
 }
-function pushAll(){if(!FB||AUTH!=='in')return;pushTrip();ITEM_KEYS.forEach(function(k){S[k].forEach(function(it){pushItem(k,it)})});}
 /* srv: el dato viene confirmado por el servidor (no es un eco de un cambio propio pendiente). Ante empate
    de u gana el servidor: así, si dos personas editan lo mismo a la vez, todos terminan viendo lo mismo. */
 function applyItem(k,d,srv){

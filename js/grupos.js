@@ -6,7 +6,6 @@
 var MYVEH=[];   /* vehículos de mi cuenta */
 function idsOf(s){return String(s||'').split(',').filter(Boolean);}
 function livingIds(list){var ok=allPeople().map(function(p){return p.id;});return idsOf(list).filter(function(id){return ok.indexOf(id)>=0;});}
-function namesOf(list){return livingIds(list).map(nameOf).join(', ');}
 /* Accesos rápidos para el reparto: cada alojamiento con gente y cada auto con pasajeros. */
 function splitGroups(){
   var me=myPersonId(),g=[];

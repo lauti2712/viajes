@@ -58,14 +58,12 @@ button{cursor:pointer}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:3px 10px 3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
 h1{font-family:var(--display);font-weight:800;font-size:clamp(22px,6vw,42px);line-height:1.08;letter-spacing:-.025em;margin:0;overflow-wrap:anywhere}
-.titlerow{display:flex;align-items:baseline;flex-wrap:wrap;column-gap:16px;row-gap:6px;margin-bottom:14px}
 .when:empty{display:none}
 .when{margin:6px 0 0;font-size:15px;color:var(--muted);display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;font-weight:500}
 .when .cal{font-size:15px}
 .when b{color:var(--ink);font-weight:700}
 .when .sep{opacity:.6}
 @media (max-width:420px){.ib{width:36px;height:36px;border-radius:11px}.ib svg{width:19px;height:19px}.icons{gap:5px}.when{font-size:14px}}
-.hb{display:flex;gap:8px;flex-wrap:wrap}
 
 /* Buttons */
 .primary,.ghost,.danger{border-radius:10px;padding:9px 15px;font-weight:700;font-size:15px;border:1.5px solid transparent;line-height:1.2}
@@ -191,11 +189,11 @@ h3{font-family:var(--display);font-weight:700;font-size:18px;margin:0}
 
 /* Itinerary */
 .iday{margin-bottom:24px}
-.ih{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.ih{position:relative;display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;margin-bottom:8px;padding-right:44px;min-height:34px}
 .ih .dn{font-size:13px;font-weight:700;color:var(--muted)}
 .ih .hoy{font-size:12px;font-weight:800;background:var(--sun);color:var(--on-sun);padding:2px 9px;border-radius:999px}
-.ih .sp{flex:1}
-.ih .ghost{padding:5px 11px;font-size:14px}
+.ih .sp{display:none}
+.ih .addp{position:absolute;right:0;top:0;width:34px;height:34px;padding:0;border-radius:999px;font-size:20px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 .pl{display:grid;grid-template-columns:54px 1fr;gap:8px;padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer}
 .pl.auto{cursor:default;border-left:3px dashed var(--sun);padding-left:10px;color:var(--muted)}
 .pl .t{font-variant-numeric:tabular-nums;font-weight:700;color:var(--muted)}
@@ -321,7 +319,6 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .cityOpt small{color:var(--muted)}
 .cityOpt:hover{border-color:var(--muted)}
 .wx{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
-.wxbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin:0 0 16px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 .tripmap.dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9)}
 .tripmap{height:260px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--paper)}
 .mpin{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--sea);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);color:#fff;font:800 12px var(--body)}
@@ -333,8 +330,6 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .mpt em{font-size:12px;font-style:normal;font-weight:700;color:#8a6d00}
 .leaflet-popup-content .ghost{color:#16223A;border-color:#ccc}
 
-.wxbox .wxbtns{order:9;margin-left:auto;display:flex;gap:6px}
-.wxbox .wxbtns .sm{padding:2px 9px!important;font-size:12px!important}
 
 /* Alojamientos con huéspedes y autos con pasajeros */
 .guests{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:14px}
@@ -344,7 +339,6 @@ body.gated .tabs,body.gated [data-act=settings],body.gated [data-act=sync],body.
 .vehs .stay{border-left-color:var(--mint)}
 .grps{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
 .itpast{display:block;width:100%;margin:0 0 14px;font-size:14px}
-.wxon{padding:4px 12px;font-size:13px;margin:0 0 12px}
 .mbr .mbn{flex:1;display:flex;flex-direction:column;min-width:0}
 .mbr .mbn small{color:var(--muted);font-size:12px}
 .mbr .sm{flex:none}
