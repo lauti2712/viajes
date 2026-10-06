@@ -438,3 +438,9 @@ a.tel{color:var(--sea);font-weight:700;text-decoration:none}
 .wxdays .pp{font-size:12px;color:var(--muted);text-align:right}
 .wxdays b{text-align:right}
 .wxdays small{color:var(--muted);text-align:right}
+/* Amigos */
+.frhead{display:flex;align-items:center;gap:12px}
+.frhead>div{display:flex;flex-direction:column}
+.frhead b{font-size:18px}
+.frhead small{color:var(--muted);font-size:13px}
+#extFr .pksug{margin:0}

@@ -229,8 +229,15 @@ function openItem(k,id,pre){
     if(k==='plans'){if(!d.hasEnd)d.endTime='';delete d.hasEnd;}
     if(k==='expenses'){
       var xc=d.hasExt?extCalc():null;
-      if(xc&&xc.n>=1){d.extN=String(xc.n);d.extAmt=String(xc.ext);d.tripPart=d.extMode==='amt'?String(xc.trip):'';d.extNames=(d.extNames||'').slice(0,80);}
-      else{d.extN='';d.extAmt='';d.tripPart='';d.extNames='';d.extMode='';d.extPaid='';}
+      var xf=takeChecks(d,'xf');
+      if(xc&&xc.n>=1){
+        var fnames=idsOf(xf).map(function(id){var L=ledgerById(id);return L?friendName(L):'';}).filter(Boolean);
+        if(!fnames.length&&ex&&ex.extNames&&idsOf(xf).length)fnames=[ex.extNames];   /* amigos de otra cuenta: se deja el nombre que había */
+        d.extOther=(d.extOther||'').slice(0,80);d.extF=xf;
+        d.extNames=fnames.concat(d.extOther?[d.extOther]:[]).join(', ').slice(0,120);
+        d.extN=String(Math.max(xc.n,idsOf(xf).length));d.extAmt=String(xc.ext);d.tripPart=d.extMode==='amt'?String(xc.trip):'';
+      }
+      else{d.extN='';d.extAmt='';d.tripPart='';d.extNames='';d.extMode='';d.extPaid='';d.extF='';d.extOther='';}
       delete d.hasExt;
     }
     if(k==='transports'){
@@ -395,7 +402,20 @@ function openItem(k,id,pre){
   if(f.querySelector('[name=hasExt]')){
     syncExt();
     f.addEventListener('input',function(e){if(/^(amount|extN|tripPart)$/.test(e.target.name))syncExt();});
-    f.addEventListener('change',function(e){if(/^(hasExt|extMode|split|cur)$/.test(e.target.name)||/^sw_/.test(e.target.name))syncExt();});
+    f.addEventListener('change',function(e){
+      if(/^xf_/.test(e.target.name)){   /* elegir amigos sube el "cuántos de afuera" si hace falta */
+        var nf=f.querySelectorAll('[name^=xf_]:checked').length,ne=el('extN');if((parseInt(ne.value,10)||0)<nf)ne.value=nf;
+      }
+      if(/^(hasExt|extMode|split|cur|extN)$/.test(e.target.name)||/^(sw|xf)_/.test(e.target.name))syncExt();
+    });
+    panel.addEventListener('click',function(e){
+      if(!e.target.closest('#extNewFr'))return;
+      var nm=window.prompt('¿Cómo se llama tu amigo/a? Queda guardado en tus amigos.');var id=createFriend(nm);if(!id)return;
+      var sel=Array.prototype.filter.call(f.querySelectorAll('[name^=xf_]'),function(c){return c.checked||c.type==='hidden';}).map(function(c){return c.name.slice(3);}).concat([id]);
+      $('#extFr',panel).innerHTML=extFriendChips(sel);
+      var ne=el('extN');if((parseInt(ne.value,10)||0)<f.querySelectorAll('[name^=xf_]:checked').length)ne.value=f.querySelectorAll('[name^=xf_]:checked').length;
+      syncExt();
+    });
   }
   /* Modo solo: quién pagó (vos) y para quién es no hace falta elegirlos. */
   if(solo()&&(k==='transports'||k==='lodging'||k==='expenses')){
@@ -636,12 +656,20 @@ function bindPeople(panel){
     redraw();var n=$('[data-pnew]',panel);if(n)n.focus();
   });
 }
+/* Chips para elegir amigos guardados (tildados = participaron) + crear uno nuevo. */
+function extFriendChips(sel){
+  var ls=LEDGERS.slice(),have={};ls.forEach(function(L){have[L.id]=1;});
+  return ls.map(function(L){return '<label class="pksug"><input type="checkbox" name="xf_'+esc(L.id)+'"'+(sel.indexOf(L.id)>=0?' checked':'')+'>'+(L.b?'🔗 ':'')+esc(friendName(L))+'</label>';}).join('')
+    +sel.filter(function(id){return !have[id];}).map(function(id){return '<input type="hidden" name="xf_'+esc(id)+'" value="on">';}).join('')   /* amigos de otra cuenta del viaje: se conservan */
+    +'<button type="button" class="ghost sm" id="extNewFr">+ Amigo nuevo</button>';
+}
 function extFieldHtml(v){
   var on=+v.extN>0;
   return '<div class="fld" id="extFld"><label class="pksug chk"><input type="checkbox" name="hasExt"'+(on?' checked':'')+'> Participaron personas de afuera del viaje</label>'
    +'<div class="grid mt8" id="extBox"'+(on?'':' hidden')+'>'
-   +'<label class="fld half"><span>¿Cuántas de afuera?</span><input type="number" name="extN" min="1" max="99" inputmode="numeric" value="'+esc(v.extN||'1')+'"></label>'
-   +'<label class="fld half"><span>Quiénes (opcional)</span><input type="text" name="extNames" maxlength="80" value="'+esc(v.extNames||'')+'" placeholder="Ej: Juan y Pedro" autocomplete="off"></label>'
+   +(FB&&AUTH==='in'?'<div class="fld"><span>Amigos que participaron</span><div class="row g6" id="extFr">'+extFriendChips(idsOf(v.extF))+'</div></div>':'')
+   +'<label class="fld half"><span>¿Cuántas de afuera en total?</span><input type="number" name="extN" min="1" max="99" inputmode="numeric" value="'+esc(v.extN||'1')+'"></label>'
+   +'<label class="fld half"><span>'+(FB&&AUTH==='in'?'Otros (sin guardar)':'Quiénes (opcional)')+'</span><input type="text" name="extOther" maxlength="80" value="'+esc(v.extOther!=null?v.extOther:(idsOf(v.extF).length?'':v.extNames||''))+'" placeholder="Ej: Juan y Pedro" autocomplete="off"></label>'
    +'<label class="fld"><span>Cómo se divide</span><select name="extMode"><option value="eq"'+(v.extMode!=='amt'?' selected':'')+'>Partes iguales entre todos</option><option value="amt"'+(v.extMode==='amt'?' selected':'')+'>Pongo cuánto nos toca</option></select></label>'
    +'<label class="fld half"><span>Parte del viaje</span><input type="number" name="tripPart" step="any" min="0" inputmode="decimal" value="'+esc(v.tripPart||'')+'" placeholder="0"></label>'
    +'<label class="fld"><span>Cómo se pagó la cuenta</span><select name="extPaid"><option value="all"'+(v.extPaid!=='own'?' selected':'')+'>Todo junto (después devuelven)</option><option value="own"'+(v.extPaid==='own'?' selected':'')+'>Cada uno pagó lo suyo</option></select></label>'

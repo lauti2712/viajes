@@ -42,6 +42,7 @@ document.addEventListener('click',function(e){
   else if(a==='itinpast'){itinPast=!itinPast;render();}
   else if(a==='wxopen')openWeather();
   else if(a==='h12'){setPref('h12',!!t.dataset.v);closeSheet();openProfile();}
+  else if(a==='friends')openFriends();
   else if(a==='rates')openRates();
   else if(a==='trash')openTrash();
   else if(a==='history')openHistory();

@@ -42,6 +42,7 @@ function openProfile(){
   if(!ME)return;
   var h='<div class="prof"><span class="avatar lg">'+initialOf(ME.name)+'</span><div><b>'+esc(ME.name||'Tu cuenta')+'</b><small>'+esc(ME.email||'')+'</small></div></div>';
   if(!homeMode())h+='<section class="psec"><div class="bar"><h3>Mis viajes</h3><button type="button" class="ghost sm" data-act="newtrip">+ Nuevo</button></div><div id="tripsl">'+tripsListHtml()+'</div></section>';
+  h+=friendsSectionHtml();
   if(cloudMode()||homeMode())h+=calHtml();
   h+=mapSectionHtml();
   h+=myVehiclesHtml();

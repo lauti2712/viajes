@@ -15,7 +15,7 @@ function app(people, extra) {
     history: { replaceState() {} },
     localStorage: store, sessionStorage: store,
   });
-  for (const f of ['config', 'core', 'plata', 'mispagos']) vm.runInContext(readFileSync(new URL(`../js/${f}.js`, import.meta.url), 'utf8'), ctx, { filename: f + '.js' });
+  for (const f of ['config', 'core', 'plata', 'mispagos', 'amigos']) vm.runInContext(readFileSync(new URL(`../js/${f}.js`, import.meta.url), 'utf8'), ctx, { filename: f + '.js' });
   vm.runInContext(`
     var CLAIMS={};
     function pushItem(){} function myPersonId(){return '';} function render(){}
@@ -206,4 +206,21 @@ test('gente de afuera: al viaje le cuenta su parte; a la tarjeta, lo que se cobr
   // Con varias del viaje: Ana pagó 20.000, entran Ana y Beto + 2 de afuera → Beto le debe 5.000.
   const e = app(P3, (c) => c.add('expenses', gasto({ amount: 20000, paidBy: 'ana', splitWith: 'ana,beto', extN: '2', extAmt: '10000' })));
   assert.deepEqual(net(e), { ana: 5000, beto: -5000, caro: 0 });
+});
+
+test('amigos: saldo entre los dos, por moneda', () => {
+  const c = app(P3);
+  const es = [
+    { payer: 'a', pa: 4175, pb: 4175, cur: 'ARS' },           // pagué yo: me debe su parte
+    { payer: 'b', pa: 5000, pb: 5000, cur: 'ARS' },           // pagó él: le debo mi parte
+    { payer: 'own', pa: 34000, pb: 35000, cur: 'ARS' },       // cada uno lo suyo: nada
+    { payer: 'x', pa: 1000, pb: 1000, cur: 'ARS' },           // pagó otro del viaje: nada entre nosotros
+    { payer: 'b', pa: 0, pb: 0, cur: 'ARS', k: 'pay' },
+    { payer: 'a', pa: 0, pb: 20, cur: 'USD' },
+    { payer: 'a', pa: 0, pb: 999, cur: 'ARS', del: true },
+  ];
+  assert.deepEqual(JSON.parse(JSON.stringify(c.friendBalance(es, 'a'))), { ARS: -825, USD: 20 });
+  assert.deepEqual(JSON.parse(JSON.stringify(c.friendBalance(es, 'b'))), { ARS: 825, USD: -20 });
+  // devolución: él me pasó 4.175 (payer b, mi parte = lo recibido)
+  assert.deepEqual(JSON.parse(JSON.stringify(c.friendBalance([{ payer: 'a', pa: 4175, pb: 4175, cur: 'ARS' }, { k: 'pay', payer: 'b', pa: 4175, pb: 0, cur: 'ARS' }], 'a'))), {});
 });

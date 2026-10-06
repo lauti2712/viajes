@@ -148,7 +148,7 @@ async function startCloud(){
   FB.au.onAuthStateChanged(FB.auth,function(u){
     if(u){
       ME={uid:u.uid,name:u.displayName||'',email:u.email||''};AUTH='in';loginMsg='';
-      if(!listening){listening=true;listenTrips();listenMeta();listenPrefs();listenMyVehicles();if(CODE)enterTrip();}
+      if(!listening){listening=true;listenTrips();listenMeta();listenPrefs();listenMyVehicles();listenLedgers();if(CODE)enterTrip();}
       render();
     }else{
       if(AUTH==='in'){if(!loggingOut)location.reload();return;}
@@ -274,6 +274,7 @@ function listen(){
     }
     migrateLegacyPacking();
     if(changed){save();render();checkNewAvisos();}
+    if(itemsReady&&(changed||!snap.metadata.fromCache))syncFriendEntries();
     setSync(snap.metadata.fromCache?(navigator.onLine?'connecting':'offline'):(snap.metadata.hasPendingWrites?'saving':'ok'));
   },function(err){fbErr(err);if(!err||err.code!=='permission-denied')setSync('err');});
 

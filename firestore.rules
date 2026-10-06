@@ -22,6 +22,30 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Amigos: cada amistad es un libro que leen y escriben solo sus miembros (a = quien lo creó; b = la
+    // cuenta del amigo, cuando acepta el link de invitación de un solo uso: claim == inv).
+    match /ledgers/{lid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      allow create: if signedIn() && request.resource.data.a == request.auth.uid
+        && request.resource.data.members == [request.auth.uid] && request.resource.data.b == '';
+      allow update: if signedIn() && (
+        (request.auth.uid in resource.data.members
+          && request.resource.data.a == resource.data.a && request.resource.data.b == resource.data.b
+          && request.resource.data.members == resource.data.members)
+        || (resource.data.b == '' && resource.data.inv != '' && request.auth.uid != resource.data.a
+          && request.resource.data.claim == resource.data.inv && request.resource.data.inv == ''
+          && request.resource.data.b == request.auth.uid && request.resource.data.a == resource.data.a
+          && request.resource.data.members == [resource.data.a, request.auth.uid]));
+      allow delete: if signedIn() && resource.data.a == request.auth.uid && resource.data.b == '';
+      match /entries/{eid} {
+        function inLedger() {
+          return signedIn() && request.auth.uid in get(/databases/$(database)/documents/ledgers/$(lid)).data.members;
+        }
+        allow read: if inLedger();
+        allow create, update: if inLedger() && request.resource.data.by == request.auth.uid;
+      }
+    }
+
     match /trips/{tripId} {
       function tripPath() {
         return /databases/$(database)/documents/trips/$(tripId);

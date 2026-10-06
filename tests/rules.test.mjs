@@ -109,6 +109,26 @@ test('gastos propios: solo los ve su dueño', async () => {
   await assertSucceeds(deleteDoc(doc(ana, 'trips', T, 'private', 'p1')));
 });
 
+test('amigos: el libro lo ven solo sus miembros; vincular con el link de un solo uso', async () => {
+  const ana = as('ana', 'ana@x.com'), nico = as('nico'), beto = as('beto');
+  await assertSucceeds(setDoc(doc(ana, 'ledgers', 'l1'), { a: 'ana', aName: 'Ana', b: '', bName: 'Nico', bAcct: '', members: ['ana'], inv: '' }));
+  await assertFails(setDoc(doc(beto, 'ledgers', 'l2'), { a: 'ana', b: '', members: ['ana'] }));   // a nombre de otro
+  await assertSucceeds(setDoc(doc(ana, 'ledgers', 'l1', 'entries', 'e1'), { k: 'direct', total: 100, pa: 50, pb: 50, payer: 'a', by: 'ana' }));
+  await assertFails(getDoc(doc(nico, 'ledgers', 'l1')));
+  await assertFails(getDocs(collection(nico, 'ledgers', 'l1', 'entries')));
+  // sin invitación activa no se puede vincular
+  await assertFails(updateDoc(doc(nico, 'ledgers', 'l1'), { b: 'nico', members: ['ana', 'nico'], claim: '', inv: '' }));
+  await assertSucceeds(updateDoc(doc(ana, 'ledgers', 'l1'), { inv: 'tok123' }));
+  await assertFails(updateDoc(doc(nico, 'ledgers', 'l1'), { b: 'nico', members: ['ana', 'nico'], claim: 'mal', inv: '' }));
+  await assertFails(updateDoc(doc(ana, 'ledgers', 'l1'), { b: 'beto', members: ['ana', 'beto'] }));   // el dueño no mete a otro
+  await assertSucceeds(updateDoc(doc(nico, 'ledgers', 'l1'), { b: 'nico', bAcct: 'Nicolás', members: ['ana', 'nico'], claim: 'tok123', inv: '' }));
+  await assertSucceeds(getDocs(collection(nico, 'ledgers', 'l1', 'entries')));   // ve lo anterior
+  await assertSucceeds(setDoc(doc(nico, 'ledgers', 'l1', 'entries', 'e2'), { k: 'direct', total: 30, pa: 15, pb: 15, payer: 'b', by: 'nico' }));
+  await assertFails(updateDoc(doc(beto, 'ledgers', 'l1'), { b: 'beto', members: ['ana', 'beto'], claim: 'tok123', inv: '' }));   // ya se usó
+  await assertFails(getDocs(collection(beto, 'ledgers', 'l1', 'entries')));
+  await assertSucceeds(getDocs(query(collection(nico, 'ledgers'), where('members', 'array-contains', 'nico'))));
+});
+
 test('con sesión y código se usa el viaje, pero no se borra nada', async () => {
   const db = as('ana', 'ana@x.com');
   await assertSucceeds(getDoc(doc(db, 'trips', T)));
