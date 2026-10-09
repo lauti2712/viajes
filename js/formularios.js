@@ -105,6 +105,7 @@ var SPECS={
     {k:'to',l:'Destino',t:'text',half:true,req:true,ph:'Ej: Bariloche'},
     {k:'dep',l:'Sale',t:'datetime-local'},
     {k:'arr',l:'Llega',t:'datetime-local'},
+    {k:'_ret',t:'html',html:''},   /* se completa en openItem: cargar también la vuelta (solo al crear) */
     {k:'_same',t:'html',html:'<label class="chk fld pksug" id="sameWrap" hidden><input type="checkbox" name="same"> Se devuelve en el mismo lugar donde se retira</label>'},
     {k:'seats',l:'Asientos',t:'number',half:true,ph:'5'},
     {k:'kmOut',l:'Km al retirar',t:'number',half:true,ph:'Ej: 45200'},
@@ -209,6 +210,9 @@ function openItem(k,id,pre){
   if('cur' in vals||k!=='plans')vals.cur=curCode(vals.cur,base());   /* para que la lista de monedas la marque bien */
   var curId=id||null;
   var tk=k==='expenses'?'<div class="row" style="margin:-4px 0 12px"><label class="ghost filebtn">📷 Leer ticket<input type="file" accept="image/*" data-ticket hidden></label><span class="m0 hint" id="tkmsg"></span></div>':'';
+  if(k==='transports')sp.fields.forEach(function(f){if(f.k==='_ret')f.html=ex?'':'<div class="fld" id="retFld"><label class="pksug chk"><input type="checkbox" name="hasRet"> Cargar también la vuelta</label>'
+    +'<div class="grid mt8" id="retBox" hidden><label class="fld"><span>Vuelta: sale</span><input type="datetime-local" name="retDep"></label><label class="fld"><span>Vuelta: llega</span><input type="datetime-local" name="retArr"></label>'
+    +'<label class="fld"><span>El costo que cargues es</span><select name="retCost"><option value="ida">Por ida y vuelta (queda todo en la ida)</option><option value="each">Por tramo (se repite en la vuelta)</option></select></label></div></div>';});
   if(k==='lodging')sp.fields.forEach(function(f){if(f.k==='_guests')f.html=peopleChecksHtml('g',vals.guests,'Quiénes se quedan acá');if(f.k==='_addr')f.html=addrFieldHtml(vals);if(f.k==='_itin')f.html='<label class="fld pksug chk"><input type="checkbox" name="showItin"'+(vals.hideItin==='1'?'':' checked')+'> Mostrar el check-in y el check-out en el itinerario</label>';});
   if(k==='plans')sp.fields.forEach(function(f){if(f.k==='_place')f.html=addrFieldHtml(vals,'place','Lugar','Nombre del lugar o dirección');if(f.k==='_end')f.html='<label class="fld pksug chk"><input type="checkbox" name="hasEnd"'+(vals.endTime?' checked':'')+'> Tiene hora de finalización</label>';});
   if(k==='expenses')sp.fields.forEach(function(f){if(f.k==='_ext')f.html=extFieldHtml(vals);});
@@ -224,6 +228,7 @@ function openItem(k,id,pre){
   var el=function(nm){return f.querySelector('[name='+nm+']');};
   function showFld(input,on){if(!input)return;var w=input.closest('.fld');if(w)w.hidden=!on;input.disabled=!on;}
 
+  var retData=null;
   function readForm(){var d={};new FormData(f).forEach(function(val,kk){d[kk]=String(val).trim();});if(k==='lodging'){d.guests=takeChecks(d,'g');d.hideItin=d.showItin?'':'1';delete d.showItin;}
     if(k==='expenses')d.inItin=d.inItin?'1':'';
     if(k==='plans'){if(!d.hasEnd)d.endTime='';delete d.hasEnd;}
@@ -244,6 +249,9 @@ function openItem(k,id,pre){
     }
     if(k==='transports'){
       var rd=takeChecks(d,'rd');
+      /* la vuelta se guarda aparte (ver el submit) */
+      retData=d.hasRet&&d.type!=='auto'?{dep:d.retDep||'',arr:d.retArr||'',cost:d.retCost||'ida'}:null;
+      delete d.hasRet;delete d.retDep;delete d.retArr;delete d.retCost;
       d.riders=rd;   /* pasajeros: en un alquiler son los que van en el auto */
       if(d.type==='auto'){d.seats=String(parseInt(d.seats,10)||'');d.kmOut=String(parseInt(d.kmOut,10)||'');d.kmIn=String(parseInt(d.kmIn,10)||'');d.mech=String(d.mech||'').replace(/[^\d+()\s-]/g,'').slice(0,30).trim();if(d.same){d.to=d.from;d.same='1';}else d.same='';}
       else{d.seats='';d.same='';d.kmOut='';d.kmIn='';d.mech='';}
@@ -253,6 +261,7 @@ function openItem(k,id,pre){
   var TLBL={from:['Origen','Lugar de retiro'],to:['Destino','Lugar de devolución'],dep:['Sale','Retiro (fecha y hora)'],arr:['Llega','Devolución (fecha y hora)'],company:['Empresa','Empresa de alquiler']};
   function syncTType(){
     if(k!=='transports')return;
+    var rf=$('#retFld',panel);if(rf){rf.hidden=el('type').value==='auto';var hr=f.querySelector('[name=hasRet]');$('#retBox',panel).hidden=!hr.checked||rf.hidden;}
     var car=el('type').value==='auto',same=car&&f.querySelector('[name=same]').checked;
     Object.keys(TLBL).forEach(function(n){var i=el(n);if(i)i.closest('.fld').querySelector('span').textContent=TLBL[n][car?1:0];});
     el('from').placeholder=car?'Ej: Aeropuerto de Iguazú':'Ej: Rosario';el('to').placeholder=car?'Ej: Centro de Puerto Iguazú':'Ej: Bariloche';el('company').placeholder=car?'Localiza, Hertz…':'Aerolínea, bus…';
@@ -439,7 +448,16 @@ function openItem(k,id,pre){
     if(k==='expenses'&&+d.extN>0&&(parseFloat(d.extAmt)<=0||parseFloat(d.extAmt)>=parseFloat(d.amount))){fm.textContent='La parte del viaje tiene que ser más que cero y menos que el total de la cuenta.';return;}
     var prob='amount' in d?splitProblem(d):'';
     if(prob){fm.textContent=prob;return;}
-    upsert(k,curId,normalizeCost(d,ex));
+    if(retData&&retData.dep&&d.arr&&retData.dep<d.arr){fm.textContent='La vuelta sale antes de que llegue la ida. Revisá las fechas.';return;}
+    if(retData&&retData.dep&&retData.arr&&retData.arr<retData.dep){fm.textContent='En la vuelta, la llegada es antes de la salida. Revisá las fechas.';return;}
+    var saved=normalizeCost(d,ex);
+    upsert(k,curId,saved);
+    if(retData){   /* la vuelta: mismo tipo, empresa, reserva y pasajeros; origen y destino al revés */
+      var back=Object.assign({},saved,{from:saved.to,to:saved.from,dep:retData.dep,arr:retData.arr,notes:''});
+      if(retData.cost!=='each'){back.amount=0;back.status=saved.status;}
+      delete back.attachments;delete back.links;
+      upsert(k,null,back);
+    }
     closeSheet();
   });
   var del=$('#del',panel);
@@ -503,7 +521,7 @@ function openItem(k,id,pre){
       return;
     }
     if(e.target.name==='split'){if(e.target.value==='self'&&el('paidBy')&&!el('paidBy').value&&myPersonId()){el('paidBy').value=myPersonId();syncPay();}drawSplit();$('#formmsg',panel).textContent='';return;}
-    if(e.target.name==='type'||e.target.name==='same'){
+    if(e.target.name==='type'||e.target.name==='same'||e.target.name==='hasRet'){
       /* al elegir "Alquiler de auto", el costo pasa a repartirse entre los que van en el auto */
       if(e.target.name==='type'&&e.target.value==='auto'&&el('split').value==='equal'&&!ex){el('split').value='riders';var me0=myPersonId(),c0=me0&&f.querySelector('[name=rd_'+me0+']');if(c0)c0.checked=true;drawSplit();}
       syncTType();return;
@@ -739,7 +757,16 @@ function settingsSections(cats){
   h+=setSec('🏷️ Categorías propias',cats.length||'',catsBlockHtml(cats),false);
   return h+'<div class="row mt14"><button type="button" class="ghost" data-act="rates">💱 Tipos de cambio</button><button type="button" class="ghost" data-act="trash">🗑️ Papelera'+(trashItems().length?' ('+trashItems().length+')':'')+'</button>'+(cloudMode()&&AUTH==='in'?'<button type="button" class="ghost" data-act="history">🕘 Últimos cambios</button>':'')+'</div>';
 }
+/* Quien arma el viaje (o toca "Agregarme") queda como persona del viaje, vinculada a su cuenta. Si ya hay
+   alguien con su nombre sin vincular, se toma esa persona en vez de crear otra. */
+function myFirstName(){return String((ME&&ME.name)||'').trim().split(/\s+/)[0]||'Yo';}
+function addMe(){
+  if(!cloudMode()||!ME||myClaim)return;
+  var nm=myFirstName().toLowerCase(),same=allPeople().find(function(p){return p.name.trim().toLowerCase()===nm&&!CLAIMS[p.id];});
+  claimPerson(same?same.id:upsert('people',null,{name:myFirstName(),c:allPeople().reduce(function(m,p){return Math.min(m,p.c);},Date.now())-1}));
+}
 function openSettings(){
+  if(!S.trip.setup&&!allPeople().length)addMe();
   var t=S.trip,first=!t.setup,nd=first?newDates():null,cats=tripCats().filter(function(c){return c&&c.name;}).map(function(c){return {name:String(c.name).slice(0,30),icon:String(c.icon||'🏷️').slice(0,4)};});
   sheetForm({title:t.setup?'Ajustes del viaje':'Armemos el viaje',noFocus:false,values:{name:first&&t.name==='Nuestro viaje'?'':t.name,start:nd?nd.start:t.start,end:nd?nd.end:t.end,base:t.base,daily:t.daily||'',budget:t.budget||'',info:t.info||''},
     fields:[
@@ -773,6 +800,6 @@ function openSettings(){
       Object.assign(S.trip,patch,{u:nextU(S.trip.u)});
       save();pushTrip(newBase||first?null:patch);   /* moneda nueva o viaje nuevo: el viaje entero */
       /* Quien arma un viaje nuevo en la nube queda como su primera persona, ya vinculada a su cuenta. */
-      if(first&&cloudMode()&&ME&&!myClaim&&!allPeople().length)claimPerson(upsert('people',null,{name:ME.name||'Yo',c:Date.now()}));
+      if(first)addMe();
     }});
 }

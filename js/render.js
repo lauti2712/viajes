@@ -72,7 +72,7 @@ function whoBanner(){
   var free=allPeople().filter(function(p){return !CLAIMS[p.id]||CLAIMS[p.id].uid===ME.uid;});
   return '<div class="infobox" style="border-left-color:var(--sun)"><h3>¿Quién sos en este viaje?</h3><p class="mb10">Elegilo una vez y queda vinculado a tu cuenta de Google: así los demás pueden elegir tus formas de pago al cargar un gasto, ven tu alias y tenés tu mochila.</p>'
    +'<div class="m0 whopick">'+free.map(function(p){return '<button type="button" class="primary" data-act="whoami" data-who="'+esc(p.id)+'">Soy '+esc(p.name)+'</button>';}).join('')
-   +'<button type="button" class="ghost" data-tab="mochila">No estoy en la lista</button><button type="button" class="ghost" data-act="wholater">Ahora no</button></div>'+(claimMsg?'<p class="msg err">'+esc(claimMsg)+'</p>':'')+'</div>';
+   +'<button type="button" class="ghost" data-act="addme">No estoy: agregarme como '+esc(myFirstName())+'</button><button type="button" class="ghost" data-act="wholater">Ahora no</button></div>'+(claimMsg?'<p class="msg err">'+esc(claimMsg)+'</p>':'')+'</div>';
 }
 function gated(){return (cloudMode()||homeMode())&&(AUTH==='pending'||AUTH==='out');}
 function vGate(){
