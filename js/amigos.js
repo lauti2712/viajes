@@ -153,7 +153,7 @@ function openFriend(id){
   var entries=null,msg='';
   function body(){
     L=ledgerById(id)||L;
-    var fn=friendName(L),mineL=L.a===ME.uid,h='';
+    var fn=friendName(L),mineL=L.a===ME.uid,h='<button type="button" class="ghost sm mb10" id="frBack">‹ Amigos</button>';
     h+='<div class="frhead"><span class="avatar lg">'+initialOf(fn)+'</span><div><b>'+esc(fn)+'</b><small>'+(L.b?'🔗 Vinculado'+(mineL&&L.bAcct?' con la cuenta de '+esc(L.bAcct):''):'Sin cuenta vinculada')+'</small></div></div>';
     if(entries)h+='<div class="balance mt10">'+esc(balanceText(friendBalance(entries,myRole(L)),fn))+'</div>';
     h+='<div class="row mt10 g6"><button type="button" class="primary sm" data-fadd="direct">+ Gasto compartido</button><button type="button" class="ghost sm" data-fadd="pay">🤝 Devolución</button>'
@@ -170,6 +170,7 @@ function openFriend(id){
   function reload(){loadEntries(id).then(function(es){entries=es;redraw();}).catch(function(){entries=[];redraw();});}
   formRefresh=redraw;reload();
   panel.addEventListener('click',function(e){
+    if(e.target.closest('#frBack')){openFriends();return;}
     var a=e.target.closest('[data-fadd]');if(a){openFriendEntry(id,null,a.getAttribute('data-fadd'),reload);return;}
     var en=e.target.closest('[data-fentry]');
     if(en){var x=(entries||[]).find(function(y){return y.id===en.getAttribute('data-fentry');});
