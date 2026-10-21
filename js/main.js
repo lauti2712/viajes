@@ -66,6 +66,14 @@ document.addEventListener('click',function(e){
   else if(a==='logout')logout();
   else if(a==='install')installApp();
 });
+/* Montos: campos de texto con teclado decimal (en iPhone el teclado en español trae coma y un campo
+   numérico la descarta). La coma pasa a punto y quedan solo números con un punto decimal. */
+document.addEventListener('input',function(e){
+  var t=e.target;if(!t.hasAttribute||!t.hasAttribute('data-dec'))return;
+  var v=t.value,n=v.replace(/,/g,'.').replace(/[^0-9.]/g,''),i=n.indexOf('.');
+  if(i>=0)n=n.slice(0,i+1)+n.slice(i+1).replace(/\./g,'');
+  if(n!==v){var p=t.selectionStart-(v.length-n.length);t.value=n;try{t.setSelectionRange(p,p);}catch(x){}}
+},true);
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&!$('#sheet').hidden){closeSheet();return;}
   if((e.key==='Enter'||e.key===' ')&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.dataset.act){e.preventDefault();e.target.click();}

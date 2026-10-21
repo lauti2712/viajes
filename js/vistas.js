@@ -39,7 +39,7 @@ function ratesSectionHtml(){
    :('<button type="button" class="sm ghost" data-act="fetchrates" data-codes="USD,BRL">🔄 Actualizar cotización</button>');
   return '<section class="sec"><div class="mb6 bar"><h2>Tipos de cambio</h2>'+updBtns+'</div><p class="sub">Cuánto vale 1 unidad de cada moneda en '+esc(base())+'. Con esto se suma todo junto.'+(S.trip.ratesUpdatedAt?(isArs?' Dólar ('+(S.trip.dollarType==='blue'?'blue':'oficial')+') y real':' Dólar y real')+' se actualizaron '+relTime(S.trip.ratesUpdatedAt)+'.':'')+'</p>'
    +(ratesFetchMsg?'<p class="msg'+(ratesFetchMsg.indexOf('No se pudo')===0?' err':'')+'">'+esc(ratesFetchMsg)+'</p>':'')
-   +'<div class="rates">'+curs.map(function(c){var v=S.trip.rates[c];return '<label class="rate'+(v>0?'':' miss')+'"><span>1 '+esc(c)+' =</span><input type="number" step="any" min="0" inputmode="decimal" data-rate="'+esc(c)+'" value="'+(v>0?v:'')+'" placeholder="0"><span>'+esc(base())+'</span></label>'}).join('')+'</div></section>';
+   +'<div class="rates">'+curs.map(function(c){var v=S.trip.rates[c];return '<label class="rate'+(v>0?'':' miss')+'"><span>1 '+esc(c)+' =</span><input type="text" inputmode="decimal" data-dec data-rate="'+esc(c)+'" value="'+(v>0?v:'')+'" placeholder="0"><span>'+esc(base())+'</span></label>'}).join('')+'</div></section>';
 }
 function vResumen(){
   var cs=costs(),h='',up=upcoming();

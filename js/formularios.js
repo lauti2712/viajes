@@ -6,7 +6,7 @@ function fieldHtml(f,v){
   var val=v[f.k]!=null?v[f.k]:(f.def!=null?f.def:''),id='f_'+f.k,inp;
   if(f.t==='select')inp='<select id="'+id+'" name="'+f.k+'">'+f.opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(String(o[0])===String(val)?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select>';
   else if(f.t==='textarea')inp='<textarea id="'+id+'" name="'+f.k+'" rows="3" placeholder="'+esc(f.ph||'')+'">'+esc(val)+'</textarea>';
-  else inp='<input id="'+id+'" name="'+f.k+'" type="'+f.t+'" value="'+esc(val)+'"'+(f.list?' list="'+f.list+'"':'')+(f.t==='number'?' step="any" inputmode="decimal" min="0"':'')+' placeholder="'+esc(f.ph||'')+'"'+(f.req?' required':'')+' autocomplete="off">';
+  else inp='<input id="'+id+'" name="'+f.k+'" type="'+(f.t==='number'?'text':f.t)+'" value="'+esc(val)+'"'+(f.list?' list="'+f.list+'"':'')+(f.t==='number'?' inputmode="decimal" data-dec':'')+' placeholder="'+esc(f.ph||'')+'"'+(f.req?' required':'')+' autocomplete="off">';
   return '<label class="fld'+(f.half?' half':'')+'"><span>'+esc(f.l)+'</span>'+inp+'</label>';
 }
 function openSheet(title,body){
@@ -320,7 +320,7 @@ function openItem(k,id,pre){
     }else if(mode==='amounts'){
       var had=Object.keys(st.amt).length;
       lastEdited=had?ppl.length-1:-1;
-      h='<div class="rates">'+ppl.map(function(p){return '<label class="rate"><span style="min-width:90px">'+dot(p.id)+esc(p.name)+'</span><input type="number" step="any" min="0" inputmode="decimal" name="sh_'+esc(p.id)+'" value="'+esc(st.amt[p.id]||'')+'" placeholder="0"></label>';}).join('')+'</div>'
+      h='<div class="rates">'+ppl.map(function(p){return '<label class="rate"><span style="min-width:90px">'+dot(p.id)+esc(p.name)+'</span><input type="text" inputmode="decimal" data-dec name="sh_'+esc(p.id)+'" value="'+esc(st.amt[p.id]||'')+'" placeholder="0"></label>';}).join('')+'</div>'
        +'<p class="mt8 hint">Al escribir el monto de alguien, lo que falta se reparte en partes iguales entre los que siguen. <span id="shsum"></span></p>';
     }
     box.innerHTML=(mode!=='guests'&&mode!=='riders'&&mode!=='self'?groupChipsHtml():'')+h;
@@ -685,7 +685,7 @@ function extFieldHtml(v){
    +'<label class="fld half"><span>¿Cuántas de afuera en total?</span><input type="number" name="extN" min="1" max="99" inputmode="numeric" value="'+esc(v.extN||'1')+'"></label>'
    +'<label class="fld half"><span>'+(FB&&AUTH==='in'?'Otros (sin guardar)':'Quiénes (opcional)')+'</span><input type="text" name="extOther" maxlength="80" value="'+esc(v.extOther!=null?v.extOther:(idsOf(v.extF).length?'':v.extNames||''))+'" placeholder="Ej: Juan y Pedro" autocomplete="off"></label>'
    +'<label class="fld"><span>Cómo se divide</span><select name="extMode"><option value="eq"'+(v.extMode!=='amt'?' selected':'')+'>Partes iguales entre todos</option><option value="amt"'+(v.extMode==='amt'?' selected':'')+'>Pongo cuánto nos toca</option></select></label>'
-   +'<label class="fld half"><span>Parte del viaje</span><input type="number" name="tripPart" step="any" min="0" inputmode="decimal" value="'+esc(v.tripPart||'')+'" placeholder="0"></label>'
+   +'<label class="fld half"><span>Parte del viaje</span><input type="text" name="tripPart" inputmode="decimal" data-dec value="'+esc(v.tripPart||'')+'" placeholder="0"></label>'
    +'<label class="fld"><span>Cómo se pagó la cuenta</span><select name="extPaid"><option value="all"'+(v.extPaid!=='own'?' selected':'')+'>Todo junto (después devuelven)</option><option value="own"'+(v.extPaid==='own'?' selected':'')+'>Cada uno pagó lo suyo</option></select></label>'
    +'<p class="full m0 hint" id="extSum"></p></div></div>';
 }
