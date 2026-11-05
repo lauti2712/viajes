@@ -132,7 +132,7 @@ async function startCloud(){
   FB.au.onAuthStateChanged(FB.auth,function(u){
     if(u){
       ME={uid:u.uid,name:u.displayName||'',email:u.email||''};AUTH='in';loginMsg='';
-      if(!listening){listening=true;listenTrips();listenMeta();listenPrefs();listenMyVehicles();listenLedgers();if(CODE)enterTrip();}
+      if(!listening){listening=true;listenTrips();listenMeta();listenPrefs();listenMethods();listenMyVehicles();listenLedgers();if(CODE)enterTrip();}
       render();
     }else{
       if(AUTH==='in'){if(!loggingOut)location.reload();return;}
@@ -267,13 +267,6 @@ function listen(){
     setSync(snap.metadata.fromCache?(navigator.onLine?'connecting':'offline'):(snap.metadata.hasPendingWrites?'saving':'ok'));
   },function(err){fbErr(err);if(!err||err.code!=='permission-denied')setSync('err');});
 
-  fs.onSnapshot(fs.collection(db,'users',ME.uid,'methods'),function(snap){
-    METHODS=snap.docs.map(function(x){return x.data()||{};}).filter(function(m){return m.id&&!m.del&&/^[a-z0-9]{1,24}$/i.test(m.id);})
-      .sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
-    if(!snap.metadata.fromCache){methodsReady=true;syncCobro();maybeLoadOthers();}
-    render();if(formRefresh)formRefresh();
-  },function(err){fbErr(err);});
-
   var claimsSeen=false;
   /* La mochila se suscribe recién cuando el vínculo está confirmado por el servidor: si la consulta
      sale antes, las reglas todavía no lo ven, la rechazan y el listener muere. */
@@ -292,8 +285,39 @@ function listen(){
   window.addEventListener('offline',function(){setSync('offline')});
   window.addEventListener('online',function(){setSync('connecting')});
 }
+/* Formas de pago de la cuenta: se escuchan desde que entra (también sin viaje abierto, para el perfil). */
+function listenMethods(){
+  var last='';
+  FB.fs.onSnapshot(FB.fs.collection(FB.db,'users',ME.uid,'methods'),{includeMetadataChanges:true},function(snap){
+    var l=snap.docs.map(function(x){return x.data()||{};}).filter(function(m){return m.id&&!m.del&&/^[a-z0-9]{1,24}$/i.test(m.id);})
+      .sort(function(a,b){return (b.type==='efectivo')-(a.type==='efectivo')||String(a.name).localeCompare(String(b.name));});
+    var key=JSON.stringify(l),ch=key!==last;last=key;
+    if(ch)METHODS=l;
+    if(!snap.metadata.fromCache&&!methodsReady){methodsReady=true;ensureCash();syncCobro();maybeLoadOthers();maybeOnboard();}
+    else if(ch)syncCobro();
+    if(ch){render();if(formRefresh)formRefresh();}
+  },function(err){fbErr(err);});
+}
+/* Efectivo está siempre: si la cuenta no tiene ninguno, se crea solo (con id fijo, así dos dispositivos no lo duplican). */
+function ensureCash(){
+  if(METHODS.some(function(m){return m.type==='efectivo';}))return;
+  saveMethod({id:'efectivo',type:'efectivo',name:'Efectivo',u:Date.now()});
+}
+/* Bienvenida: la primera vez que alguien entra, antes que nada completa sus formas de pago.
+   Se muestra hasta que la persona la usa (prefs pagosOk); si ya tenía formas de pago cargadas, no aparece. */
+var prefsSrv=null,onboardDone=false;
+function maybeOnboard(){
+  if(onboardDone||!methodsReady||!prefsSrv||prefsSrv.pagosOk)return;
+  if(METHODS.some(function(m){return m.type!=='efectivo';})){onboardDone=true;setPref('pagosOk',true);return;}
+  if(!$('#sheet').hidden)return;   /* hay otra hoja abierta: se vuelve a probar al cerrarla */
+  onboardDone=true;openPagosIntro();
+  /* Se da por vista recién cuando la persona la usa o la cierra: si la página se recarga antes
+     (pasa al entrar a un viaje por link), vuelve a aparecer. */
+  $('#sheet').addEventListener('click',function(){setPref('pagosOk',true);},{once:true});
+}
 function listenPrefs(){
-  FB.fs.onSnapshot(FB.fs.doc(FB.db,'users',ME.uid,'prefs','app'),function(snap){
+  FB.fs.onSnapshot(FB.fs.doc(FB.db,'users',ME.uid,'prefs','app'),{includeMetadataChanges:true},function(snap){
+    if(!snap.metadata.fromCache){prefsSrv=snap.exists()?snap.data()||{}:{};maybeOnboard();}
     if(!snap.exists())return;var d=snap.data()||{};
     var ch=false;['showWeather','wxShort','h12'].forEach(function(k){if(typeof d[k]==='boolean'&&d[k]!==!!PREFS[k]){PREFS[k]=d[k];ch=true;}});
     if(ch){try{localStorage.setItem('viaje-de-a-dos:prefs',JSON.stringify(PREFS));}catch(e){}render();}

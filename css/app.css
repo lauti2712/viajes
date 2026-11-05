@@ -463,3 +463,5 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=datetime-local]::
 input[type=date],input[type=datetime-local],input[type=time]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;display:block;text-align:left}
 input::-webkit-date-and-time-value{text-align:left;margin:0}
 html,body{overflow-x:clip}
+.obadd{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.obadd button{justify-content:flex-start;text-align:left}

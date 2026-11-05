@@ -61,7 +61,7 @@ document.addEventListener('click',function(e){
   else if(a==='addme'){addMe();render();}
   else if(a==='whoswitch'){claimMsg='';releaseClaim();render();}
   else if(a==='login')login();
-  else if(a==='addmethod')openMethod(null);
+  else if(a==='addmethod')openMethod(null,t.dataset.type);
   else if(a==='editmethod')openMethod(t.dataset.id);
   else if(a==='logout')logout();
   else if(a==='install')installApp();

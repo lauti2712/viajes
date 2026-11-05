@@ -17,7 +17,7 @@ function openSheet(title,body){
   return $('.panel',host);
 }
 var formRefresh=null;
-function closeSheet(){formRefresh=null;var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');if(reloadPending){forceReload(reloadPending);return;}render();if(pendingJoin.length)setTimeout(askJoin,0);}
+function closeSheet(){formRefresh=null;var h=$('#sheet');h.hidden=true;h.innerHTML='';document.body.classList.remove('lock');if(reloadPending){forceReload(reloadPending);return;}render();if(pendingJoin.length)setTimeout(askJoin,0);if(typeof maybeOnboard==='function')setTimeout(maybeOnboard,0);}
 function sheetForm(o){
   var v=o.values||{};
   var panel=openSheet(o.title,(o.intro||'')+'<form id="sf" class="grid" novalidate>'+o.fields.map(function(f){return fieldHtml(f,v)}).join('')+'<p class="full m0 msg err" id="sfmsg"></p><div class="acts">'+(o.onDelete?'<button type="button" class="danger" id="del">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>'+(o.extra||''));

@@ -5,6 +5,29 @@ var METHODS=[];
 var MTYPES={credito:['💳','Tarjeta de crédito'],debito:['💳','Tarjeta de débito'],banco:['🏦','Cuenta bancaria'],billetera:['📱','Billetera virtual'],efectivo:['💵','Efectivo'],otro:['🧾','Otro']};
 var mtype=function(m){return MTYPES[m.type]||MTYPES.otro};
 var methodLabel=function(m){return (m.name||'Sin nombre')+(m.last4?' ••'+m.last4:'')};
+/* El último efectivo de la cuenta no se borra ni cambia de tipo: efectivo está siempre. */
+var lastCash=function(m){return m&&m.type==='efectivo'&&METHODS.filter(function(x){return x.type==='efectivo';}).length<2;};
+function methodRowsHtml(){
+  return METHODS.length?METHODS.map(function(m){var ty=mtype(m);return '<div class="exp" role="button" tabindex="0" data-act="editmethod" data-id="'+esc(m.id)+'" style="grid-template-columns:34px 1fr"><span class="ec" aria-hidden="true">'+ty[0]+'</span><div class="et"><b>'+esc(methodLabel(m))+'</b><small><span>'+esc(ty[1])+'</span>'+(lastCash(m)?'<span>Siempre disponible</span>':'')+(m.alias&&m.share?'<span>Alias visible: '+esc(m.alias)+'</span>':'')+'</small></div></div>';}).join('')
+    :'<p class="nada">Todavía no cargaste ninguna. Sirven para elegir con qué pagaste cada gasto y para que te paguen a tu alias.</p>';
+}
+/* Bienvenida (la primera vez que entra la cuenta): cargar las formas de pago antes que nada.
+   Cada "Agregar" abre el formulario y al guardar vuelve acá. */
+function openPagosIntro(){
+  var adds=['credito','debito','banco','billetera','otro'].map(function(k){return '<button type="button" class="ghost" data-obtype="'+k+'">'+MTYPES[k][0]+' '+MTYPES[k][1]+'</button>';}).join('');
+  var panel=openSheet('Tus formas de pago','<p class="sub">Antes de arrancar, contanos con qué pagás. Así, cuando cargues un gasto, elegís con cuál lo pagaste, y la app te arma los resúmenes de cada tarjeta.</p>'
+    +'<div id="obl">'+methodRowsHtml()+'</div>'
+    +'<h3 class="mt12 mb8">Agregar</h3><div class="obadd">'+adds+'</div>'
+    +'<p class="mt12 hint">Son privadas: los demás solo ven el nombre en cada gasto. Después las cambiás cuando quieras desde tu perfil.</p>'
+    +'<div class="acts"><button type="button" class="primary" data-close>Listo</button></div>');
+  formRefresh=function(){var w=$('#obl',panel);if(w)w.innerHTML=methodRowsHtml();};
+  panel.addEventListener('click',function(e){
+    var b=e.target.closest('[data-obtype]');
+    if(b){e.stopPropagation();openMethod(null,b.getAttribute('data-obtype'),openPagosIntro);return;}
+    var r=e.target.closest('[data-act="editmethod"]');
+    if(r){e.stopPropagation();openMethod(r.getAttribute('data-id'),'',openPagosIntro);}
+  });
+}
 function totalsText(lines){var t={};lines.forEach(function(l){t[l.cur]=(t[l.cur]||0)+l.amt;});var ks=Object.keys(t);return ks.length?ks.map(function(c){return money(t[c],c);}).join(' + '):money(0);}
 /* Reparte los cargos de una tarjeta en sus resúmenes: cada compra (o cuota) cae en el primer resumen
    que cierra el día de la compra o después; la cuota 2 en el siguiente, etc. */
@@ -104,9 +127,10 @@ function vPagos(){
     return out+'</section>';
   }).join('');
 }
-function openMethod(id){
-  var m=id?METHODS.find(function(x){return x.id===id;}):null;
-  var v=m?Object.assign({},m):{type:'credito',name:'',bank:'',last4:''};
+function openMethod(id,preset,back){
+  var m=id?METHODS.find(function(x){return x.id===id;}):null,cash=lastCash(m);
+  var v=m?Object.assign({},m):{type:MTYPES[preset]?preset:'credito',name:'',bank:'',last4:''};
+  function done(){closeSheet();if(back)back();}
   var st=((m&&m.statements)||[]).map(function(x){return {c:x.c||'',v:x.v||''};});
   function stRows(){return st.length?st.map(function(x,i){return '<div class="strow"><label>Cierre<input type="date" data-stc="'+i+'" value="'+esc(x.c)+'"></label><label>Vencimiento<input type="date" data-stv="'+i+'" value="'+esc(x.v)+'"></label><button type="button" class="x" data-strm="'+i+'" aria-label="Quitar resumen">✕</button></div>';}).join(''):'<p class="nada">Sin resúmenes cargados.</p>';}
   var fields=[
@@ -121,8 +145,11 @@ function openMethod(id){
     +'<div class="fld" id="stWrap"><span>Resumen de la tarjeta</span><p class="mb6 hint">Con el día de cierre y el de vencimiento, la app arma sola el resumen de cada mes y te avisa antes de que venza.</p>'
     +'<div class="grid"><label class="fld half"><span>Cierra el día</span><input type="number" name="closeDay" min="1" max="31" inputmode="numeric" placeholder="Ej: 25" value="'+esc(v.closeDay||'')+'"></label><label class="fld half"><span>Vence el día</span><input type="number" name="dueDay" min="1" max="31" inputmode="numeric" placeholder="Ej: 5" value="'+esc(v.dueDay||'')+'"></label></div>'
     +'<details class="fgrp mt10"'+(st.length?' open':'')+'><summary><span>Meses con fechas distintas</span><small>'+(st.length?st.length:'')+'</small></summary><p class="mb6 hint">Si el banco corre el cierre o el vencimiento de algún mes, cargalo acá: ese mes manda sobre el automático.</p><div id="stRows">'+stRows()+'</div><div class="mb10"><button type="button" class="sm ghost" id="staddrow">+ Agregar mes</button></div></details></div>'
-    +'<p class="full m0 msg err" id="mmsg"></p><div class="acts">'+(m?'<button type="button" class="danger" id="mdel">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>');
+    +(cash?'<p class="full m0 hint">El efectivo está siempre: le podés cambiar el nombre, pero no borrarlo.</p>':'')
+    +'<p class="full m0 msg err" id="mmsg"></p><div class="acts">'+(back?'<button type="button" class="ghost" id="mback">Volver</button>':'')+(m&&!cash?'<button type="button" class="danger" id="mdel">Eliminar</button>':'')+'<button type="submit" class="primary">Guardar</button></div></form>');
   var f=$('#mf',panel),l4=$('#f_last4',panel);
+  if(cash)$('#f_type',panel).disabled=true;
+  if(back)$('#mback',panel).addEventListener('click',done);
   l4.setAttribute('inputmode','numeric');l4.setAttribute('maxlength','4');
   function syncType(){
     var t=$('#f_type',panel).value,cobra=t==='banco'||t==='billetera';
@@ -154,11 +181,11 @@ function openMethod(id){
     if(d.type==='credito'&&vd&&!cd){msg.textContent='Poné también el día de cierre.';return;}
     var cobra=d.type==='banco'||d.type==='billetera';
     saveMethod(Object.assign({},m||{},{id:m?m.id:uid(),type:d.type,name:d.name,bank:d.bank||'',last4:digits,statements:stc,closeDay:d.type==='credito'&&cd?String(cd):'',dueDay:d.type==='credito'&&vd?String(vd):'',alias:cobra?(d.alias||''):'',share:cobra&&d.alias&&d.share?'1':'',u:Date.now()}));
-    closeSheet();
+    done();
   });
   var del=$('#mdel',panel);
   if(del)del.addEventListener('click',function(){
     if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='¿Seguro? Tocá de nuevo';return;}
-    saveMethod(Object.assign({},m,{del:true,u:Date.now()}));closeSheet();
+    saveMethod(Object.assign({},m,{del:true,u:Date.now()}));done();
   });
 }
