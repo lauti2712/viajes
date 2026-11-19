@@ -713,7 +713,10 @@ function membersBlockHtml(){
        +(org&&!me?'<button type="button" class="ghost sm" data-kick="'+esc(m.uid)+'">Sacar</button>':'')+'</div>';
     }).join(''):'<p class="nada">Cargando…</p>')+'</div>'
    +(org&&bn.length?'<p class="hint" style="margin:10px 0 4px">Sacados del viaje:</p><div class="attlist">'+bn.map(function(b){return '<div class="pplrow mbr"><span class="mbn"><b>'+esc(b.name||'Sin nombre')+'</b></span><button type="button" class="ghost sm" data-unban="'+esc(b.uid)+'">Volver a permitir</button></div>';}).join('')+'</div>':'')
-   +(org?'<label class="chk mt10 fld pksug"><input type="checkbox" data-lock'+(S.trip.locked?' checked':'')+'> Cerrar el link: nadie nuevo puede entrar (los que ya están siguen)</label>':(S.trip.locked?'<p class="hint">El link está cerrado: no puede entrar nadie nuevo.</p>':''))
+   +(org&&pendingReqs().length?'<p class="hint" style="margin:10px 0 4px">Piden entrar:</p><div class="attlist">'+reqsHtml(pendingReqs())+'</div>':'')
+   +(org?'<label class="chk mt10 fld pksug"><input type="checkbox" data-approval'+(S.trip.approval!==false?' checked':'')+'> Pedir mi aprobación para entrar: quien abre el link queda esperando hasta que lo aceptes</label>':(S.trip.approval!==false&&S.trip.owner?'<p class="hint">Para entrar hace falta que el organizador acepte el pedido.</p>':''))
+   +(org?'<label class="chk mt10 fld pksug"><input type="checkbox" data-lock'+(S.trip.locked?' checked':'')+'> Cerrar el link: nadie nuevo puede entrar ni pedir entrar (los que ya están siguen)</label>':(S.trip.locked?'<p class="hint">El link está cerrado: no puede entrar nadie nuevo.</p>':''))
+   +leaveHtml(org,ms)
    +'<p class="msg" data-mbrmsg></p></div>';
 }
 function bindMembers(panel){
@@ -727,7 +730,26 @@ function bindMembers(panel){
     var u=e.target.closest('[data-unban]');
     if(u){unbanMember(u.getAttribute('data-unban'));redraw('Listo: puede volver a entrar con el link.');}
   });
-  panel.addEventListener('change',function(e){if(e.target.hasAttribute('data-lock'))setLocked(e.target.checked);});
+  panel.addEventListener('change',function(e){
+    if(e.target.hasAttribute('data-lock'))setLocked(e.target.checked);
+    if(e.target.hasAttribute('data-approval'))setApproval(e.target.checked);
+  });
+  panel.addEventListener('click',function(e){
+    var b=e.target.closest('[data-leave]');if(!b)return;
+    var sel=$('#leaveOwner',panel),no=sel?sel.value:'';
+    if(sel&&!no){redraw('Elegí a quién le dejás la organización del viaje.');return;}
+    if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='¿Seguro? Tocá de nuevo para salir';return;}
+    b.disabled=true;
+    leaveTrip(no).catch(function(){b.disabled=false;b.classList.remove('armed');b.textContent='Salir del viaje';var m=$('[data-mbrmsg]',panel);if(m)m.textContent='No se pudo salir. Revisá la conexión y probá de nuevo.';});
+  });
+}
+/* Salir del viaje: el organizador, si quedan otros, elige a quién le deja la organización. */
+function leaveHtml(org,ms){
+  var others=ms.filter(function(m){return m.uid!==ME.uid;});
+  return '<div class="mt12"><h3 class="mb8">Salir del viaje</h3><p class="hint">Dejás de ver el viaje y sale de tu lista. Lo que cargaste queda para los demás. Para volver vas a necesitar el link'+(S.trip.approval!==false&&S.trip.owner?' y que te acepten':'')+'.</p>'
+    +(org&&others.length?'<label class="fld"><span>Le dejás la organización a</span><select id="leaveOwner"><option value="">Elegí a alguien…</option>'+others.map(function(m){return '<option value="'+esc(m.uid)+'">'+esc(m.name||'Sin nombre')+'</option>';}).join('')+'</select></label>':'')
+    +(org&&!others.length?'<p class="warn">Sos la única cuenta del viaje: si salís, el viaje queda guardado, pero solo vas a poder volver con el link.</p>':'')
+    +'<button type="button" class="danger" data-leave>Salir del viaje</button></div>';
 }
 /* Categorías propias del viaje (S.trip.cats = [{name,icon}]), además de las fijas de CATS. Se editan en
    Ajustes y se guardan con "Guardar". */

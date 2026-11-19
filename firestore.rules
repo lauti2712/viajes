@@ -81,20 +81,46 @@ service cloud.firestore {
       allow get: if isMember() || isAdmin();
       allow list: if isAdmin();
       allow create: if isMember() && request.resource.data.get('owner', request.auth.uid) == request.auth.uid;
-      // owner se fija una sola vez (el que armó el viaje) y locked solo lo cambia el organizador.
+      // owner se fija una vez (el que armó el viaje); después solo el organizador lo pasa a otro miembro
+      // (al salir del viaje). locked y approval solo los cambia el organizador.
       allow update: if isMember()
-        && (same('owner', '') || (resource.data.get('owner', '') == '' && request.resource.data.owner == request.auth.uid))
-        && (same('locked', false) || isOwner());
+        && (same('owner', '') || (resource.data.get('owner', '') == '' && request.resource.data.owner == request.auth.uid)
+          || (isOwner() && request.resource.data.owner is string
+            && exists(/databases/$(database)/documents/trips/$(tripId)/members/$(request.resource.data.owner))))
+        && (same('locked', false) || isOwner())
+        && (same('approval', true) || isOwner());
 
-      // Entrar con el link: cada uno se anota a sí mismo, salvo que el organizador lo haya sacado
-      // o haya cerrado el viaje a gente nueva. Salir: uno mismo o el organizador.
+      // Entrar con el link: si el viaje pide aprobación (approval, por defecto sí), el que llega deja un
+      // pedido (requests) y el organizador lo anota como miembro al aceptarlo. Si no pide aprobación,
+      // cada uno se anota a sí mismo. Nunca si el organizador lo sacó (banned) o cerró el link (locked).
+      // El que arma un viaje nuevo (todavía no existe) y el organizador siempre pueden entrar.
+      // Salir: uno mismo o el organizador.
+      function openEntry() {
+        let t = get(tripPath()).data;
+        return t.get('owner', '') == request.auth.uid
+          || (t.get('locked', false) != true && (t.get('owner', '') == '' || t.get('approval', true) == false));
+      }
       match /members/{userId} {
-        allow read: if isMember() || isAdmin();
-        allow create: if signedIn() && userId == request.auth.uid
-          && request.resource.data.uid == request.auth.uid
-          && !exists(/databases/$(database)/documents/trips/$(tripId)/banned/$(userId))
-          && (!exists(tripPath()) || get(tripPath()).data.get('locked', false) != true);
+        allow list: if isMember() || isAdmin();
+        allow get: if isMember() || isAdmin() || (signedIn() && userId == request.auth.uid);
+        allow create: if signedIn() && request.resource.data.uid == userId && (
+          (userId == request.auth.uid
+            && !exists(/databases/$(database)/documents/trips/$(tripId)/banned/$(userId))
+            && (!exists(tripPath()) || openEntry()))
+          || (isOwner() && exists(/databases/$(database)/documents/trips/$(tripId)/requests/$(userId))));
         allow update: if signedIn() && userId == request.auth.uid && request.resource.data.uid == request.auth.uid;
+        allow delete: if signedIn() && (userId == request.auth.uid || isOwner());
+      }
+      // Pedidos para entrar: cada uno crea el suyo; solo lo ven él y el organizador. El organizador lo
+      // rechaza (st: 'no') o lo acepta (crea el miembro y borra el pedido). Uno puede cancelar el suyo.
+      match /requests/{userId} {
+        allow get: if signedIn() && (userId == request.auth.uid || isOwner());
+        allow list: if isOwner();
+        allow create: if signedIn() && userId == request.auth.uid && request.resource.data.uid == userId
+          && request.resource.data.get('st', '') == ''
+          && !exists(/databases/$(database)/documents/trips/$(tripId)/banned/$(userId))
+          && exists(tripPath()) && get(tripPath()).data.get('locked', false) != true;
+        allow update: if isOwner() && request.resource.data.uid == resource.data.uid;
         allow delete: if signedIn() && (userId == request.auth.uid || isOwner());
       }
       // Cuentas que el organizador sacó del viaje: no pueden volver a entrar con el link.

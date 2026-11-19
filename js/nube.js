@@ -26,12 +26,12 @@ function pushPacking(it){
    cambian cosas distintas a la vez (el nombre y el dólar, por ejemplo) no se pise ninguna. */
 /* El viaje entero se reescribe (sin merge, para que se vayan las cotizaciones viejas al cambiar de moneda);
    owner y locked salen de lo último que dijo el servidor: las reglas no dejan cambiarlos sin ser el organizador. */
-var TRIP_SRV={owner:'',locked:false};
+var TRIP_SRV={owner:'',locked:false,approval:true};
 function pushTrip(patch){
   if(!FB||!CODE||AUTH!=='in')return;
   var body;
   if(patch)body=Object.assign({u:S.trip.u},patch);
-  else{body=Object.assign({},S.trip);if(TRIP_SRV.owner)body.owner=TRIP_SRV.owner;body.locked=TRIP_SRV.owner===ME.uid?!!S.trip.locked:TRIP_SRV.locked;if(!body.owner)delete body.owner;}
+  else{body=Object.assign({},S.trip);if(TRIP_SRV.owner)body.owner=TRIP_SRV.owner;body.locked=TRIP_SRV.owner===ME.uid?!!S.trip.locked:TRIP_SRV.locked;body.approval=TRIP_SRV.owner===ME.uid?S.trip.approval!==false:TRIP_SRV.approval;if(!body.owner)delete body.owner;}
   try{FB.fs.setDoc(fdoc(),clean(body),{merge:!!patch}).catch(fbErr);}catch(e){}
 }
 /* srv: el dato viene confirmado por el servidor (no es un eco de un cambio propio pendiente). Ante empate
@@ -226,7 +226,7 @@ function listen(){
   fs.onSnapshot(fdoc(),{includeMetadataChanges:true},function(snap){
     if(snap.exists()){
       var r=fix({trip:snap.data()}).trip,srv=!snap.metadata.fromCache;
-      if(srv){TRIP_SRV={owner:r.owner||'',locked:r.locked===true};}
+      if(srv){TRIP_SRV={owner:r.owner||'',locked:r.locked===true,approval:r.approval!==false};listenRequests();}
       /* El viaje se guarda por partes (merge): lo del servidor puede traer cambios de otros con el mismo u. */
       if((!S.trip.setup&&r.setup)||(r.u||0)>(S.trip.u||0)||(srv&&(r.u||0)===(S.trip.u||0)&&JSON.stringify(r)!==JSON.stringify(S.trip))){S.trip=r;save();render();}
       else if(S.trip.setup&&(S.trip.u||0)>(r.u||0)&&!snap.metadata.fromCache)pushTrip();
@@ -347,27 +347,117 @@ function connectTo(code){setCode(code);location.href=location.pathname;}
 var MEMBERS={},BANNED={},NOACCESS=false,JOINED_KEY='viaje-de-a-dos:joined';
 function joinedList(){try{var l=JSON.parse(localStorage.getItem(JOINED_KEY)||'[]');return Array.isArray(l)?l:[];}catch(e){return [];}}
 function markJoined(on){var l=joinedList().filter(function(c){return c!==CODE;});if(on)l.push(CODE);try{localStorage.setItem(JOINED_KEY,JSON.stringify(l.slice(-200)));}catch(e){}}
-/* Resuelve true si quedó anotado; false si las reglas no lo dejan (lo sacaron o el viaje está cerrado). */
+/* Resuelve 'ok' si quedó anotado (o no hay señal: se sigue con lo del dispositivo), 'pending' si el viaje
+   pide aprobación y quedó el pedido, 'rejected' si el organizador lo rechazó, 'no' si no puede entrar
+   (lo sacaron o el link está cerrado). */
 function joinTrip(){
   var p=FB.fs.setDoc(fdoc('members',ME.uid),{uid:ME.uid,name:ME.name||'',at:Date.now()},{merge:true})
-    .then(function(){markJoined(true);return true;},function(e){return !(e&&e.code==='permission-denied');});
+    .then(function(){markJoined(true);return 'ok';},function(e){return e&&e.code==='permission-denied'?'denied':'ok';});
   /* sin señal no hay respuesta del servidor: se sigue con lo guardado en el dispositivo */
-  return Promise.race([p,new Promise(function(r){setTimeout(function(){r(true);},6000);})]);
+  return Promise.race([p,new Promise(function(r){setTimeout(function(){r('ok');},6000);})])
+    .then(function(r){return r==='denied'?askToJoin(false):r;});
+}
+/* Deja el pedido para entrar (o mira cómo está el que ya había). again: borra uno rechazado y pide de nuevo. */
+function askToJoin(again){
+  var fs=FB.fs,ref=fdoc('requests',ME.uid);
+  function create(){return fs.setDoc(ref,{uid:ME.uid,name:ME.name||'',email:ME.email||'',at:Date.now()}).then(function(){return 'pending';});}
+  return fs.getDoc(ref).then(function(s){
+    if(s.exists()&&again)return fs.deleteDoc(ref).then(create);
+    if(s.exists())return (s.data()||{}).st==='no'?'rejected':'pending';
+    return create();
+  }).catch(function(){return 'no';});
 }
 function enterTrip(){
   if(joinedList().indexOf(CODE)>=0||navigator.onLine===false){listen();return;}
-  joinTrip().then(function(){listen();});
+  joinTrip().then(function(r){if(r==='ok')listen();else if(r==='no')noAccess();else waitApproval(r);});
 }
-/* Sin permiso para leer el viaje: o se anotó recién (se reintenta una vez), o lo sacaron / está cerrado. */
+/* Sin permiso para leer el viaje: o se anotó recién (se reintenta una vez), o lo sacaron / está cerrado
+   / tiene que pedir entrar. */
 function deniedTrip(){
   var k='viaje-de-a-dos:rejoin:'+CODE,tried=false;try{tried=sessionStorage.getItem(k)==='1';}catch(e){}
-  if(!tried){try{sessionStorage.setItem(k,'1');}catch(e){}joinTrip().then(function(ok){if(ok)location.reload();else noAccess();});return;}
+  if(!tried){try{sessionStorage.setItem(k,'1');}catch(e){}joinTrip().then(function(r){if(r==='ok')location.reload();else if(r==='no')noAccess();else waitApproval(r);});return;}
   noAccess();
 }
 function noAccess(){
   NOACCESS=true;markJoined(false);
   try{localStorage.removeItem(LS);}catch(e){}   /* la copia local de un viaje al que ya no tiene acceso */
   S=blank();setSync('');render();
+}
+/* Esperando que el organizador acepte: se escucha la propia membresía (aparece al aceptarlo) y el pedido
+   (para enterarse si lo rechazan). */
+var JOINREQ='',waitUnsub=null;
+function waitApproval(st){
+  JOINREQ=st;markJoined(false);
+  try{localStorage.removeItem(LS);}catch(e){}
+  S=blank();setSync('');render();
+  if(waitUnsub)return;
+  var fs=FB.fs,u1=fs.onSnapshot(fdoc('members',ME.uid),function(snap){
+    if(!snap.exists()||snap.metadata.fromCache)return;
+    markJoined(true);try{sessionStorage.removeItem('viaje-de-a-dos:rejoin:'+CODE);}catch(e){}
+    location.reload();
+  },function(){});
+  var u2=fs.onSnapshot(fdoc('requests',ME.uid),function(snap){
+    var st=!snap.exists()?'':((snap.data()||{}).st==='no'?'rejected':'pending');
+    if(st&&st!==JOINREQ){JOINREQ=st;render();}
+  },function(){});
+  waitUnsub=function(){u1();u2();};
+}
+function vWaiting(){
+  if(JOINREQ==='rejected')return '<div class="gate"><h2>No te aceptaron en este viaje</h2><p>Quien organiza el viaje rechazó tu pedido para entrar. Si fue un error, avisale y volvé a pedir.</p>'
+    +'<div class="row g6" style="justify-content:center"><button type="button" class="primary" data-act="reqagain">Volver a pedir</button><button type="button" class="ghost" data-act="gohome">Ir a mis viajes</button></div></div>';
+  return '<div class="gate"><h2>Pediste entrar al viaje</h2><p>Quien lo organiza tiene que aceptarte. Apenas lo haga, el viaje se abre solo en esta pantalla. Si cerrás la app, volvé a abrir el mismo link.</p>'
+    +'<div class="row g6" style="justify-content:center"><button type="button" class="ghost" data-act="gohome">Ir a mis viajes</button><button type="button" class="ghost" data-act="reqcancel">Cancelar el pedido</button></div></div>';
+}
+function cancelJoin(){
+  if(waitUnsub){waitUnsub();waitUnsub=null;}
+  FB.fs.deleteDoc(fdoc('requests',ME.uid)).catch(function(){}).then(function(){setCode('');location.href=location.pathname;});
+}
+function requestAgain(){askToJoin(true).then(function(r){if(r==='no')noAccess();else{JOINREQ=r;render();}});}
+
+/* ---------- Pedidos para entrar (solo el organizador los ve) ---------- */
+var REQS=[],reqUnsub=null;
+function listenRequests(){
+  if(reqUnsub||!FB||!CODE||!ME||TRIP_SRV.owner!==ME.uid)return;
+  reqUnsub=FB.fs.onSnapshot(FB.fs.collection(FB.db,'trips',CODE,'requests'),function(snap){
+    REQS=snap.docs.map(function(x){var d=x.data()||{};return {uid:x.id,name:String(d.name||''),email:String(d.email||''),at:+d.at||0,st:d.st==='no'?'no':''};})
+      .sort(function(a,b){return a.at-b.at;});
+    render();if(formRefresh)formRefresh();
+  },function(){reqUnsub=null;});
+}
+function pendingReqs(){return isOrganizer()?REQS.filter(function(r){return r.st!=='no';}):[];}
+function acceptReq(uid){
+  var r=REQS.find(function(x){return x.uid===uid;});if(!r||!isOrganizer())return;
+  var b=FB.fs.writeBatch(FB.db);
+  b.set(fdoc('members',uid),{uid:uid,name:r.name||'',at:Date.now(),by:ME.uid});
+  b.delete(fdoc('requests',uid));
+  b.commit().then(function(){showToast((r.name||'Esa cuenta')+' ya puede ver el viaje.');}).catch(fbErr);
+}
+function rejectReq(uid){
+  var r=REQS.find(function(x){return x.uid===uid;});if(!r||!isOrganizer())return;
+  FB.fs.updateDoc(fdoc('requests',uid),{st:'no',by:ME.uid}).catch(fbErr);
+}
+function reqsHtml(list){
+  return list.map(function(r){return '<div class="pplrow mbr"><span class="mbn"><b>'+esc(r.name||'Sin nombre')+'</b><small>'+esc(r.email)+(r.at?' · pidió '+esc(relTime(r.at)):'')+'</small></span>'
+    +'<button type="button" class="primary sm" data-act="reqok" data-uid="'+esc(r.uid)+'">Aceptar</button><button type="button" class="ghost sm" data-act="reqno" data-uid="'+esc(r.uid)+'">Rechazar</button></div>';}).join('');
+}
+function reqBanner(){
+  var l=pendingReqs();if(!l.length)return '';
+  return '<div class="infobox" style="border-left-color:var(--sun)"><h3>'+(l.length===1?'Alguien pide entrar al viaje':l.length+' personas piden entrar al viaje')+'</h3><p class="mb8">Solo entran si las aceptás. Si no sabés quién es, rechazalo.</p><div class="attlist">'+reqsHtml(l)+'</div></div>';
+}
+function setApproval(on){if(!isOrganizer())return;S.trip.approval=!!on;S.trip.u=nextU(S.trip.u);save();pushTrip({approval:!!on});}
+
+/* Salir del viaje: deja de ser miembro, suelta su persona (sus gastos quedan) y lo saca de su lista.
+   Si organiza y quedan otros, primero le pasa la organización a uno de ellos. */
+function leaveTrip(newOwner){
+  var fs=FB.fs,b=fs.writeBatch(FB.db);
+  if(isOrganizer()&&newOwner&&MEMBERS[newOwner])b.update(fdoc(),{owner:newOwner});
+  Object.keys(CLAIMS).forEach(function(pid){if(CLAIMS[pid].uid===ME.uid)b.delete(fdoc('claims',pid));});
+  b.delete(fdoc('members',ME.uid));
+  return b.commit().then(function(){
+    forgetTrip(CODE);markJoined(false);
+    try{localStorage.removeItem(LS);}catch(e){}
+    setCode('');location.href=location.pathname;
+  });
 }
 function vNoAccess(){
   return '<div class="gate"><h2>No tenés acceso a este viaje</h2><p>Quien organiza el viaje te sacó, o cerró el link para que no entre gente nueva. Si creés que es un error, pedile que te vuelva a habilitar.</p>'

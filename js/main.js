@@ -55,6 +55,10 @@ document.addEventListener('click',function(e){
   else if(a==='newtrip')connectTo(genCode());
   else if(a==='gotrip'){if(t.dataset.code===CODE)closeSheet();else connectTo(t.dataset.code);}
   else if(a==='gohome'){setCode('');location.href=location.pathname;}
+  else if(a==='reqok')acceptReq(t.dataset.uid);
+  else if(a==='reqno')rejectReq(t.dataset.uid);
+  else if(a==='reqcancel')cancelJoin();
+  else if(a==='reqagain')requestAgain();
   else if(a==='wholater'){whoLater=true;render();}
   else if(a==='gwho'){gastosWho=t.dataset.who||'';render();}
   else if(a==='whoami'){claimPerson(t.dataset.who);render();}

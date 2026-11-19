@@ -90,9 +90,10 @@ function render(){
   if(g){$('#main').innerHTML=vGate();return;}
   if(homeMode()){$('#main').innerHTML=vHome();return;}
   if(NOACCESS){document.body.classList.add('gated');$('#main').innerHTML=vNoAccess();return;}
+  if(JOINREQ){document.body.classList.add('gated');$('#main').innerHTML=vWaiting();return;}
   var canPay=cloudMode()&&AUTH==='in';
   if(tab==='pagos'&&!canPay)tab='itinerario';   /* Mis pagos se abre desde el perfil */
-  $('#main').innerHTML=whoBanner()+VIEWS[tab]();
+  $('#main').innerHTML=reqBanner()+whoBanner()+VIEWS[tab]();
   Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
 }
 

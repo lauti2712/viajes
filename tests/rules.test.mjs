@@ -48,11 +48,14 @@ test('solo el admin lista todos los viajes', async () => {
   await assertSucceeds(getDocs(collection(as('admin', ADMIN), 'trips')));
 });
 
-test('solo los miembros ven el viaje; entrar con el link te suma', async () => {
+test('solo los miembros ven el viaje; sin aprobación, entrar con el link te suma', async () => {
   const carla = as('carla');
   await assertFails(getDoc(doc(carla, 'trips', T)));
   await assertFails(getDocs(collection(carla, 'trips', T, 'items')));
   await assertFails(setDoc(doc(carla, 'trips', T, 'items', 'x1'), { k: 'expenses', id: 'x1' }));
+  await assertFails(setDoc(doc(carla, 'trips', T, 'members', 'carla'), { uid: 'carla', name: 'Carla' }));   // pide aprobación (por defecto)
+  await assertFails(updateDoc(doc(as('beto'), 'trips', T), { approval: false }));   // solo el organizador
+  await assertSucceeds(updateDoc(doc(as('ana'), 'trips', T), { approval: false }));
   await assertFails(setDoc(doc(carla, 'trips', T, 'members', 'beto'), { uid: 'beto' }));   // no se anota a otro
   await assertSucceeds(setDoc(doc(carla, 'trips', T, 'members', 'carla'), { uid: 'carla', name: 'Carla' }));
   await assertSucceeds(getDoc(doc(carla, 'trips', T)));
@@ -76,8 +79,44 @@ test('el organizador saca a alguien y no puede volver a entrar', async () => {
   await assertSucceeds(deleteDoc(doc(ana, 'trips', T, 'claims', 'pb')));
   await assertFails(getDoc(doc(beto, 'trips', T)));
   await assertFails(setDoc(doc(beto, 'trips', T, 'members', 'beto'), { uid: 'beto' }));
+  await assertFails(setDoc(doc(beto, 'trips', T, 'requests', 'beto'), { uid: 'beto', name: 'Beto' }));   // sacado: ni pedir
   await assertSucceeds(deleteDoc(doc(ana, 'trips', T, 'banned', 'beto')));                // volver a permitir
-  await assertSucceeds(setDoc(doc(beto, 'trips', T, 'members', 'beto'), { uid: 'beto' }));
+  await assertSucceeds(setDoc(doc(beto, 'trips', T, 'requests', 'beto'), { uid: 'beto', name: 'Beto' }));
+  await assertSucceeds(setDoc(doc(ana, 'trips', T, 'members', 'beto'), { uid: 'beto', name: 'Beto' }));
+});
+
+test('entrar con aprobación: pedido, rechazo y aceptación', async () => {
+  const ana = as('ana'), beto = as('beto'), carla = as('carla');
+  await assertFails(setDoc(doc(carla, 'trips', T, 'requests', 'dani'), { uid: 'dani' }));   // a nombre de otro
+  await assertFails(setDoc(doc(carla, 'trips', T, 'requests', 'carla'), { uid: 'carla', st: 'ok' }));   // no se marca aceptado
+  await assertSucceeds(setDoc(doc(carla, 'trips', T, 'requests', 'carla'), { uid: 'carla', name: 'Carla' }));
+  await assertSucceeds(getDoc(doc(carla, 'trips', T, 'requests', 'carla')));
+  await assertSucceeds(getDoc(doc(carla, 'trips', T, 'members', 'carla')));   // puede mirar si ya la aceptaron
+  await assertFails(getDocs(collection(beto, 'trips', T, 'requests')));          // solo el organizador los lista
+  await assertSucceeds(getDocs(collection(ana, 'trips', T, 'requests')));
+  await assertFails(updateDoc(doc(carla, 'trips', T, 'requests', 'carla'), { st: '' }));   // no se acepta sola
+  await assertFails(setDoc(doc(beto, 'trips', T, 'members', 'carla'), { uid: 'carla' }));   // otro miembro no acepta
+  await assertSucceeds(updateDoc(doc(ana, 'trips', T, 'requests', 'carla'), { st: 'no' }));   // rechazo
+  await assertFails(setDoc(doc(carla, 'trips', T, 'members', 'carla'), { uid: 'carla' }));
+  await assertSucceeds(deleteDoc(doc(carla, 'trips', T, 'requests', 'carla')));   // vuelve a pedir
+  await assertSucceeds(setDoc(doc(carla, 'trips', T, 'requests', 'carla'), { uid: 'carla', name: 'Carla' }));
+  await assertFails(setDoc(doc(ana, 'trips', T, 'members', 'dani'), { uid: 'dani' }));   // sin pedido no
+  await assertSucceeds(setDoc(doc(ana, 'trips', T, 'members', 'carla'), { uid: 'carla', name: 'Carla' }));
+  await assertSucceeds(getDoc(doc(carla, 'trips', T)));
+  await assertSucceeds(updateDoc(doc(ana, 'trips', T), { locked: true }));
+  await assertFails(setDoc(doc(as('dani'), 'trips', T, 'requests', 'dani'), { uid: 'dani' }));   // link cerrado: ni pedir
+});
+
+test('salir del viaje: el organizador deja la organización a otro miembro', async () => {
+  const ana = as('ana'), beto = as('beto');
+  await assertFails(updateDoc(doc(ana, 'trips', T), { owner: 'carla' }));   // no es miembro
+  await assertFails(updateDoc(doc(beto, 'trips', T), { owner: 'beto' }));
+  await assertSucceeds(updateDoc(doc(ana, 'trips', T), { owner: 'beto' }));
+  await assertSucceeds(deleteDoc(doc(ana, 'trips', T, 'members', 'ana')));
+  await assertFails(getDoc(doc(ana, 'trips', T)));
+  await assertFails(setDoc(doc(ana, 'trips', T, 'members', 'ana'), { uid: 'ana' }));   // ahora pide aprobación
+  await assertSucceeds(deleteDoc(doc(beto, 'trips', T, 'members', 'beto')));   // el organizador sale solo
+  await assertSucceeds(setDoc(doc(beto, 'trips', T, 'members', 'beto'), { uid: 'beto' }));   // y vuelve con el link
 });
 
 test('viaje cerrado: nadie nuevo entra con el link; solo el organizador lo cierra', async () => {
@@ -173,6 +212,7 @@ test('nadie toma ni suelta el vínculo de otro', async () => {
   await assertFails(deleteDoc(doc(beto, 'trips', T, 'claims', 'pa')));
   await assertSucceeds(updateDoc(doc(beto, 'trips', T, 'claims', 'pb'), { cobro: [{ n: 'MP', a: 'beto.mp' }] }));
   await assertFails(setDoc(doc(as('carla'), 'trips', T, 'claims', 'pc'), { uid: 'carla', name: 'Carla' }));   // todavía no entró
+  await updateDoc(doc(as('ana'), 'trips', T), { approval: false });
   await setDoc(doc(as('carla'), 'trips', T, 'members', 'carla'), { uid: 'carla' });
   await assertSucceeds(setDoc(doc(as('carla'), 'trips', T, 'claims', 'pc'), { uid: 'carla', name: 'Carla' }));
 });
