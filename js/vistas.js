@@ -129,6 +129,8 @@ function costRow(k,item,desc,icon,catLabel,extra){
 function expRow(e,extra){return costRow('expenses',e,e.desc||'Gasto',catIcon(e.cat),(e.time?hh(e.time)+' · ':'')+(e.cat||'Otros'),extra);}
 /* Filtro "Ver gastos de": muestra solo lo que esa persona pagó o donde le toca una parte, y suma su parte. */
 var gastosWho='';
+var cuentasOpen=false;
+document.addEventListener('toggle',function(e){if(e.target&&e.target.id==='cuentasBox')cuentasOpen=e.target.open;},true);
 function vGastos(){
   var g={},ppl=allPeople();
   if(gastosWho&&!ppl.some(function(p){return p.id===gastosWho;}))gastosWho='';
@@ -154,7 +156,10 @@ function vGastos(){
   var keys=Object.keys(g).sort().reverse();
   var h='<div class="bar"><h2>Gastos</h2><button class="primary" data-act="add" data-k="expenses">+ Anotar gasto</button></div>';
   var bal=balanceHtml(who);
-  if(bal)h+='<section class="cuentas"><h3>'+(who?'Las cuentas de '+esc(nameOf(who)):'Quién le debe a quién')+'</h3>'+bal+'</section>';
+  if(bal){   /* plegado: se abre al tocarlo (y queda abierto mientras no se recargue) */
+    var sl=settlements().list.filter(function(x){return !who||x.fromId===who||x.toId===who;}).length;
+    h+='<details class="cuentas fgrp"'+(cuentasOpen?' open':'')+' id="cuentasBox"><summary><span>'+(who?'Las cuentas de '+esc(nameOf(who)):'Quién le debe a quién')+'</span><small>'+(sl?(sl===1?'1 pago pendiente':sl+' pagos pendientes'):'Están a mano')+'</small></summary>'+bal+'</details>';
+  }
   if(ppl.length>1)h+='<div class="whopick gwho"><span class="lbl">Ver gastos de</span><button type="button" class="ghost sm'+(!who?' active':'')+'" data-act="gwho" data-who="">Todos</button>'
     +ppl.map(function(p){return '<button type="button" class="ghost sm'+(who===p.id?' active':'')+'" data-act="gwho" data-who="'+esc(p.id)+'">'+dot(p.id)+esc(p.name)+'</button>';}).join('')+'</div>';
   if(who&&!keys.length)return h+empty('No hay gastos de '+esc(nameOf(who)),'Ningún gasto cargado lo pagó '+esc(nameOf(who))+' ni le toca una parte.')+paymentsHtml(who);

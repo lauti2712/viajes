@@ -605,21 +605,70 @@ function unlinkPerson(oldId){
   var old=allPeople().find(function(p){return p.id===oldId;});if(!old)return '';
   freezeEqual();   /* los "todos por igual" viejos pasan a nombrar a cada uno, así se puede reemplazar el id */
   var nid=upsert('people',null,{name:old.name,c:old.c<1e15?old.c:Date.now()});
-  var rep=function(id){return id===oldId?nid:id;};
-  ['transports','lodging','expenses'].forEach(function(k){S[k].slice().forEach(function(x){
-    var ch={};
-    if(x.paidBy===oldId)ch.paidBy=nid;
-    if(x.split===oldId)ch.split=nid;
-    if(splitIds(x).indexOf(oldId)>=0)ch.splitWith=splitIds(x).map(rep).join(',');
-    if(Array.isArray(x.shares)&&x.shares.some(function(s){return s.p===oldId;}))ch.shares=x.shares.map(function(s){return Object.assign({},s,{p:rep(s.p)});});
-    if(Object.keys(ch).length)sysUpdate(k,x.id,ch);
-  });});
-  S.lodging.slice().forEach(function(x){if(idsOf(x.guests).indexOf(oldId)>=0)sysUpdate('lodging',x.id,{guests:idsOf(x.guests).map(rep).join(',')});});
-  S.transports.slice().forEach(function(x){if(idsOf(x.riders).indexOf(oldId)>=0)sysUpdate('transports',x.id,{riders:idsOf(x.riders).map(rep).join(',')});});
-  S.vehicles.slice().forEach(function(x){var ch={};if(idsOf(x.riders).indexOf(oldId)>=0)ch.riders=idsOf(x.riders).map(rep).join(',');if(x.owner===oldId)ch.owner=nid;if(Object.keys(ch).length)sysUpdate('vehicles',x.id,ch);});
-  S.payments.slice().forEach(function(x){var ch={};if(x.from===oldId)ch.from=nid;if(x.to===oldId)ch.to=nid;if(Object.keys(ch).length)sysUpdate('payments',x.id,ch);});
+  remapPerson(oldId,nid);
   savePerson(oldId,{});remove('people',oldId,true);
   return nid;
+}
+/* Pasa todo lo de la persona oldId (pagó, reparto, montos, huéspedes, pasajeros, autos, pagos y los
+   amigos de afuera que cargó) a newId, sin repetirla si ya estaba. Un pago entre las dos se borra. */
+function remapPerson(oldId,newId){
+  var rep=function(id){return id===oldId?newId:id;};
+  var uniq=function(l){return l.map(rep).filter(function(id,i,a){return a.indexOf(id)===i;}).join(',');};
+  ['transports','lodging','expenses'].forEach(function(k){S[k].slice().forEach(function(x){
+    var ch={};
+    if(x.paidBy===oldId)ch.paidBy=newId;
+    if(x.split===oldId)ch.split=newId;
+    if(splitIds(x).indexOf(oldId)>=0)ch.splitWith=uniq(splitIds(x));
+    if(Array.isArray(x.shares)&&x.shares.some(function(s){return s.p===oldId;})){
+      var m={},ord=[];
+      x.shares.forEach(function(s){var p=rep(s.p);if(!(p in m)){m[p]=0;ord.push(p);}m[p]+=parseFloat(s.a)||0;});
+      ch.shares=ord.map(function(p){return {p:p,a:String(Math.round(m[p]*100)/100)};});
+    }
+    if(k==='lodging'&&idsOf(x.guests).indexOf(oldId)>=0)ch.guests=uniq(idsOf(x.guests));
+    if(k==='transports'&&idsOf(x.riders).indexOf(oldId)>=0)ch.riders=uniq(idsOf(x.riders));
+    if(k==='expenses'&&idsOf(x.extF).some(function(t){return parseTok(t).pid===oldId;}))
+      ch.extF=idsOf(x.extF).map(function(t){var q=String(t).split('~');if(q[2]===oldId)q[2]=newId;return q.join('~');}).join(',');
+    if(Object.keys(ch).length)sysUpdate(k,x.id,ch);
+  });});
+  S.vehicles.slice().forEach(function(x){var ch={};if(idsOf(x.riders).indexOf(oldId)>=0)ch.riders=uniq(idsOf(x.riders));if(x.owner===oldId)ch.owner=newId;if(Object.keys(ch).length)sysUpdate('vehicles',x.id,ch);});
+  S.payments.slice().forEach(function(x){
+    var f=rep(x.from),t=rep(x.to);
+    if(f===x.from&&t===x.to)return;
+    if(f===t){if(!x.del)remove('payments',x.id,true);return;}
+    sysUpdate('payments',x.id,{from:f,to:t});
+  });
+}
+/* Unir dos personas que son la misma (ej: alguien entró y se agregó como "Agostina" cuando ya estaba
+   cargada como "Agos"). Queda una sola, con el nombre de keep y todo lo de las dos. Sobrevive el id de
+   la que está vinculada a una cuenta, así su vínculo y su mochila siguen andando. */
+function mergePeople(dupId,keepId){
+  var dup=allPeople().find(function(p){return p.id===dupId;}),keep=allPeople().find(function(p){return p.id===keepId;});
+  if(!dup||!keep||dupId===keepId)return 'Elegí dos personas distintas.';
+  var cd=cloudMode()?CLAIMS[dupId]:null,ck=cloudMode()?CLAIMS[keepId]:null;
+  if(cd&&ck&&cd.uid!==ck.uid)return 'Las dos están vinculadas a cuentas distintas, así que no son la misma persona. Si una está mal, desvinculala primero.';
+  var org=isOrganizer(),mine=myPersonId();
+  if(!org&&dupId!==mine&&keepId!==mine)return 'Solo quien organiza el viaje puede unir a otras personas.';
+  var surv=cd&&!ck?dupId:keepId,gone=surv===dupId?keepId:dupId;
+  freezeEqual();   /* los "todos por igual" viejos pasan a nombrar a cada uno, así se puede reemplazar el id */
+  remapPerson(gone,surv);
+  if(surv!==keepId||nameOf(surv)!==keep.name)savePerson(surv,{name:keep.name,c:Math.min(dup.c||Date.now(),keep.c||Date.now())});
+  if(cloudMode()&&CLAIMS[gone]&&FB)FB.fs.deleteDoc(fdoc('claims',gone)).catch(fbErr);
+  savePerson(gone,{});remove('people',gone,true);
+  if(gastosWho===gone)gastosWho=surv;
+  return '';
+}
+function mergeHtml(){
+  var ppl=allPeople();if(ppl.length<2||!cloudMode()||AUTH!=='in')return '';
+  var org=isOrganizer(),mine=myPersonId();
+  if(!org&&!mine)return '';
+  var opts=function(l){return l.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';}).join('');};
+  var dupL=org?ppl:ppl.filter(function(p){return p.id===mine;});
+  return '<details class="fgrp mt10" id="mergeWrap"><summary><span>¿Hay alguien repetido?</span></summary>'
+    +'<p class="mb8 hint">Si alguien entró y se agregó con otro nombre (por ejemplo "Agostina" cuando ya estaba "Agos"), unilas: queda una sola persona con los gastos, repartos y pagos de las dos, y la cuenta vinculada sigue igual.</p>'
+    +'<div class="grid"><label class="fld half"><span>Esta persona</span><select id="mgDup">'+opts(dupL)+'</select></label>'
+    +'<label class="fld half"><span>es la misma que</span><select id="mgKeep"><option value="">Elegí…</option>'+opts(ppl)+'</select></label></div>'
+    +'<p class="hint m0">Queda con el nombre de la segunda (después lo podés cambiar).</p>'
+    +'<div class="acts"><button type="button" class="ghost" id="mgGo">Unir</button></div><p class="msg" id="mgMsg"></p></details>';
 }
 function peopleUsed(id){if(live('payments').some(function(x){return x.from===id||x.to===id;}))return true;return costs().some(function(c){return c.paidBy===id||c.split===id||(c.split==='guests'&&idsOf(c.guests).indexOf(id)>=0)||(c.split==='riders'&&idsOf(c.riders).indexOf(id)>=0)||((c.split==='some'||c.split==='equal')&&(splitIds(c).indexOf(id)>=0||(c.split==='equal'&&!c.splitWith)))||(c.split==='amounts'&&c.shares.some(function(x){return x.p===id&&(parseFloat(x.a)||0)>0;}));});}
 function savePerson(id,data){return upsert('people',id,data);}
@@ -634,7 +683,7 @@ function pplBlock(){
        +(cl&&org&&cl.uid!==ME.uid?'<button type="button" class="sm fnone ghost" data-unlink="'+esc(p.id)+'">Desvincular</button>':'')
        +'<button type="button" class="x" data-pdel="'+esc(p.id)+'" aria-label="Quitar a '+esc(p.name)+'">✕</button></div>';
     }).join(''):'<p class="nada">'+(cloudMode()&&ME?'Al guardar, quedás vos'+(ME.name?' ('+esc(ME.name)+')':'')+' como primera persona. Después podés sumar a los demás.':'Todavía no hay nadie.')+'</p>')
-   +'</div><form class="pplform"><input type="text" data-pnew placeholder="Nombre" autocomplete="off" required><button type="submit" class="ghost">+ Agregar persona</button></form><p class="msg" data-pplmsg></p></div>';
+   +'</div><form class="pplform"><input type="text" data-pnew placeholder="Nombre" autocomplete="off" required><button type="submit" class="ghost">+ Agregar persona</button></form><p class="msg" data-pplmsg></p>'+mergeHtml()+'</div>';
 }
 function bindPeople(panel){
   function redraw(msg,err){var w=$('#pplWrap',panel);if(w)w.outerHTML=pplBlock();var m=$('[data-pplmsg]',panel);if(m&&msg){m.textContent=msg;m.className='msg'+(err?' err':'');}renderHead();}
@@ -653,6 +702,15 @@ function bindPeople(panel){
       unlinkPerson(uid0);
       redraw('Listo: '+unm+' quedó libre para que la elija su cuenta.');
       return;
+    }
+    var mg=e.target.closest('#mgGo');
+    if(mg){
+      var dId=$('#mgDup',panel).value,kId=$('#mgKeep',panel).value,mm=$('#mgMsg',panel);
+      if(!kId||kId===dId){mm.className='msg err';mm.textContent='Elegí con quién es la misma persona.';return;}
+      if(!mg.classList.contains('armed')){mg.classList.add('armed');mg.textContent='¿Unir '+nameOf(dId)+' con '+nameOf(kId)+'? Tocá de nuevo';return;}
+      var dn=nameOf(dId),kn=nameOf(kId),err=mergePeople(dId,kId);
+      if(err){mm.className='msg err';mm.textContent=err;mg.classList.remove('armed');mg.textContent='Unir';return;}
+      render();redraw('Listo: '+dn+' y '+kn+' ahora son una sola persona ('+kn+').');return;
     }
     var b=e.target.closest('[data-pdel]');if(!b)return;
     var id=b.getAttribute('data-pdel'),nm=nameOf(id);

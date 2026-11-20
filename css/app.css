@@ -465,3 +465,6 @@ input::-webkit-date-and-time-value{text-align:left;margin:0}
 html,body{overflow-x:clip}
 .obadd{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .obadd button{justify-content:flex-start;text-align:left}
+.cuentas.fgrp{margin:0 0 16px}
+.cuentas.fgrp>summary small{margin-left:auto;color:var(--muted);font-weight:500}
+.cuentas.fgrp .balance{margin-bottom:12px}
